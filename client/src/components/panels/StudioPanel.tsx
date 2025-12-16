@@ -56,6 +56,7 @@ import EmailBuilder from "../studio/EmailBuilder";
 import HyperBrowserBuilder from "../studio/HyperBrowserBuilder";
 import AIContextFileGenerator from "../studio/AIContextFileGenerator";
 import A2UIRenderer from "../a2ui/A2UIRenderer";
+import ReportsModal from "../studio/ReportsModal";
 import type { Workflow as WorkflowType, Source } from "@/lib/types";
 import type { A2UIComponent, ContentType } from "@shared/schema";
 
@@ -122,30 +123,6 @@ const CONTENT_TYPES: Array<{
     description: 'Generate a podcast-style audio summary of your sources'
   },
   {
-    type: 'study_guide',
-    icon: BookOpen,
-    title: 'Study Guide',
-    description: 'Create a comprehensive study guide with key concepts'
-  },
-  {
-    type: 'briefing_doc',
-    icon: FileText,
-    title: 'Briefing Doc',
-    description: 'Generate an executive briefing document'
-  },
-  {
-    type: 'faq',
-    icon: HelpCircle,
-    title: 'FAQ',
-    description: 'Create frequently asked questions from your sources'
-  },
-  {
-    type: 'timeline',
-    icon: Clock,
-    title: 'Timeline',
-    description: 'Build a chronological timeline of events'
-  },
-  {
     type: 'mindmap',
     icon: Network,
     title: 'Mind Map',
@@ -179,6 +156,7 @@ export default function StudioPanel({
   selectedSourceIds = [],
 }: StudioPanelProps) {
   const [activeView, setActiveView] = useState<ActiveView>('main');
+  const [reportsModalOpen, setReportsModalOpen] = useState(false);
   const [loadingType, setLoadingType] = useState<ContentType | null>(null);
   const [generatedContent, setGeneratedContent] = useState<GeneratedContent | null>(null);
   const [resultModalOpen, setResultModalOpen] = useState(false);
@@ -417,6 +395,22 @@ export default function StudioPanel({
             </Card>
           </div>
 
+          <div className="mt-3">
+            <Card 
+              className="flex flex-col p-3 rounded-xl cursor-pointer hover-elevate transition-all bg-card border-border/50"
+              onClick={() => setReportsModalOpen(true)}
+              data-testid="card-reports"
+            >
+              <div className="flex items-center gap-2 mb-2">
+                <FileBarChart className="w-5 h-5 text-primary" />
+                <span className="text-sm font-medium text-foreground">Reports</span>
+              </div>
+              <span className="text-xs text-muted-foreground">
+                Create structured reports from your sources
+              </span>
+            </Card>
+          </div>
+
           <div className="mt-4 pt-4 border-t border-border/50">
             <Card 
               className="flex flex-col p-3 rounded-xl cursor-pointer hover-elevate transition-all bg-card border-border/50"
@@ -549,6 +543,18 @@ export default function StudioPanel({
           Add note
         </Button>
       </div>
+
+      <ReportsModal
+        open={reportsModalOpen}
+        onOpenChange={setReportsModalOpen}
+        onSelectReport={(reportType) => {
+          setReportsModalOpen(false);
+          toast({
+            title: 'Report Selected',
+            description: `Creating ${reportType.name} report...`
+          });
+        }}
+      />
 
       <Dialog open={resultModalOpen} onOpenChange={setResultModalOpen}>
         <DialogContent className="max-w-3xl max-h-[80vh] overflow-hidden flex flex-col" data-testid="dialog-generated-content">

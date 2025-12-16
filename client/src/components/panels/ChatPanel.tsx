@@ -409,7 +409,7 @@ export default function ChatPanel({
       </ScrollArea>
 
       <div className="px-4 pb-4 pt-2">
-        <div className="bg-[hsl(var(--muted)/0.6)] dark:bg-[hsl(220_10%_18%)] rounded-2xl overflow-hidden">
+        <div className="bg-muted/60 dark:bg-muted rounded-2xl overflow-hidden">
           <div className="px-4 pt-3 pb-2">
             <Textarea
               ref={textareaRef}
