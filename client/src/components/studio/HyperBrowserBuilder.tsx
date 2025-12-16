@@ -196,7 +196,7 @@ export default function HyperBrowserBuilder({ onBack, onRun, onMinimize }: Hyper
         </Button>
       </div>
 
-      {/* Main Content Area */}
+      {/* Main Content - Vertical Stack */}
       <div className="flex flex-1 min-h-0">
         {/* Left Sidebar - API Docs */}
         <div className="w-44 border-r border-border/50 p-2 shrink-0">
@@ -232,173 +232,176 @@ export default function HyperBrowserBuilder({ onBack, onRun, onMinimize }: Hyper
           </ScrollArea>
         </div>
 
-        {/* Center - Code Editor */}
+        {/* Main Area - Browser on top, Code on bottom */}
         <div className="flex-1 flex flex-col min-w-0">
-          <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'editor' | 'output')} className="flex-1 flex flex-col">
-            <div className="flex items-center justify-between px-4 py-2 border-b border-border/50">
-              <TabsList className="h-8 rounded-lg bg-muted/50">
-                <TabsTrigger value="editor" className="h-6 rounded-md text-xs gap-1">
-                  <FileCode className="w-3 h-3" />
-                  Editor
-                </TabsTrigger>
-                <TabsTrigger value="output" className="h-6 rounded-md text-xs gap-1">
-                  <Terminal className="w-3 h-3" />
-                  Output Logs
-                </TabsTrigger>
-              </TabsList>
-              <div className="flex items-center gap-1">
-                <Button variant="ghost" size="icon" className="h-7 w-7">
-                  <RotateCcw className="w-3 h-3" />
-                </Button>
-                <Button variant="ghost" size="icon" className="h-7 w-7">
-                  <Settings className="w-3 h-3" />
-                </Button>
+          {/* Browser Preview - Top (Landscape) */}
+          <div className="flex-1 flex flex-col border-b border-border/50 min-h-0">
+            {/* Browser Header */}
+            <div className="flex items-center gap-2 p-2 border-b border-border/50 bg-muted/30 shrink-0">
+              <div className="flex gap-1">
+                <div className="w-2.5 h-2.5 rounded-full bg-red-500/70" />
+                <div className="w-2.5 h-2.5 rounded-full bg-yellow-500/70" />
+                <div className="w-2.5 h-2.5 rounded-full bg-green-500/70" />
+              </div>
+              <div className="flex-1 flex items-center gap-1 px-2 py-1 bg-background/50 rounded text-xs text-muted-foreground">
+                <ExternalLink className="w-3 h-3" />
+                <span className="truncate">{browserUrl}</span>
               </div>
             </div>
 
-            <TabsContent value="editor" className="flex-1 m-0 overflow-hidden">
-              <div className="h-full bg-[#1e1e1e] p-4 font-mono text-sm overflow-auto">
-                <textarea
-                  value={script}
-                  onChange={(e) => setScript(e.target.value)}
-                  className="w-full h-full bg-transparent text-[#d4d4d4] resize-none outline-none font-mono text-xs leading-relaxed"
-                  spellCheck={false}
-                  data-testid="textarea-script"
-                />
-              </div>
-            </TabsContent>
-
-            <TabsContent value="output" className="flex-1 m-0 overflow-hidden">
-              <div className="h-full bg-[#1e1e1e] p-4 font-mono text-xs">
-                <ScrollArea className="h-full">
-                  {output.map((line, i) => (
-                    <div key={i} className="text-[#6a9955]">{line}</div>
-                  ))}
-                  {isRunning && (
-                    <div className="text-amber-400 animate-pulse">Running...</div>
-                  )}
-                </ScrollArea>
-              </div>
-            </TabsContent>
-          </Tabs>
-        </div>
-
-        {/* Right - Browser Preview (Larger) */}
-        <div className="w-[400px] border-l border-border/50 flex flex-col shrink-0">
-          {/* Browser Header */}
-          <div className="flex items-center gap-2 p-2 border-b border-border/50 bg-muted/30">
-            <div className="flex gap-1">
-              <div className="w-2.5 h-2.5 rounded-full bg-red-500/70" />
-              <div className="w-2.5 h-2.5 rounded-full bg-yellow-500/70" />
-              <div className="w-2.5 h-2.5 rounded-full bg-green-500/70" />
-            </div>
-            <div className="flex-1 flex items-center gap-1 px-2 py-1 bg-background/50 rounded text-xs text-muted-foreground">
-              <ExternalLink className="w-3 h-3" />
-              <span className="truncate">{browserUrl}</span>
-            </div>
-          </div>
-
-          {/* Browser Content */}
-          <div className="flex-1 bg-[#1a1a1a] flex items-center justify-center">
-            {showBrowser ? (
-              <div className="w-full h-full p-4">
-                <div className="w-full h-full bg-white rounded-lg flex items-center justify-center">
-                  <div className="text-center p-6">
-                    <div className="text-orange-500 text-4xl font-bold mb-2">Y</div>
-                    <div className="text-gray-800 text-sm font-medium">Hacker News</div>
-                    <div className="text-gray-500 text-xs mt-2">
-                      {isRunning ? 'Extracting stories...' : 'Browser session active'}
+            {/* Browser Content */}
+            <div className="flex-1 bg-[#1a1a1a] flex items-center justify-center">
+              {showBrowser ? (
+                <div className="w-full h-full p-4">
+                  <div className="w-full h-full bg-white rounded-lg flex items-center justify-center">
+                    <div className="text-center p-6">
+                      <div className="text-orange-500 text-4xl font-bold mb-2">Y</div>
+                      <div className="text-gray-800 text-sm font-medium">Hacker News</div>
+                      <div className="text-gray-500 text-xs mt-2">
+                        {isRunning ? 'Extracting stories...' : 'Browser session active'}
+                      </div>
                     </div>
                   </div>
                 </div>
-              </div>
-            ) : (
-              <div className="text-center p-6">
-                <Zap className="w-16 h-16 text-amber-500 mx-auto mb-4" />
-                <p className="text-sm text-muted-foreground mb-2">
-                  Click Run to launch the browser
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  Your workflow will execute and appear here
-                </p>
-              </div>
-            )}
-          </div>
+              ) : (
+                <div className="text-center p-6">
+                  <Zap className="w-16 h-16 text-amber-500 mx-auto mb-4" />
+                  <p className="text-sm text-muted-foreground mb-2">
+                    Click Run to launch the browser
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    Your workflow will execute and appear here
+                  </p>
+                </div>
+              )}
+            </div>
 
-          {/* Browser Controls */}
-          <div className="p-3 border-t border-border/50 bg-muted/20">
-            <div className="flex items-center justify-between gap-2">
-              <div className="flex items-center gap-1">
-                {isRunning ? (
-                  <>
+            {/* Browser Controls */}
+            <div className="p-2 border-t border-border/50 bg-muted/20 shrink-0">
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-1">
+                  {isRunning ? (
+                    <>
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        className="h-7 gap-1 rounded-lg text-xs"
+                        onClick={handlePause}
+                      >
+                        <Pause className="w-3 h-3" />
+                        Pause
+                      </Button>
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        className="h-7 gap-1 rounded-lg text-xs"
+                        onClick={handleStop}
+                      >
+                        <Square className="w-3 h-3" />
+                        Stop
+                      </Button>
+                    </>
+                  ) : (
                     <Button 
-                      variant="outline" 
                       size="sm" 
-                      className="h-8 gap-1 rounded-lg"
-                      onClick={handlePause}
+                      className="h-7 gap-1 rounded-lg text-xs"
+                      onClick={handleRun}
                     >
-                      <Pause className="w-3 h-3" />
-                      Pause
+                      <Play className="w-3 h-3" />
+                      Run
                     </Button>
-                    <Button 
-                      variant="outline" 
-                      size="sm" 
-                      className="h-8 gap-1 rounded-lg"
-                      onClick={handleStop}
-                    >
-                      <Square className="w-3 h-3" />
-                      Stop
-                    </Button>
-                  </>
-                ) : (
+                  )}
                   <Button 
-                    size="sm" 
-                    className="h-8 gap-1 rounded-lg"
-                    onClick={handleRun}
+                    variant="ghost" 
+                    size="icon" 
+                    className="h-7 w-7"
+                    onClick={handleRefresh}
+                    disabled={!showBrowser}
                   >
-                    <Play className="w-3 h-3" />
-                    Run
+                    <RefreshCw className="w-3 h-3" />
                   </Button>
-                )}
-                <Button 
-                  variant="ghost" 
-                  size="icon" 
-                  className="h-8 w-8"
-                  onClick={handleRefresh}
-                  disabled={!showBrowser}
-                >
-                  <RefreshCw className="w-3 h-3" />
-                </Button>
-              </div>
-              
-              <div className="flex items-center gap-2">
-                {showBrowser && (
-                  <div className="text-xs text-muted-foreground">
-                    {isRunning ? (
-                      <span className="flex items-center gap-1">
-                        <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
-                        Running
-                      </span>
-                    ) : (
-                      <span className="flex items-center gap-1">
-                        <span className="w-2 h-2 rounded-full bg-green-500" />
-                        Ready
-                      </span>
-                    )}
-                  </div>
-                )}
-                <Button 
-                  variant="ghost" 
-                  size="sm" 
-                  className="h-8 gap-1 rounded-lg text-xs"
-                  onClick={onMinimize}
-                  disabled={!showBrowser}
-                >
-                  <Minimize2 className="w-3 h-3" />
-                  Minimize
-                </Button>
+                </div>
+                
+                <div className="flex items-center gap-2">
+                  {showBrowser && (
+                    <div className="text-xs text-muted-foreground">
+                      {isRunning ? (
+                        <span className="flex items-center gap-1">
+                          <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
+                          Running
+                        </span>
+                      ) : (
+                        <span className="flex items-center gap-1">
+                          <span className="w-2 h-2 rounded-full bg-green-500" />
+                          Ready
+                        </span>
+                      )}
+                    </div>
+                  )}
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    className="h-7 gap-1 rounded-lg text-xs"
+                    onClick={onMinimize}
+                    disabled={!showBrowser}
+                  >
+                    <Minimize2 className="w-3 h-3" />
+                    Minimize
+                  </Button>
+                </div>
               </div>
             </div>
+          </div>
+
+          {/* Code Editor - Bottom */}
+          <div className="h-[280px] flex flex-col shrink-0">
+            <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'editor' | 'output')} className="flex-1 flex flex-col">
+              <div className="flex items-center justify-between px-3 py-1.5 border-b border-border/50 shrink-0">
+                <TabsList className="h-7 rounded-lg bg-muted/50">
+                  <TabsTrigger value="editor" className="h-5 rounded-md text-xs gap-1 px-2">
+                    <FileCode className="w-3 h-3" />
+                    Editor
+                  </TabsTrigger>
+                  <TabsTrigger value="output" className="h-5 rounded-md text-xs gap-1 px-2">
+                    <Terminal className="w-3 h-3" />
+                    Output Logs
+                  </TabsTrigger>
+                </TabsList>
+                <div className="flex items-center gap-1">
+                  <Button variant="ghost" size="icon" className="h-6 w-6">
+                    <RotateCcw className="w-3 h-3" />
+                  </Button>
+                  <Button variant="ghost" size="icon" className="h-6 w-6">
+                    <Settings className="w-3 h-3" />
+                  </Button>
+                </div>
+              </div>
+
+              <TabsContent value="editor" className="flex-1 m-0 overflow-hidden">
+                <div className="h-full bg-[#1e1e1e] p-3 font-mono text-sm overflow-auto">
+                  <textarea
+                    value={script}
+                    onChange={(e) => setScript(e.target.value)}
+                    className="w-full h-full bg-transparent text-[#d4d4d4] resize-none outline-none font-mono text-xs leading-relaxed"
+                    spellCheck={false}
+                    data-testid="textarea-script"
+                  />
+                </div>
+              </TabsContent>
+
+              <TabsContent value="output" className="flex-1 m-0 overflow-hidden">
+                <div className="h-full bg-[#1e1e1e] p-3 font-mono text-xs">
+                  <ScrollArea className="h-full">
+                    {output.map((line, i) => (
+                      <div key={i} className="text-[#6a9955]">{line}</div>
+                    ))}
+                    {isRunning && (
+                      <div className="text-amber-400 animate-pulse">Running...</div>
+                    )}
+                  </ScrollArea>
+                </div>
+              </TabsContent>
+            </Tabs>
           </div>
         </div>
       </div>
