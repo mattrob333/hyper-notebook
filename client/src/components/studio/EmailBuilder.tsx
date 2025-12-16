@@ -837,11 +837,11 @@ export default function EmailBuilder({ onBack }: EmailBuilderProps) {
             )}
           </TabsContent>
 
-          <TabsContent value="templates" className="flex-1 overflow-hidden">
+          <TabsContent value="templates" className="flex-1 overflow-hidden mt-0">
             <div className="flex h-full">
               {/* Template List - Left Side */}
-              <div className="w-1/3 border-r border-border/50 overflow-auto p-3">
-                <p className="text-xs text-muted-foreground mb-3">Choose a template</p>
+              <div className="w-1/3 min-w-[200px] border-r border-border/50 overflow-auto p-3">
+                <p className="text-xs text-muted-foreground mb-2">Choose a template</p>
                 
                 {/* Business Templates */}
                 <div className="mb-4">
@@ -903,9 +903,16 @@ export default function EmailBuilder({ onBack }: EmailBuilderProps) {
               </div>
 
               {/* Template Preview - Right Side */}
-              <div className="flex-1 overflow-auto p-4 bg-muted/30">
-                <div className="mb-3 flex items-center justify-between">
-                  <h3 className="text-sm font-semibold">{selectedTemplate.name} Preview</h3>
+              <div className="flex-1 overflow-auto p-3 bg-muted/20">
+                <div className="mb-2 flex items-center justify-between">
+                  <div>
+                    <h3 className="text-sm font-semibold">{selectedTemplate.name}</h3>
+                    {!effectiveLogo && (
+                      <p className="text-xs text-muted-foreground">
+                        Add your logo in the Signature tab →
+                      </p>
+                    )}
+                  </div>
                   <Button 
                     size="sm" 
                     onClick={() => {
@@ -919,13 +926,13 @@ export default function EmailBuilder({ onBack }: EmailBuilderProps) {
                     Use This Template
                   </Button>
                 </div>
-                <div className="bg-white text-black rounded-lg border shadow-md overflow-hidden transform scale-[0.85] origin-top">
+                <div className="bg-white text-black rounded-lg border shadow-md overflow-hidden max-w-[500px]">
                   <div 
                     dangerouslySetInnerHTML={{ __html: replaceVariables(selectedTemplate.letterhead) }}
                   />
                   <div className="p-4">
                     <div 
-                      className="prose prose-sm max-w-none"
+                      className="prose prose-sm max-w-none text-sm"
                       dangerouslySetInnerHTML={{ __html: replaceVariables(selectedTemplate.defaultContent || '<p>Start writing your email content here...</p>') }}
                     />
                   </div>
@@ -937,7 +944,7 @@ export default function EmailBuilder({ onBack }: EmailBuilderProps) {
             </div>
           </TabsContent>
 
-          <TabsContent value="contacts" className="flex-1 overflow-auto p-3">
+          <TabsContent value="contacts" className="flex-1 overflow-auto p-3 mt-0">
             <div className="space-y-4">
               <div>
                 <Label className="text-xs text-muted-foreground">Upload Contacts CSV</Label>
@@ -1010,7 +1017,7 @@ export default function EmailBuilder({ onBack }: EmailBuilderProps) {
             </div>
           </TabsContent>
 
-          <TabsContent value="signature" className="flex-1 overflow-auto p-3">
+          <TabsContent value="signature" className="flex-1 overflow-auto p-3 mt-0">
             <ScrollArea className="h-full">
               <div className="space-y-4">
                 <p className="text-xs text-muted-foreground">Configure your branding and signature</p>
