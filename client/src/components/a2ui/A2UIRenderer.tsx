@@ -532,21 +532,21 @@ function buildMindmapNodesAndEdges(root: MindmapNode): { nodes: Node[]; edges: E
   const nodes: Node[] = [];
   const edges: Edge[] = [];
 
-  function traverse(node: MindmapNode, x: number, y: number, level: number) {
-    const isHighlight = level > 1 && Math.random() > 0.6;
+  function traverse(node: MindmapNode, x: number, y: number, level: number, nodeIndex: number) {
+    const isRootNode = level === 0;
     nodes.push({
       id: node.id,
       position: { x, y },
       data: { label: node.label },
       style: {
-        background: isHighlight ? '#059669' : '#3a3f47',
+        background: isRootNode ? '#059669' : '#3a3f47',
         color: '#ffffff',
-        border: isHighlight ? '1px solid #10b981' : '1px solid #4a5058',
+        border: isRootNode ? '1px solid #10b981' : '1px solid #4a5058',
         borderRadius: '6px',
         padding: '10px 16px',
-        fontSize: level === 0 ? '13px' : '12px',
-        fontWeight: level === 0 ? '600' : '500',
-        minWidth: level === 0 ? '180px' : '140px',
+        fontSize: isRootNode ? '13px' : '12px',
+        fontWeight: isRootNode ? '600' : '500',
+        minWidth: isRootNode ? '180px' : '140px',
         textAlign: 'center',
       },
     });
@@ -564,13 +564,13 @@ function buildMindmapNodesAndEdges(root: MindmapNode): { nodes: Node[]; edges: E
           type: 'smoothstep',
           style: { stroke: '#5a6068', strokeWidth: 2 },
         });
-        traverse(child, x + 220, startY + idx * spacing, level + 1);
+        traverse(child, x + 220, startY + idx * spacing, level + 1, idx);
       });
     }
   }
 
   if (root) {
-    traverse(root, 50, 200, 0);
+    traverse(root, 50, 200, 0, 0);
   }
   return { nodes, edges };
 }
@@ -595,7 +595,7 @@ function A2Mindmap({
     if ('format' in data && data.format === 'reactflow' && 'nodes' in data && 'edges' in data) {
       // Transform React Flow format nodes to proper Node objects with dark theme
       const nodes: Node[] = (data.nodes || []).map((node, idx) => {
-        const isHighlight = node.highlight || (idx > 2 && Math.random() > 0.6);
+        const isRootNode = node.isRoot || idx === 0;
         return {
           id: node.id || `node-${idx}`,
           type: 'default',
@@ -604,14 +604,14 @@ function A2Mindmap({
             label: node.label || node.data?.label || node.id || 'Node' 
           },
           style: {
-            background: isHighlight ? '#059669' : '#3a3f47',
+            background: isRootNode ? '#059669' : '#3a3f47',
             color: '#ffffff',
-            border: isHighlight ? '1px solid #10b981' : '1px solid #4a5058',
+            border: isRootNode ? '1px solid #10b981' : '1px solid #4a5058',
             borderRadius: '6px',
             padding: '10px 16px',
-            fontSize: '12px',
-            fontWeight: '500',
-            minWidth: '140px',
+            fontSize: isRootNode ? '13px' : '12px',
+            fontWeight: isRootNode ? '600' : '500',
+            minWidth: isRootNode ? '180px' : '140px',
             textAlign: 'center',
           },
         };

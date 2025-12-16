@@ -197,7 +197,7 @@ export default function MindmapView({ title, data, sourceCount }: MindmapViewPro
         <Button 
           variant="outline" 
           size="sm"
-          className="h-8 px-3 bg-transparent border-[#4a5058] text-[#9ca3af] hover:text-white hover:bg-[#3a3f47] text-xs gap-1.5"
+          className="bg-transparent border-[#4a5058] text-[#9ca3af]"
           data-testid="button-good-content"
         >
           <ThumbsUp className="w-3.5 h-3.5" />
@@ -206,7 +206,7 @@ export default function MindmapView({ title, data, sourceCount }: MindmapViewPro
         <Button 
           variant="outline" 
           size="sm"
-          className="h-8 px-3 bg-transparent border-[#4a5058] text-[#9ca3af] hover:text-white hover:bg-[#3a3f47] text-xs gap-1.5"
+          className="bg-transparent border-[#4a5058] text-[#9ca3af]"
           data-testid="button-bad-content"
         >
           <ThumbsDown className="w-3.5 h-3.5" />
