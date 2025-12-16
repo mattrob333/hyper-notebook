@@ -119,7 +119,7 @@ export default function SourcesPanel({
   };
 
   return (
-    <div className="flex flex-col h-full bg-background" data-testid="sources-panel">
+    <div className="flex flex-col h-full bg-sidebar" data-testid="sources-panel">
       <div className="p-4 space-y-4">
         <div className="flex items-center justify-between">
           <h2 className="font-semibold text-base">Sources</h2>

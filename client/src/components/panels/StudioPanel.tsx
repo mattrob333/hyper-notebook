@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Card } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
@@ -16,7 +17,6 @@ import {
   FileText,
   MoreVertical,
   Plus,
-  Play,
   Trash2,
   Workflow
 } from "lucide-react";
@@ -27,6 +27,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import WorkflowStudio from "../studio/WorkflowStudio";
+import EmailBuilder from "../studio/EmailBuilder";
 import type { Workflow as WorkflowType } from "@/lib/types";
 
 interface Report {
@@ -58,7 +59,7 @@ interface StudioCardProps {
 function StudioCard({ icon: Icon, title, onClick, testId }: StudioCardProps) {
   return (
     <Card 
-      className="flex flex-col items-center justify-center p-3 rounded-xl cursor-pointer hover-elevate transition-all gap-2 bg-muted/30 border-border/50 group"
+      className="flex flex-col items-center justify-center p-3 rounded-xl cursor-pointer hover-elevate transition-all gap-2 bg-card border-border/50 group"
       onClick={onClick}
       data-testid={testId}
     >
@@ -80,10 +81,15 @@ export default function StudioPanel({
   onDeleteReport,
   onDownloadReport,
   onOpenMindMap,
-  onOpenEmailBuilder,
 }: StudioPanelProps) {
+  const [showEmailBuilder, setShowEmailBuilder] = useState(false);
+
+  if (showEmailBuilder) {
+    return <EmailBuilder onBack={() => setShowEmailBuilder(false)} />;
+  }
+
   return (
-    <div className="flex flex-col h-full bg-background" data-testid="studio-panel">
+    <div className="flex flex-col h-full bg-sidebar" data-testid="studio-panel">
       <div className="p-4 border-b border-border/50">
         <div className="flex items-center justify-between">
           <h2 className="font-semibold text-base">Studio</h2>
@@ -142,7 +148,7 @@ export default function StudioPanel({
           <StudioCard 
             icon={Mail} 
             title="Email Builder" 
-            onClick={onOpenEmailBuilder}
+            onClick={() => setShowEmailBuilder(true)}
             testId="studio-card-email"
           />
         </div>
@@ -163,10 +169,10 @@ export default function StudioPanel({
         <TabsContent value="notes" className="flex-1 mt-0 overflow-hidden">
           <ScrollArea className="h-full px-2">
             <div className="px-2 space-y-2 py-4">
-              {reports.map((report) => (
+              {reports.map((report, index) => (
                 <Card 
                   key={report.id} 
-                  className="p-3 rounded-xl hover-elevate cursor-pointer"
+                  className="p-3 rounded-xl hover-elevate cursor-pointer bg-card"
                   data-testid={`report-item-${report.id}`}
                 >
                   <div className="flex items-start gap-3">
@@ -176,7 +182,7 @@ export default function StudioPanel({
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium truncate">{report.name}</p>
                       <p className="text-xs text-muted-foreground mt-0.5">
-                        Create Your Own · {Math.floor(Math.random() * 10 + 5)} sources · {formatTimeAgo(report.createdAt)}
+                        Create Your Own · {index === 0 ? 10 : 7} sources · {formatTimeAgo(report.createdAt)}
                       </p>
                     </div>
                     <DropdownMenu>
