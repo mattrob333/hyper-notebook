@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, jsonb } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, jsonb, timestamp, integer, boolean } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -17,58 +17,106 @@ export const insertUserSchema = createInsertSchema(users).pick({
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
 
-export interface Source {
-  id: string;
-  type: 'url' | 'pdf' | 'text';
-  content: string;
-  name: string;
-}
+export const sources = pgTable("sources", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  type: text("type").notNull().$type<'url' | 'pdf' | 'text' | 'audio' | 'video'>(),
+  name: text("name").notNull(),
+  content: text("content").notNull(),
+  summary: text("summary"),
+  metadata: jsonb("metadata").$type<Record<string, any>>(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
 
-export interface Workflow {
-  id: string;
-  name: string;
-  description: string;
-  steps: WorkflowStep[];
-}
+export const insertSourceSchema = createInsertSchema(sources).omit({ id: true, createdAt: true });
+export type InsertSource = z.infer<typeof insertSourceSchema>;
+export type Source = typeof sources.$inferSelect;
+
+export const notes = pgTable("notes", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  title: text("title").notNull(),
+  content: text("content").notNull(),
+  sourceIds: text("source_ids").array(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertNoteSchema = createInsertSchema(notes).omit({ id: true, createdAt: true });
+export type InsertNote = z.infer<typeof insertNoteSchema>;
+export type Note = typeof notes.$inferSelect;
+
+export const conversations = pgTable("conversations", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  title: text("title"),
+  model: text("model").default("gpt-4.1"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertConversationSchema = createInsertSchema(conversations).omit({ id: true, createdAt: true });
+export type InsertConversation = z.infer<typeof insertConversationSchema>;
+export type Conversation = typeof conversations.$inferSelect;
+
+export const messages = pgTable("messages", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  conversationId: varchar("conversation_id").notNull().references(() => conversations.id),
+  role: text("role").notNull().$type<'user' | 'assistant' | 'system'>(),
+  content: text("content").notNull(),
+  a2uiComponents: jsonb("a2ui_components").$type<A2UIComponent[]>(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertMessageSchema = createInsertSchema(messages).omit({ id: true, createdAt: true });
+export type InsertMessage = z.infer<typeof insertMessageSchema>;
+export type Message = typeof messages.$inferSelect;
+
+export const workflows = pgTable("workflows", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  description: text("description"),
+  steps: jsonb("steps").$type<WorkflowStep[]>().default([]),
+  isActive: boolean("is_active").default(false),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertWorkflowSchema = createInsertSchema(workflows).omit({ id: true, createdAt: true });
+export type InsertWorkflow = z.infer<typeof insertWorkflowSchema>;
+export type Workflow = typeof workflows.$inferSelect;
+
+export const generatedContent = pgTable("generated_content", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  type: text("type").notNull().$type<'study_guide' | 'briefing_doc' | 'faq' | 'timeline' | 'mindmap' | 'infographic' | 'slides' | 'audio_overview' | 'email'>(),
+  title: text("title").notNull(),
+  content: jsonb("content").$type<any>().notNull(),
+  sourceIds: text("source_ids").array(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertGeneratedContentSchema = createInsertSchema(generatedContent).omit({ id: true, createdAt: true });
+export type InsertGeneratedContent = z.infer<typeof insertGeneratedContentSchema>;
+export type GeneratedContent = typeof generatedContent.$inferSelect;
 
 export interface WorkflowStep {
   id: string;
-  action: 'scrape' | 'summarize' | 'generate_mindmap' | 'generate_ui';
-  params: Record<string, any>;
+  action: 'navigate' | 'click' | 'type' | 'scrape' | 'screenshot' | 'wait' | 'extract' | 'summarize';
+  selector?: string;
+  value?: string;
+  params?: Record<string, any>;
 }
 
 export interface A2UIComponent {
   id: string;
-  type: string;
+  type: 'card' | 'chart' | 'table' | 'list' | 'code' | 'quote' | 'image' | 'accordion' | 'tabs' | 'progress' | 'badge' | 'button' | 'link' | 'mindmap' | 'timeline' | 'slides';
   parentId?: string;
   properties: Record<string, any>;
   data?: any;
+  children?: any[];
 }
 
 export interface ChatMessage {
   id: string;
   role: 'user' | 'assistant';
   content: string;
+  model?: string;
   a2uiComponents?: A2UIComponent[];
   timestamp: Date;
 }
 
-export const insertSourceSchema = z.object({
-  type: z.enum(['url', 'pdf', 'text']),
-  content: z.string(),
-  name: z.string(),
-});
-
-export type InsertSource = z.infer<typeof insertSourceSchema>;
-
-export const insertWorkflowSchema = z.object({
-  name: z.string(),
-  description: z.string(),
-  steps: z.array(z.object({
-    id: z.string(),
-    action: z.enum(['scrape', 'summarize', 'generate_mindmap', 'generate_ui']),
-    params: z.record(z.any()),
-  })),
-});
-
-export type InsertWorkflow = z.infer<typeof insertWorkflowSchema>;
+export type ContentType = 'study_guide' | 'briefing_doc' | 'faq' | 'timeline' | 'mindmap' | 'infographic' | 'slides' | 'audio_overview' | 'email';
