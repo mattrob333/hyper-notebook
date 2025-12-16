@@ -47,3 +47,4 @@ vite.config.ts.*
 
 # Local development
 .local/
+.claude/

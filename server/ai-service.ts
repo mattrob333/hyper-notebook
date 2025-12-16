@@ -20,150 +20,95 @@ export interface ModelInfo {
   description: string;
   supportsImages?: boolean;
   supportsStreaming?: boolean;
+  supportsImageGeneration?: boolean;
 }
 
 export const availableModels: ModelInfo[] = [
   // Anthropic Models
   {
-    id: "anthropic/claude-sonnet-4",
-    name: "Claude Sonnet 4",
+    id: "anthropic/claude-opus-4.5",
+    name: "Claude Opus 4.5",
     provider: "Anthropic",
     contextLength: 200000,
-    description: "Latest Claude model, excellent for complex reasoning and coding",
+    description: "Anthropic's frontier reasoning model, optimized for complex software engineering and agentic workflows",
     supportsImages: true,
     supportsStreaming: true,
   },
   {
-    id: "anthropic/claude-3.5-sonnet",
-    name: "Claude 3.5 Sonnet",
+    id: "anthropic/claude-sonnet-4.5",
+    name: "Claude Sonnet 4.5",
     provider: "Anthropic",
-    contextLength: 200000,
-    description: "Best balance of intelligence and speed",
+    contextLength: 1000000,
+    description: "Most advanced Sonnet, optimized for real-world agents and coding workflows with 1M context",
     supportsImages: true,
     supportsStreaming: true,
   },
   {
-    id: "anthropic/claude-3.5-haiku",
-    name: "Claude 3.5 Haiku",
+    id: "anthropic/claude-haiku-4.5",
+    name: "Claude Haiku 4.5",
     provider: "Anthropic",
     contextLength: 200000,
-    description: "Fast and affordable for simple tasks",
+    description: "Fastest and most efficient Claude model, near-frontier intelligence at low cost",
     supportsImages: true,
     supportsStreaming: true,
   },
   // OpenAI Models
   {
-    id: "openai/gpt-4o",
-    name: "GPT-4o",
+    id: "openai/gpt-5.2",
+    name: "GPT-5.2",
     provider: "OpenAI",
-    contextLength: 128000,
-    description: "OpenAI's flagship model with vision capabilities",
+    contextLength: 400000,
+    description: "Latest frontier-grade model with adaptive reasoning and strong agentic performance",
     supportsImages: true,
     supportsStreaming: true,
   },
   {
-    id: "openai/gpt-4o-mini",
-    name: "GPT-4o Mini",
+    id: "openai/gpt-5.2-pro",
+    name: "GPT-5.2 Pro",
     provider: "OpenAI",
-    contextLength: 128000,
-    description: "Fast and cost-effective GPT-4 variant",
+    contextLength: 400000,
+    description: "OpenAI's most advanced model for complex tasks requiring step-by-step reasoning",
     supportsImages: true,
     supportsStreaming: true,
   },
   {
-    id: "openai/o1",
-    name: "o1",
-    provider: "OpenAI",
-    contextLength: 200000,
-    description: "Advanced reasoning model for complex problems",
-    supportsImages: true,
-    supportsStreaming: true,
-  },
-  {
-    id: "openai/o1-mini",
-    name: "o1-mini",
+    id: "openai/gpt-5.2-chat",
+    name: "GPT-5.2 Chat",
     provider: "OpenAI",
     contextLength: 128000,
-    description: "Smaller reasoning model, faster responses",
-    supportsImages: false,
+    description: "Fast, lightweight GPT-5.2 optimized for low-latency chat",
+    supportsImages: true,
     supportsStreaming: true,
   },
   // Google Models
   {
-    id: "google/gemini-2.0-flash-exp",
-    name: "Gemini 2.0 Flash",
+    id: "google/gemini-3-pro-preview",
+    name: "Gemini 3 Pro",
     provider: "Google",
-    contextLength: 1000000,
-    description: "Latest Gemini with 1M context window",
+    contextLength: 1050000,
+    description: "Google's flagship frontier model for high-precision multimodal reasoning with 1M context",
     supportsImages: true,
     supportsStreaming: true,
   },
   {
-    id: "google/gemini-pro-1.5",
-    name: "Gemini Pro 1.5",
+    id: "google/gemini-3-pro-image-preview",
+    name: "Nano Banana Pro (Gemini 3 Pro Image)",
     provider: "Google",
-    contextLength: 2000000,
-    description: "2M context window, great for large documents",
+    contextLength: 66000,
+    description: "Google's most advanced image generation and editing model with high-fidelity visual synthesis",
     supportsImages: true,
     supportsStreaming: true,
+    supportsImageGeneration: true,
   },
   {
-    id: "google/gemini-flash-1.5",
-    name: "Gemini Flash 1.5",
+    id: "google/gemini-2.5-flash-image",
+    name: "Nano Banana (Gemini 2.5 Flash Image)",
     provider: "Google",
-    contextLength: 1000000,
-    description: "Fast Gemini model with long context",
+    contextLength: 33000,
+    description: "State-of-the-art image generation with contextual understanding, text-to-image and image edits",
     supportsImages: true,
     supportsStreaming: true,
-  },
-  // Meta Models
-  {
-    id: "meta-llama/llama-3.3-70b-instruct",
-    name: "Llama 3.3 70B",
-    provider: "Meta",
-    contextLength: 131072,
-    description: "Latest open-source model from Meta",
-    supportsImages: false,
-    supportsStreaming: true,
-  },
-  // Mistral Models
-  {
-    id: "mistralai/mistral-large-2411",
-    name: "Mistral Large",
-    provider: "Mistral",
-    contextLength: 128000,
-    description: "Mistral's most capable model",
-    supportsImages: false,
-    supportsStreaming: true,
-  },
-  {
-    id: "mistralai/mistral-small-2409",
-    name: "Mistral Small",
-    provider: "Mistral",
-    contextLength: 32000,
-    description: "Fast and efficient Mistral model",
-    supportsImages: false,
-    supportsStreaming: true,
-  },
-  // DeepSeek Models
-  {
-    id: "deepseek/deepseek-chat",
-    name: "DeepSeek V3",
-    provider: "DeepSeek",
-    contextLength: 64000,
-    description: "Powerful open model, excellent for coding",
-    supportsImages: false,
-    supportsStreaming: true,
-  },
-  // Qwen Models
-  {
-    id: "qwen/qwen-2.5-72b-instruct",
-    name: "Qwen 2.5 72B",
-    provider: "Qwen",
-    contextLength: 131072,
-    description: "Alibaba's latest large model",
-    supportsImages: false,
-    supportsStreaming: true,
+    supportsImageGeneration: true,
   },
 ];
 
@@ -171,7 +116,7 @@ export const availableModels: ModelInfo[] = [
 export type ModelId = typeof availableModels[number]["id"];
 
 // Default model
-export const DEFAULT_MODEL: ModelId = process.env.DEFAULT_MODEL as ModelId || "anthropic/claude-3.5-sonnet";
+export const DEFAULT_MODEL: ModelId = process.env.DEFAULT_MODEL as ModelId || "anthropic/claude-sonnet-4.5";
 
 export interface ChatOptions {
   model?: ModelId;
@@ -234,15 +179,12 @@ export async function generateImage(
   prompt: string,
   options: { size?: '1024x1024' | '512x512' | '256x256' } = {}
 ): Promise<string> {
-  // Use OpenAI's DALL-E through OpenRouter
-  const response = await openrouter.images.generate({
-    model: 'openai/dall-e-3',
-    prompt,
-    size: options.size || '1024x1024',
-    n: 1,
-    response_format: 'b64_json',
+  // Use Nano Banana Pro (Gemini 3 Pro Image) for image generation
+  const response = await openrouter.chat.completions.create({
+    model: 'google/gemini-3-pro-image-preview',
+    messages: [{ role: 'user', content: prompt }],
   });
-  return response.data?.[0]?.b64_json || '';
+  return response.choices[0]?.message?.content || '';
 }
 
 const contentPrompts: Record<ContentType, string> = {
@@ -344,7 +286,7 @@ export async function generateContent(
 export async function summarizeSource(content: string, options: { model?: ModelId } = {}): Promise<string> {
   // Use a fast model for summarization
   const fastModel = availableModels.find(m =>
-    m.id.includes('haiku') || m.id.includes('mini') || m.id.includes('flash')
+    m.id.includes('haiku') || m.id.includes('chat') || m.id.includes('flash')
   )?.id || DEFAULT_MODEL;
 
   return chat(
