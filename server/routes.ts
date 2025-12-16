@@ -4,6 +4,13 @@ import { storage } from "./storage";
 import { streamChat, chat, generateContent, summarizeSource, generateImage, type ModelId } from "./ai-service";
 import { insertSourceSchema, insertNoteSchema, insertWorkflowSchema, type ContentType } from "@shared/schema";
 import { z } from "zod";
+import multer from "multer";
+import { extractText } from "unpdf";
+
+const upload = multer({ 
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 10 * 1024 * 1024 }
+});
 
 export async function registerRoutes(
   httpServer: Server,
@@ -64,6 +71,56 @@ export async function registerRoutes(
       res.status(204).send();
     } catch (error) {
       res.status(500).json({ error: "Failed to delete source" });
+    }
+  });
+
+  app.post("/api/sources/upload", upload.single('file'), async (req: Request, res: Response) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({ error: "No file uploaded" });
+      }
+
+      const file = req.file;
+      const fileName = file.originalname;
+      const mimeType = file.mimetype;
+      let content = '';
+      let sourceType: 'pdf' | 'text' = 'text';
+
+      if (mimeType === 'application/pdf') {
+        sourceType = 'pdf';
+        try {
+          const pdfData = await extractText(file.buffer);
+          const textArray = pdfData.text;
+          content = Array.isArray(textArray) ? textArray.join('\n') : String(textArray || '');
+        } catch (pdfError) {
+          console.error('PDF extraction error:', pdfError);
+          return res.status(400).json({ error: "Failed to extract text from PDF" });
+        }
+      } else if (mimeType === 'text/plain' || fileName.endsWith('.txt') || fileName.endsWith('.md')) {
+        content = file.buffer.toString('utf-8');
+      } else {
+        content = file.buffer.toString('utf-8');
+      }
+
+      if (!content.trim()) {
+        return res.status(400).json({ error: "Could not extract content from file" });
+      }
+
+      const source = await storage.createSource({
+        type: sourceType,
+        name: fileName,
+        content: content,
+        metadata: { 
+          originalName: fileName,
+          mimeType: mimeType,
+          size: String(file.size)
+        } as Record<string, unknown>
+      });
+
+      res.status(201).json(source);
+    } catch (error) {
+      console.error('Upload error:', error);
+      res.status(500).json({ error: "Failed to upload file" });
     }
   });
 

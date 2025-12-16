@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -61,6 +61,8 @@ export default function SourcesPanel({
   const [selectedSources, setSelectedSources] = useState<Set<string>>(new Set());
   const [expandedSourceId, setExpandedSourceId] = useState<string | null>(null);
   const [addSourcesModalOpen, setAddSourcesModalOpen] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const { data: sources = [], isLoading, isError, error } = useQuery<Source[]>({
     queryKey: ['/api/sources'],
@@ -167,6 +169,43 @@ export default function SourcesPanel({
     setAddTextDialogOpen(false);
     setTextInput('');
     setTextName('');
+  };
+
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    setIsUploading(true);
+    setAddSourcesModalOpen(false);
+    
+    const formData = new FormData();
+    formData.append('file', file);
+
+    try {
+      const response = await fetch('/api/sources/upload', {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Upload failed');
+      }
+
+      await queryClient.invalidateQueries({ queryKey: ['/api/sources'] });
+      toast({ title: "File uploaded successfully" });
+    } catch (err) {
+      toast({ 
+        title: "Failed to upload file", 
+        description: err instanceof Error ? err.message : 'Unknown error',
+        variant: "destructive" 
+      });
+    } finally {
+      setIsUploading(false);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    }
   };
 
   const handleDeepResearch = () => {
@@ -521,17 +560,31 @@ export default function SourcesPanel({
               </div>
             </button>
             <button
-              className="w-full flex items-center gap-3 p-3 rounded-xl border border-border/50 hover-elevate transition-colors text-left opacity-60"
+              className="w-full flex items-center gap-3 p-3 rounded-xl border border-border/50 hover-elevate transition-colors text-left"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={isUploading}
               data-testid="button-modal-upload-file"
             >
               <div className="w-10 h-10 rounded-lg bg-purple-500/10 dark:bg-purple-500/20 flex items-center justify-center">
-                <FileUp className="w-5 h-5 text-purple-500" />
+                {isUploading ? (
+                  <Loader2 className="w-5 h-5 text-purple-500 animate-spin" />
+                ) : (
+                  <FileUp className="w-5 h-5 text-purple-500" />
+                )}
               </div>
               <div>
                 <p className="text-sm font-medium">Upload file</p>
-                <p className="text-xs text-muted-foreground">PDF, TXT, or other documents (coming soon)</p>
+                <p className="text-xs text-muted-foreground">PDF, TXT, or Markdown files</p>
               </div>
             </button>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".pdf,.txt,.md,text/plain,application/pdf"
+              onChange={handleFileUpload}
+              className="hidden"
+              data-testid="input-file-upload"
+            />
           </div>
         </DialogContent>
       </Dialog>
