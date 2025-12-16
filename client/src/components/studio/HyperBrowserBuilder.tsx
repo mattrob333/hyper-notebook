@@ -257,9 +257,9 @@ export default function HyperBrowserBuilder({ onBack, onRun, onMinimize }: Hyper
             <ArrowLeft className="w-4 h-4" />
           </Button>
           <Select value={selectedWorkflowId} onValueChange={handleWorkflowChange}>
-            <SelectTrigger className="w-[220px] h-8 rounded-lg bg-amber-500/20 border-amber-500/30" data-testid="select-workflow">
-              <div className="flex items-center gap-2">
-                <Zap className="w-4 h-4 text-amber-500" />
+            <SelectTrigger className="min-w-[280px] h-8 rounded-lg bg-amber-500/20 border-amber-500/30" data-testid="select-workflow">
+              <div className="flex items-center gap-2 whitespace-nowrap">
+                <Zap className="w-4 h-4 text-amber-500 shrink-0" />
                 <SelectValue />
               </div>
             </SelectTrigger>
