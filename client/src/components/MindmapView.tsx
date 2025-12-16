@@ -12,10 +12,12 @@ import {
   Position,
   NodeProps,
   MarkerType,
+  getBezierPath,
+  EdgeProps,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import { Button } from '@/components/ui/button';
-import { ThumbsUp, ThumbsDown } from 'lucide-react';
+import { ThumbsUp, ThumbsDown, ChevronRight } from 'lucide-react';
 
 interface MindmapNode {
   id: string;
@@ -30,36 +32,50 @@ interface MindmapViewProps {
   sourceCount?: number;
 }
 
+// Custom node styling to match NotebookLM
 const CustomNode = memo(({ data }: NodeProps) => {
-  const isRoot = data.isRoot;
-  const isHighlight = data.highlight;
+  const isRoot = data.isRoot as boolean;
+  const level = (data.level as number) || 0;
+  const hasChildren = data.hasChildren as boolean;
+  
+  // Color scheme based on level (NotebookLM-like teal/cyan theme)
+  const getNodeStyle = () => {
+    if (isRoot) {
+      return 'bg-[#2d4a4a] text-white border-2 border-[#3d6a6a]';
+    }
+    if (level === 1) {
+      return 'bg-[#1e3a3a] text-[#5fd4d4] border border-[#3d5a5a]';
+    }
+    return 'bg-[#1a2f2f] text-[#4dbdbd] border border-[#2d4545]';
+  };
   
   return (
     <div
       className={`
-        px-4 py-2.5 rounded-md text-sm font-medium transition-all
-        ${isRoot 
-          ? 'bg-[#3a3f47] text-white border border-[#4a5058] min-w-[200px]' 
-          : isHighlight
-            ? 'bg-emerald-600/90 text-white border border-emerald-500 min-w-[150px]'
-            : 'bg-[#3a3f47] text-white/90 border border-[#4a5058] min-w-[140px]'
-        }
+        px-4 py-2 rounded-lg text-sm font-medium transition-all shadow-lg
+        ${getNodeStyle()}
       `}
       style={{ 
-        fontSize: isRoot ? '13px' : '12px',
-        maxWidth: '280px',
+        fontSize: isRoot ? '14px' : '12px',
+        maxWidth: isRoot ? '300px' : '220px',
+        minWidth: isRoot ? '180px' : '120px',
       }}
     >
       <Handle 
         type="target" 
         position={Position.Left} 
-        className="!bg-[#4a5058] !border-0 !w-1.5 !h-1.5"
+        className="!bg-transparent !border-0 !w-0 !h-0"
       />
-      <span className="block text-center whitespace-normal leading-tight">{String(data.label)}</span>
+      <div className="flex items-center gap-2">
+        <span className="block whitespace-normal leading-tight flex-1">{String(data.label)}</span>
+        {hasChildren && (
+          <ChevronRight className="w-3 h-3 text-current opacity-60 shrink-0" />
+        )}
+      </div>
       <Handle 
         type="source" 
         position={Position.Right} 
-        className="!bg-[#4a5058] !border-0 !w-1.5 !h-1.5"
+        className="!bg-transparent !border-0 !w-0 !h-0"
       />
     </div>
   );
@@ -67,8 +83,50 @@ const CustomNode = memo(({ data }: NodeProps) => {
 
 CustomNode.displayName = 'CustomNode';
 
+// Custom bezier edge with NotebookLM-like styling
+const CustomEdge = memo(({
+  id,
+  sourceX,
+  sourceY,
+  targetX,
+  targetY,
+  sourcePosition,
+  targetPosition,
+  style = {},
+}: EdgeProps) => {
+  const [edgePath] = getBezierPath({
+    sourceX,
+    sourceY,
+    sourcePosition,
+    targetX,
+    targetY,
+    targetPosition,
+    curvature: 0.3,
+  });
+
+  return (
+    <path
+      id={id}
+      className="react-flow__edge-path"
+      d={edgePath}
+      style={{
+        stroke: '#3d6a6a',
+        strokeWidth: 2,
+        fill: 'none',
+        ...style,
+      }}
+    />
+  );
+});
+
+CustomEdge.displayName = 'CustomEdge';
+
 const nodeTypes = {
   custom: CustomNode,
+};
+
+const edgeTypes = {
+  custom: CustomEdge,
 };
 
 function buildNodesAndEdges(root: MindmapNode): { nodes: Node[]; edges: Edge[] } {
@@ -89,6 +147,7 @@ function buildNodesAndEdges(root: MindmapNode): { nodes: Node[]; edges: Edge[] }
 
   function traverse(node: MindmapNode, x: number, yStart: number, yEnd: number, level: number) {
     const yCenter = (yStart + yEnd) / 2;
+    const hasChildren = node.children && node.children.length > 0;
     
     nodes.push({
       id: node.id,
@@ -97,6 +156,8 @@ function buildNodesAndEdges(root: MindmapNode): { nodes: Node[]; edges: Edge[] }
       data: { 
         label: node.label,
         isRoot: level === 0,
+        level,
+        hasChildren,
         highlight: node.highlight || false,
       },
     });
@@ -116,9 +177,9 @@ function buildNodesAndEdges(root: MindmapNode): { nodes: Node[]; edges: Edge[] }
           id: `${node.id}-${child.id}`,
           source: node.id,
           target: child.id,
-          type: 'smoothstep',
+          type: 'custom',
           style: { 
-            stroke: '#5a6068',
+            stroke: '#3d6a6a',
             strokeWidth: 2,
           },
         });
@@ -176,19 +237,25 @@ export default function MindmapView({ title, data, sourceCount }: MindmapViewPro
           onEdgesChange={onEdgesChange}
           onConnect={onConnect}
           nodeTypes={nodeTypes}
+          edgeTypes={edgeTypes}
           fitView
-          fitViewOptions={{ padding: 0.2 }}
+          fitViewOptions={{ padding: 0.3 }}
           attributionPosition="bottom-right"
           proOptions={{ hideAttribution: true }}
-          style={{ background: '#2a2d32' }}
+          style={{ background: '#1a1f1f' }}
+          nodesDraggable={false}
+          nodesConnectable={false}
+          elementsSelectable={false}
+          panOnDrag={true}
+          zoomOnScroll={true}
           defaultEdgeOptions={{
-            type: 'smoothstep',
-            style: { stroke: '#5a6068', strokeWidth: 2 },
+            type: 'custom',
+            style: { stroke: '#3d6a6a', strokeWidth: 2 },
           }}
         >
           <Controls 
             position="bottom-right"
-            className="!bg-[#3a3f47] !border-[#4a5058] !rounded-lg !shadow-lg [&>button]:!bg-[#3a3f47] [&>button]:!border-[#4a5058] [&>button]:!text-white [&>button:hover]:!bg-[#4a5058]"
+            className="!bg-[#2d4a4a] !border-[#3d6a6a] !rounded-lg !shadow-lg [&>button]:!bg-[#2d4a4a] [&>button]:!border-[#3d6a6a] [&>button]:!text-[#5fd4d4] [&>button:hover]:!bg-[#3d5a5a]"
           />
         </ReactFlow>
       </div>

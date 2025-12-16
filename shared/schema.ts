@@ -17,8 +17,25 @@ export const insertUserSchema = createInsertSchema(users).pick({
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
 
+// Notebooks table - each notebook contains its own sources, conversations, and generated content
+export const notebooks = pgTable("notebooks", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  description: text("description"),
+  emoji: text("emoji").default("📓"),
+  color: text("color").default("#6366f1"),
+  sourceCount: integer("source_count").default(0),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertNotebookSchema = createInsertSchema(notebooks).omit({ id: true, createdAt: true, updatedAt: true, sourceCount: true });
+export type InsertNotebook = z.infer<typeof insertNotebookSchema>;
+export type Notebook = typeof notebooks.$inferSelect;
+
 export const sources = pgTable("sources", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  notebookId: varchar("notebook_id").references(() => notebooks.id, { onDelete: 'cascade' }),
   type: text("type").notNull().$type<'url' | 'pdf' | 'text' | 'audio' | 'video'>(),
   name: text("name").notNull(),
   content: text("content").notNull(),
@@ -27,7 +44,10 @@ export const sources = pgTable("sources", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
-export const insertSourceSchema = createInsertSchema(sources).omit({ id: true, createdAt: true });
+export const insertSourceSchema = createInsertSchema(sources).omit({ id: true, createdAt: true }).extend({
+  type: z.enum(['url', 'pdf', 'text', 'audio', 'video']),
+  metadata: z.record(z.any()).optional().nullable(),
+});
 export type InsertSource = z.infer<typeof insertSourceSchema>;
 export type Source = typeof sources.$inferSelect;
 
@@ -45,6 +65,7 @@ export type Note = typeof notes.$inferSelect;
 
 export const conversations = pgTable("conversations", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  notebookId: varchar("notebook_id").references(() => notebooks.id, { onDelete: 'cascade' }),
   title: text("title"),
   model: text("model").default("gpt-4.1"),
   createdAt: timestamp("created_at").defaultNow(),
@@ -63,7 +84,17 @@ export const messages = pgTable("messages", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
-export const insertMessageSchema = createInsertSchema(messages).omit({ id: true, createdAt: true });
+export const insertMessageSchema = createInsertSchema(messages).omit({ id: true, createdAt: true }).extend({
+  role: z.enum(['user', 'assistant', 'system']),
+  a2uiComponents: z.array(z.object({
+    id: z.string(),
+    type: z.enum(['card', 'chart', 'table', 'list', 'code', 'quote', 'image', 'accordion', 'tabs', 'progress', 'badge', 'button', 'link', 'mindmap', 'timeline', 'slides']),
+    parentId: z.string().optional(),
+    properties: z.record(z.any()),
+    data: z.any().optional(),
+    children: z.array(z.any()).optional(),
+  })).optional().nullable(),
+});
 export type InsertMessage = z.infer<typeof insertMessageSchema>;
 export type Message = typeof messages.$inferSelect;
 
@@ -76,12 +107,21 @@ export const workflows = pgTable("workflows", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
-export const insertWorkflowSchema = createInsertSchema(workflows).omit({ id: true, createdAt: true });
+export const insertWorkflowSchema = createInsertSchema(workflows).omit({ id: true, createdAt: true }).extend({
+  steps: z.array(z.object({
+    id: z.string(),
+    action: z.enum(['navigate', 'click', 'type', 'scrape', 'screenshot', 'wait', 'extract', 'summarize']),
+    selector: z.string().optional(),
+    value: z.string().optional(),
+    params: z.record(z.any()).optional(),
+  })).optional(),
+});
 export type InsertWorkflow = z.infer<typeof insertWorkflowSchema>;
 export type Workflow = typeof workflows.$inferSelect;
 
 export const generatedContent = pgTable("generated_content", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  notebookId: varchar("notebook_id").references(() => notebooks.id, { onDelete: 'cascade' }),
   type: text("type").notNull().$type<'study_guide' | 'briefing_doc' | 'faq' | 'timeline' | 'mindmap' | 'infographic' | 'slides' | 'audio_overview' | 'email'>(),
   title: text("title").notNull(),
   content: jsonb("content").$type<any>().notNull(),
@@ -89,7 +129,13 @@ export const generatedContent = pgTable("generated_content", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
-export const insertGeneratedContentSchema = createInsertSchema(generatedContent).omit({ id: true, createdAt: true });
+// Define base schema and then make content required
+const baseGeneratedContentSchema = createInsertSchema(generatedContent).omit({ id: true, createdAt: true }).extend({
+  type: z.enum(['study_guide', 'briefing_doc', 'faq', 'timeline', 'mindmap', 'infographic', 'slides', 'audio_overview', 'email']),
+});
+export const insertGeneratedContentSchema = baseGeneratedContentSchema.extend({
+  content: z.any(),
+});
 export type InsertGeneratedContent = z.infer<typeof insertGeneratedContentSchema>;
 export type GeneratedContent = typeof generatedContent.$inferSelect;
 

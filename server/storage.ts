@@ -1,7 +1,7 @@
-import { eq } from "drizzle-orm";
+import { eq, desc, sql } from "drizzle-orm";
 import { db } from "./db";
 import {
-  users, sources, notes, conversations, messages, workflows, generatedContent,
+  users, sources, notes, conversations, messages, workflows, generatedContent, notebooks,
   type User, type InsertUser,
   type Source, type InsertSource,
   type Note, type InsertNote,
@@ -9,6 +9,7 @@ import {
   type Message, type InsertMessage,
   type Workflow, type InsertWorkflow,
   type GeneratedContent, type InsertGeneratedContent,
+  type Notebook, type InsertNotebook,
 } from "@shared/schema";
 
 export interface IStorage {
@@ -16,7 +17,14 @@ export interface IStorage {
   getUserByUsername(username: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
 
-  getSources(): Promise<Source[]>;
+  // Notebooks
+  getNotebooks(): Promise<Notebook[]>;
+  getNotebook(id: string): Promise<Notebook | undefined>;
+  createNotebook(notebook: InsertNotebook): Promise<Notebook>;
+  updateNotebook(id: string, notebook: Partial<InsertNotebook>): Promise<Notebook | undefined>;
+  deleteNotebook(id: string): Promise<boolean>;
+
+  getSources(notebookId?: string): Promise<Source[]>;
   getSource(id: string): Promise<Source | undefined>;
   createSource(source: InsertSource): Promise<Source>;
   updateSource(id: string, source: Partial<InsertSource>): Promise<Source | undefined>;
@@ -64,7 +72,47 @@ export class DatabaseStorage implements IStorage {
     return created;
   }
 
-  async getSources(): Promise<Source[]> {
+  // Notebooks
+  async getNotebooks(): Promise<Notebook[]> {
+    return db.select().from(notebooks).orderBy(desc(notebooks.updatedAt));
+  }
+
+  async getNotebook(id: string): Promise<Notebook | undefined> {
+    const [notebook] = await db.select().from(notebooks).where(eq(notebooks.id, id));
+    return notebook;
+  }
+
+  async createNotebook(notebook: InsertNotebook): Promise<Notebook> {
+    const [created] = await db.insert(notebooks).values(notebook).returning();
+    return created;
+  }
+
+  async updateNotebook(id: string, notebook: Partial<InsertNotebook>): Promise<Notebook | undefined> {
+    const [updated] = await db.update(notebooks)
+      .set({ ...notebook, updatedAt: new Date() })
+      .where(eq(notebooks.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteNotebook(id: string): Promise<boolean> {
+    await db.delete(notebooks).where(eq(notebooks.id, id));
+    return true;
+  }
+
+  async updateNotebookSourceCount(notebookId: string): Promise<void> {
+    const [result] = await db.select({ count: sql<number>`count(*)` })
+      .from(sources)
+      .where(eq(sources.notebookId, notebookId));
+    await db.update(notebooks)
+      .set({ sourceCount: result?.count || 0, updatedAt: new Date() })
+      .where(eq(notebooks.id, notebookId));
+  }
+
+  async getSources(notebookId?: string): Promise<Source[]> {
+    if (notebookId) {
+      return db.select().from(sources).where(eq(sources.notebookId, notebookId)).orderBy(sources.createdAt);
+    }
     return db.select().from(sources).orderBy(sources.createdAt);
   }
 
@@ -75,6 +123,10 @@ export class DatabaseStorage implements IStorage {
 
   async createSource(source: InsertSource): Promise<Source> {
     const [created] = await db.insert(sources).values(source).returning();
+    // Update notebook source count if notebookId is provided
+    if (source.notebookId) {
+      await this.updateNotebookSourceCount(source.notebookId);
+    }
     return created;
   }
 
@@ -84,7 +136,13 @@ export class DatabaseStorage implements IStorage {
   }
 
   async deleteSource(id: string): Promise<boolean> {
-    const result = await db.delete(sources).where(eq(sources.id, id));
+    // Get the source first to get notebookId
+    const source = await this.getSource(id);
+    await db.delete(sources).where(eq(sources.id, id));
+    // Update notebook source count if it belonged to a notebook
+    if (source?.notebookId) {
+      await this.updateNotebookSourceCount(source.notebookId);
+    }
     return true;
   }
 
@@ -165,7 +223,10 @@ export class DatabaseStorage implements IStorage {
     return true;
   }
 
-  async getGeneratedContent(): Promise<GeneratedContent[]> {
+  async getGeneratedContent(notebookId?: string): Promise<GeneratedContent[]> {
+    if (notebookId) {
+      return db.select().from(generatedContent).where(eq(generatedContent.notebookId, notebookId)).orderBy(generatedContent.createdAt);
+    }
     return db.select().from(generatedContent).orderBy(generatedContent.createdAt);
   }
 
@@ -175,7 +236,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createGeneratedContent(content: InsertGeneratedContent): Promise<GeneratedContent> {
-    const [created] = await db.insert(generatedContent).values(content).returning();
+    const [created] = await db.insert(generatedContent).values(content as any).returning();
     return created;
   }
 

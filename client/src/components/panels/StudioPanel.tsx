@@ -60,6 +60,8 @@ import HyperBrowserBuilder from "../studio/HyperBrowserBuilder";
 import AIContextFileGenerator from "../studio/AIContextFileGenerator";
 import A2UIRenderer from "../a2ui/A2UIRenderer";
 import ReportsModal from "../studio/ReportsModal";
+import CustomizeInfographicModal from "../studio/CustomizeInfographicModal";
+import CustomizeSlideDeckModal from "../studio/CustomizeSlideDeckModal";
 import type { Workflow as WorkflowType, Source } from "@/lib/types";
 import type { A2UIComponent, ContentType } from "@shared/schema";
 
@@ -175,6 +177,8 @@ export default function StudioPanel({
 }: StudioPanelProps) {
   const [activeView, setActiveView] = useState<ActiveView>('main');
   const [reportsModalOpen, setReportsModalOpen] = useState(false);
+  const [infographicModalOpen, setInfographicModalOpen] = useState(false);
+  const [slideDeckModalOpen, setSlideDeckModalOpen] = useState(false);
   const [loadingType, setLoadingType] = useState<ContentType | null>(null);
   const [generatedContent, setGeneratedContent] = useState<GeneratedContent | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -267,12 +271,13 @@ export default function StudioPanel({
       return;
     }
 
-    // Show config dialog for slides and infographics
-    if (type === 'slides' || type === 'infographic') {
-      setConfigType(type);
-      setConfigModel(CONTENT_TYPE_DEFAULT_MODELS[type] || 'gemini-2.5-pro');
-      setConfigPrompt('');
-      setConfigDialogOpen(true);
+    // Show custom modals for slides and infographics
+    if (type === 'infographic') {
+      setInfographicModalOpen(true);
+      return;
+    }
+    if (type === 'slides') {
+      setSlideDeckModalOpen(true);
       return;
     }
 
@@ -707,12 +712,30 @@ export default function StudioPanel({
       <ReportsModal
         open={reportsModalOpen}
         onOpenChange={setReportsModalOpen}
-        onSelectReport={(reportType) => {
-          setReportsModalOpen(false);
-          toast({
-            title: 'Report Selected',
-            description: `Creating ${reportType.name} report...`
-          });
+        selectedSourceIds={selectedSourceIds}
+        onReportGenerated={(content) => {
+          setGeneratedContent(content);
+          setActiveView('canvas');
+        }}
+      />
+
+      <CustomizeInfographicModal
+        open={infographicModalOpen}
+        onOpenChange={setInfographicModalOpen}
+        selectedSourceIds={selectedSourceIds}
+        onGenerated={(content) => {
+          setGeneratedContent(content);
+          setActiveView('canvas');
+        }}
+      />
+
+      <CustomizeSlideDeckModal
+        open={slideDeckModalOpen}
+        onOpenChange={setSlideDeckModalOpen}
+        selectedSourceIds={selectedSourceIds}
+        onGenerated={(content) => {
+          setGeneratedContent(content);
+          setActiveView('canvas');
         }}
       />
 

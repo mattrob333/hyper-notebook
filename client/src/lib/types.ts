@@ -8,5 +8,7 @@ export type {
   Conversation, 
   Message,
   GeneratedContent,
-  ContentType
+  ContentType,
+  Notebook,
+  InsertNotebook
 } from "@shared/schema";

@@ -2,7 +2,7 @@ import type { Express, Request, Response } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { streamChat, chat, generateContent, summarizeSource, generateImage, availableModels, getModelsByProvider, DEFAULT_MODEL, type ModelId } from "./ai-service";
-import { insertSourceSchema, insertNoteSchema, insertWorkflowSchema, type ContentType } from "@shared/schema";
+import { insertSourceSchema, insertNoteSchema, insertWorkflowSchema, insertNotebookSchema, type ContentType } from "@shared/schema";
 import { z } from "zod";
 import multer from "multer";
 import { extractText } from "unpdf";
@@ -24,6 +24,82 @@ export async function registerRoutes(
       byProvider: getModelsByProvider(),
       defaultModel: DEFAULT_MODEL,
     });
+  });
+
+  // Notebooks endpoints
+  app.get("/api/notebooks", async (req: Request, res: Response) => {
+    try {
+      const notebooks = await storage.getNotebooks();
+      res.json(notebooks);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch notebooks" });
+    }
+  });
+
+  app.get("/api/notebooks/:id", async (req: Request, res: Response) => {
+    try {
+      const notebook = await storage.getNotebook(req.params.id);
+      if (!notebook) {
+        return res.status(404).json({ error: "Notebook not found" });
+      }
+      res.json(notebook);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch notebook" });
+    }
+  });
+
+  app.post("/api/notebooks", async (req: Request, res: Response) => {
+    try {
+      const validated = insertNotebookSchema.parse(req.body);
+      const notebook = await storage.createNotebook(validated);
+      res.status(201).json(notebook);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: error.errors });
+      }
+      res.status(500).json({ error: "Failed to create notebook" });
+    }
+  });
+
+  app.patch("/api/notebooks/:id", async (req: Request, res: Response) => {
+    try {
+      const notebook = await storage.updateNotebook(req.params.id, req.body);
+      if (!notebook) {
+        return res.status(404).json({ error: "Notebook not found" });
+      }
+      res.json(notebook);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to update notebook" });
+    }
+  });
+
+  app.delete("/api/notebooks/:id", async (req: Request, res: Response) => {
+    try {
+      await storage.deleteNotebook(req.params.id);
+      res.status(204).send();
+    } catch (error) {
+      res.status(500).json({ error: "Failed to delete notebook" });
+    }
+  });
+
+  // Get sources for a specific notebook
+  app.get("/api/notebooks/:notebookId/sources", async (req: Request, res: Response) => {
+    try {
+      const sources = await storage.getSources(req.params.notebookId);
+      res.json(sources);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch sources" });
+    }
+  });
+
+  // Get generated content for a specific notebook
+  app.get("/api/notebooks/:notebookId/generated", async (req: Request, res: Response) => {
+    try {
+      const content = await storage.getGeneratedContent(req.params.notebookId);
+      res.json(content);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch generated content" });
+    }
   });
 
   app.get("/api/sources", async (req: Request, res: Response) => {
@@ -248,7 +324,7 @@ export async function registerRoutes(
           originalName: fileName,
           mimeType: mimeType,
           size: String(file.size)
-        } as Record<string, unknown>
+        }
       });
 
       res.status(201).json(source);

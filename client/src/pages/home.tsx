@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { useParams, useLocation } from "wouter";
 import { 
   ResizablePanelGroup, 
   ResizablePanel, 
@@ -11,9 +12,13 @@ import ChatPanel from "@/components/panels/ChatPanel";
 import StudioPanel from "@/components/panels/StudioPanel";
 import SourceDetailView from "@/components/panels/SourceDetailView";
 import BrowserAgentMonitor from "@/components/browser/BrowserAgentMonitor";
-import type { Source, ChatMessage, A2UIComponent } from "@/lib/types";
+import type { Source, ChatMessage, A2UIComponent, Notebook } from "@/lib/types";
 
 export default function Home() {
+  const params = useParams<{ id: string }>();
+  const [, navigate] = useLocation();
+  const notebookId = params.id;
+  
   const [isDarkMode, setIsDarkMode] = useState(true);
   const [selectedSourceId, setSelectedSourceId] = useState<string>();
   const [selectedSourceIds, setSelectedSourceIds] = useState<string[]>([]);
@@ -26,8 +31,15 @@ export default function Home() {
   const [browserUrl, setBrowserUrl] = useState('about:blank');
   const [messages, setMessages] = useState<ChatMessage[]>([]);
 
+  // Fetch notebook details
+  const { data: notebook } = useQuery<Notebook>({
+    queryKey: [`/api/notebooks/${notebookId}`],
+    enabled: !!notebookId,
+  });
+
+  // Fetch sources for this notebook
   const { data: sources = [] } = useQuery<Source[]>({
-    queryKey: ['/api/sources'],
+    queryKey: notebookId ? [`/api/notebooks/${notebookId}/sources`] : ['/api/sources'],
   });
 
   const selectedSource = selectedSourceId 
@@ -76,7 +88,12 @@ export default function Home() {
 
   return (
     <div className="h-screen flex flex-col bg-background" data-testid="home-page">
-      <Navbar isDarkMode={isDarkMode} onToggleDarkMode={() => setIsDarkMode(!isDarkMode)} />
+      <Navbar 
+        isDarkMode={isDarkMode} 
+        onToggleDarkMode={() => setIsDarkMode(!isDarkMode)}
+        notebookName={notebook?.name}
+        onBackToDashboard={() => navigate('/')}
+      />
       
       <div className="flex-1 p-4 overflow-hidden">
         <ResizablePanelGroup direction="horizontal" className="h-full gap-3">
@@ -86,6 +103,7 @@ export default function Home() {
                 selectedSourceId={selectedSourceId}
                 onSourcesChange={setSelectedSourceIds}
                 onSelectSource={(source) => setSelectedSourceId(source.id)}
+                notebookId={notebookId}
               />
             </div>
           </ResizablePanel>

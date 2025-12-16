@@ -47,6 +47,7 @@ interface SourcesPanelProps {
   onSourcesChange?: (selectedSourceIds: string[]) => void;
   onSelectSource?: (source: Source) => void;
   selectedSourceId?: string;
+  notebookId?: string;
 }
 
 const sourceTypeIcons: Record<string, typeof Globe> = {
@@ -58,7 +59,8 @@ const sourceTypeIcons: Record<string, typeof Globe> = {
 export default function SourcesPanel({ 
   onSourcesChange,
   onSelectSource,
-  selectedSourceId 
+  selectedSourceId,
+  notebookId
 }: SourcesPanelProps) {
   const { toast } = useToast();
   const [addUrlDialogOpen, setAddUrlDialogOpen] = useState(false);
@@ -89,7 +91,7 @@ export default function SourcesPanel({
   const [showSearchResults, setShowSearchResults] = useState(false);
 
   const { data: sources = [], isLoading, isError, error } = useQuery<Source[]>({
-    queryKey: ['/api/sources'],
+    queryKey: notebookId ? [`/api/notebooks/${notebookId}/sources`] : ['/api/sources'],
   });
 
   useEffect(() => {
@@ -104,12 +106,15 @@ export default function SourcesPanel({
   }, [selectedSources, onSourcesChange]);
 
   const createSourceMutation = useMutation({
-    mutationFn: async (source: { type: string; name: string; content: string }) => {
-      const res = await apiRequest('POST', '/api/sources', source);
+    mutationFn: async (source: { type: string; name: string; content: string; notebookId?: string }) => {
+      const res = await apiRequest('POST', '/api/sources', { ...source, notebookId });
       return res.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/sources'] });
+      queryClient.invalidateQueries({ queryKey: notebookId ? [`/api/notebooks/${notebookId}/sources`] : ['/api/sources'] });
+      if (notebookId) {
+        queryClient.invalidateQueries({ queryKey: ['/api/notebooks'] });
+      }
       toast({ title: "Source added successfully" });
     },
     onError: (err: Error) => {
@@ -122,7 +127,10 @@ export default function SourcesPanel({
       await apiRequest('DELETE', `/api/sources/${id}`);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/sources'] });
+      queryClient.invalidateQueries({ queryKey: notebookId ? [`/api/notebooks/${notebookId}/sources`] : ['/api/sources'] });
+      if (notebookId) {
+        queryClient.invalidateQueries({ queryKey: ['/api/notebooks'] });
+      }
       toast({ title: "Source deleted" });
     },
     onError: (err: Error) => {
@@ -136,7 +144,7 @@ export default function SourcesPanel({
       return res.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/sources'] });
+      queryClient.invalidateQueries({ queryKey: notebookId ? [`/api/notebooks/${notebookId}/sources`] : ['/api/sources'] });
       toast({ title: "Summary generated" });
     },
     onError: (err: Error) => {

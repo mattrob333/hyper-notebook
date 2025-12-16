@@ -1,4 +1,3 @@
-import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { 
   BookOpen, 
@@ -8,7 +7,8 @@ import {
   Sun,
   Share2,
   BarChart3,
-  Plus
+  Plus,
+  ChevronLeft
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -22,25 +22,46 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 interface NavbarProps {
   isDarkMode: boolean;
   onToggleDarkMode: () => void;
+  notebookName?: string;
+  onBackToDashboard?: () => void;
 }
 
-export default function Navbar({ isDarkMode, onToggleDarkMode }: NavbarProps) {
+export default function Navbar({ isDarkMode, onToggleDarkMode, notebookName, onBackToDashboard }: NavbarProps) {
   return (
     <header className="h-12 border-b flex items-center justify-between gap-4 px-4 bg-background" data-testid="navbar">
       <div className="flex items-center gap-3">
-        <div className="flex items-center gap-2">
-          <div className="w-7 h-7 rounded-lg bg-primary/20 flex items-center justify-center">
-            <BookOpen className="w-4 h-4 text-primary" />
+        {notebookName ? (
+          <div className="flex items-center gap-2">
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              className="h-8 w-8"
+              onClick={onBackToDashboard}
+            >
+              <ChevronLeft className="w-5 h-5" />
+            </Button>
+            <div className="w-7 h-7 rounded-lg bg-primary/20 flex items-center justify-center">
+              <BookOpen className="w-4 h-4 text-primary" />
+            </div>
+            <span className="font-medium text-sm">{notebookName}</span>
           </div>
-          <span className="font-medium text-sm">Agent-to-User Interface and AI Research Tools</span>
-        </div>
+        ) : (
+          <div className="flex items-center gap-2">
+            <div className="w-7 h-7 rounded-lg bg-primary/20 flex items-center justify-center">
+              <BookOpen className="w-4 h-4 text-primary" />
+            </div>
+            <span className="font-medium text-sm">NotebookLM</span>
+          </div>
+        )}
       </div>
 
       <div className="flex items-center gap-1">
-        <Button variant="ghost" size="sm" className="gap-2 text-xs rounded-lg" data-testid="button-create-notebook">
-          <Plus className="w-4 h-4" />
-          Create notebook
-        </Button>
+        {!notebookName && (
+          <Button variant="ghost" size="sm" className="gap-2 text-xs rounded-lg" data-testid="button-create-notebook">
+            <Plus className="w-4 h-4" />
+            Create notebook
+          </Button>
+        )}
         
         <Button variant="ghost" size="sm" className="gap-2 text-xs rounded-lg" data-testid="button-analytics">
           <BarChart3 className="w-4 h-4" />
