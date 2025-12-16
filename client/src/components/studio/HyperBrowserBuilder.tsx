@@ -2,6 +2,13 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { 
   ArrowLeft, 
   Play, 
@@ -24,6 +31,104 @@ interface HyperBrowserBuilderProps {
   onRun: (script: string) => void;
   onMinimize: () => void;
 }
+
+interface SavedWorkflow {
+  id: string;
+  name: string;
+  script: string;
+}
+
+const savedWorkflows: SavedWorkflow[] = [
+  {
+    id: 'hacker-news',
+    name: 'Hacker News Top Stories',
+    script: `/**
+ * Hacker News Top Stories
+ * 
+ * This script navigates to Hacker News and extracts the top 10 stories
+ * with their titles and links.
+ */
+
+const sleep = async (ms: number) => {
+  await new Promise(resolve => setTimeout(resolve, ms));
+};
+
+await page.goto("https://news.ycombinator.com", { timeout: 30000 });
+console.log("Loaded Hacker News homepage");
+
+const stories = await page.evaluate(() => {
+  const rows = document.querySelectorAll('.athing');
+  return Array.from(rows).slice(0, 10).map(row => ({
+    title: row.querySelector('.titleline > a')?.textContent || '',
+    link: (row.querySelector('.titleline > a') as HTMLAnchorElement)?.href || ''
+  }));
+});
+
+console.log("Extracted stories:", stories);
+`
+  },
+  {
+    id: 'product-hunt',
+    name: 'Product Hunt Trending',
+    script: `/**
+ * Product Hunt Trending Products
+ * 
+ * Scrapes the trending products from Product Hunt homepage
+ */
+
+await page.goto("https://www.producthunt.com", { timeout: 30000 });
+console.log("Loaded Product Hunt");
+
+await page.waitForSelector('[data-test="post-item"]');
+const products = await page.evaluate(() => {
+  return Array.from(document.querySelectorAll('[data-test="post-item"]')).slice(0, 5).map(el => ({
+    name: el.querySelector('h3')?.textContent || '',
+    tagline: el.querySelector('p')?.textContent || ''
+  }));
+});
+
+console.log("Found products:", products);
+`
+  },
+  {
+    id: 'github-trending',
+    name: 'GitHub Trending Repos',
+    script: `/**
+ * GitHub Trending Repositories
+ * 
+ * Extracts today's trending repositories from GitHub
+ */
+
+await page.goto("https://github.com/trending", { timeout: 30000 });
+console.log("Loaded GitHub Trending");
+
+const repos = await page.evaluate(() => {
+  return Array.from(document.querySelectorAll('article.Box-row')).slice(0, 10).map(el => ({
+    name: el.querySelector('h2 a')?.textContent?.trim() || '',
+    description: el.querySelector('p')?.textContent?.trim() || '',
+    stars: el.querySelector('[href$="/stargazers"]')?.textContent?.trim() || '0'
+  }));
+});
+
+console.log("Trending repos:", repos);
+`
+  },
+  {
+    id: 'new-workflow',
+    name: '+ New Workflow',
+    script: `/**
+ * New Browser Workflow
+ * 
+ * Start building your automation here
+ */
+
+// Navigate to a URL
+await page.goto("https://example.com", { timeout: 30000 });
+
+// Your automation code here...
+`
+  }
+];
 
 const defaultScript = `/**
  * Hacker News Top Stories
@@ -72,12 +177,23 @@ console.log("Extracted stories:", storyRows);
 `;
 
 export default function HyperBrowserBuilder({ onBack, onRun, onMinimize }: HyperBrowserBuilderProps) {
+  const [selectedWorkflowId, setSelectedWorkflowId] = useState('hacker-news');
   const [script, setScript] = useState(defaultScript);
   const [activeTab, setActiveTab] = useState<'editor' | 'output'>('editor');
   const [output, setOutput] = useState<string[]>([]);
   const [isRunning, setIsRunning] = useState(false);
   const [browserUrl, setBrowserUrl] = useState('about:blank');
   const [showBrowser, setShowBrowser] = useState(false);
+
+  const handleWorkflowChange = (workflowId: string) => {
+    setSelectedWorkflowId(workflowId);
+    const workflow = savedWorkflows.find(w => w.id === workflowId);
+    if (workflow) {
+      setScript(workflow.script);
+    }
+  };
+
+  const currentWorkflow = savedWorkflows.find(w => w.id === selectedWorkflowId);
 
   const handleRun = () => {
     setIsRunning(true);
@@ -140,10 +256,21 @@ export default function HyperBrowserBuilder({ onBack, onRun, onMinimize }: Hyper
           >
             <ArrowLeft className="w-4 h-4" />
           </Button>
-          <div className="flex items-center gap-2 px-2 py-1 bg-amber-500/20 rounded-lg">
-            <Zap className="w-4 h-4 text-amber-500" />
-            <span className="text-sm font-medium">Hacker News Stories</span>
-          </div>
+          <Select value={selectedWorkflowId} onValueChange={handleWorkflowChange}>
+            <SelectTrigger className="w-[220px] h-8 rounded-lg bg-amber-500/20 border-amber-500/30" data-testid="select-workflow">
+              <div className="flex items-center gap-2">
+                <Zap className="w-4 h-4 text-amber-500" />
+                <SelectValue />
+              </div>
+            </SelectTrigger>
+            <SelectContent className="rounded-xl">
+              {savedWorkflows.map((workflow) => (
+                <SelectItem key={workflow.id} value={workflow.id} className="rounded-lg">
+                  {workflow.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
           <span className="text-xs text-muted-foreground">Draft</span>
         </div>
         <div className="flex items-center gap-2">
@@ -378,11 +505,11 @@ export default function HyperBrowserBuilder({ onBack, onRun, onMinimize }: Hyper
               </div>
 
               <TabsContent value="editor" className="flex-1 m-0 overflow-hidden">
-                <div className="h-full bg-[#1e1e1e] p-3 font-mono text-sm overflow-auto">
+                <div className="h-full bg-[#1e1e1e] p-3 font-mono text-sm overflow-auto dark-scrollbar">
                   <textarea
                     value={script}
                     onChange={(e) => setScript(e.target.value)}
-                    className="w-full h-full bg-transparent text-[#d4d4d4] resize-none outline-none font-mono text-xs leading-relaxed"
+                    className="w-full h-full bg-transparent text-[#d4d4d4] resize-none outline-none font-mono text-xs leading-relaxed dark-scrollbar"
                     spellCheck={false}
                     data-testid="textarea-script"
                   />
@@ -390,15 +517,13 @@ export default function HyperBrowserBuilder({ onBack, onRun, onMinimize }: Hyper
               </TabsContent>
 
               <TabsContent value="output" className="flex-1 m-0 overflow-hidden">
-                <div className="h-full bg-[#1e1e1e] p-3 font-mono text-xs">
-                  <ScrollArea className="h-full">
-                    {output.map((line, i) => (
-                      <div key={i} className="text-[#6a9955]">{line}</div>
-                    ))}
-                    {isRunning && (
-                      <div className="text-amber-400 animate-pulse">Running...</div>
-                    )}
-                  </ScrollArea>
+                <div className="h-full bg-[#1e1e1e] p-3 font-mono text-xs dark-scrollbar overflow-auto">
+                  {output.map((line, i) => (
+                    <div key={i} className="text-[#6a9955]">{line}</div>
+                  ))}
+                  {isRunning && (
+                    <div className="text-amber-400 animate-pulse">Running...</div>
+                  )}
                 </div>
               </TabsContent>
             </Tabs>
