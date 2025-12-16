@@ -1,9 +1,8 @@
 import { useState } from "react";
 import ChatPanel from "../panels/ChatPanel";
-import type { ChatMessage, Source } from "@/lib/types";
+import type { ChatMessage, Source, A2UIComponent } from "@/lib/types";
 
 export default function ChatPanelExample() {
-  // todo: remove mock functionality
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
       id: '1',
@@ -34,20 +33,37 @@ export default function ChatPanelExample() {
   ]);
 
   const sources: Source[] = [
-    { id: '1', type: 'url', name: 'Competitor A', content: 'https://competitor-a.com' },
-    { id: '2', type: 'url', name: 'Competitor B', content: 'https://competitor-b.com' },
+    { id: '1', type: 'url', name: 'Competitor A', content: 'https://competitor-a.com', summary: null, metadata: null, createdAt: null },
+    { id: '2', type: 'url', name: 'Competitor B', content: 'https://competitor-b.com', summary: null, metadata: null, createdAt: null },
   ];
 
-  const handleNewMessage = (content: string) => {
-    setMessages([
+  const sourceSummaries = [
+    { id: '1', name: 'Competitor A', summary: 'Leading enterprise SaaS platform with focus on automation.' },
+    { id: '2', name: 'Competitor B', summary: 'Small business focused solution with affordable pricing.' },
+  ];
+
+  const handleNewMessage = (userContent: string, response?: string, a2uiComponents?: A2UIComponent[]) => {
+    const newMessages: ChatMessage[] = [
       ...messages,
       {
         id: Date.now().toString(),
-        role: 'user',
-        content,
+        role: 'user' as const,
+        content: userContent,
         timestamp: new Date(),
       },
-    ]);
+    ];
+    
+    if (response) {
+      newMessages.push({
+        id: (Date.now() + 1).toString(),
+        role: 'assistant' as const,
+        content: response,
+        a2uiComponents,
+        timestamp: new Date(),
+      });
+    }
+    
+    setMessages(newMessages);
   };
 
   return (
@@ -57,6 +73,7 @@ export default function ChatPanelExample() {
         messages={messages}
         onNewMessage={handleNewMessage}
         isLoading={false}
+        sourceSummaries={sourceSummaries}
       />
     </div>
   );

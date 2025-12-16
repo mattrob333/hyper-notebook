@@ -199,7 +199,7 @@ export async function registerRoutes(
 
       const generated = await storage.createGeneratedContent({
         type,
-        title: `${type.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())} - ${new Date().toLocaleDateString()}`,
+        title: `${type.replace(/_/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase())} - ${new Date().toLocaleDateString()}`,
         content,
         sourceIds: sourceIds || [],
       });
