@@ -83,6 +83,15 @@ export async function registerRoutes(
       const file = req.file;
       const fileName = file.originalname;
       const mimeType = file.mimetype;
+      
+      const allowedMimeTypes = ['application/pdf', 'text/plain', 'text/markdown'];
+      const allowedExtensions = ['.pdf', '.txt', '.md'];
+      const fileExtension = fileName.toLowerCase().slice(fileName.lastIndexOf('.'));
+      
+      if (!allowedMimeTypes.includes(mimeType) && !allowedExtensions.includes(fileExtension)) {
+        return res.status(400).json({ error: "Unsupported file type. Please upload PDF, TXT, or Markdown files." });
+      }
+      
       let content = '';
       let sourceType: 'pdf' | 'text' = 'text';
 
