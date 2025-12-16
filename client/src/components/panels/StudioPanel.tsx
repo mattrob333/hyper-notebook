@@ -9,7 +9,6 @@ import {
   BrainCircuit, 
   FileBarChart, 
   Layers, 
-  HelpCircle, 
   BarChart3, 
   Presentation,
   Mail,
@@ -18,7 +17,9 @@ import {
   MoreVertical,
   Plus,
   Trash2,
-  Workflow
+  Workflow,
+  Globe,
+  FileCode
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -28,7 +29,10 @@ import {
 } from "@/components/ui/dropdown-menu";
 import WorkflowStudio from "../studio/WorkflowStudio";
 import EmailBuilder from "../studio/EmailBuilder";
-import type { Workflow as WorkflowType } from "@/lib/types";
+import HyperBrowserBuilder from "../studio/HyperBrowserBuilder";
+import AIContextFileGenerator from "../studio/AIContextFileGenerator";
+import ReportsModal from "../studio/ReportsModal";
+import type { Workflow as WorkflowType, Source } from "@/lib/types";
 
 interface Report {
   id: string;
@@ -40,6 +44,7 @@ interface Report {
 interface StudioPanelProps {
   workflows: WorkflowType[];
   reports: Report[];
+  sources: Source[];
   onSaveWorkflow: (workflow: WorkflowType) => void;
   onDeleteWorkflow: (id: string) => void;
   onRunWorkflow: (workflow: WorkflowType) => void;
@@ -47,6 +52,7 @@ interface StudioPanelProps {
   onDownloadReport: (id: string) => void;
   onOpenMindMap?: () => void;
   onOpenEmailBuilder?: () => void;
+  onRunBrowserScript?: (script: string) => void;
 }
 
 interface StudioCardProps {
@@ -72,20 +78,45 @@ function StudioCard({ icon: Icon, title, onClick, testId }: StudioCardProps) {
   );
 }
 
+type ActiveView = 'main' | 'email' | 'hyperbrowser' | 'context-file';
+
 export default function StudioPanel({
   workflows,
   reports,
+  sources,
   onSaveWorkflow,
   onDeleteWorkflow,
   onRunWorkflow,
   onDeleteReport,
   onDownloadReport,
   onOpenMindMap,
+  onRunBrowserScript,
 }: StudioPanelProps) {
-  const [showEmailBuilder, setShowEmailBuilder] = useState(false);
+  const [activeView, setActiveView] = useState<ActiveView>('main');
+  const [reportsModalOpen, setReportsModalOpen] = useState(false);
 
-  if (showEmailBuilder) {
-    return <EmailBuilder onBack={() => setShowEmailBuilder(false)} />;
+  if (activeView === 'email') {
+    return <EmailBuilder onBack={() => setActiveView('main')} />;
+  }
+
+  if (activeView === 'hyperbrowser') {
+    return (
+      <HyperBrowserBuilder 
+        onBack={() => setActiveView('main')} 
+        onRun={(script) => {
+          onRunBrowserScript?.(script);
+        }}
+      />
+    );
+  }
+
+  if (activeView === 'context-file') {
+    return (
+      <AIContextFileGenerator 
+        onBack={() => setActiveView('main')} 
+        sources={sources}
+      />
+    );
   }
 
   return (
@@ -120,17 +151,20 @@ export default function StudioPanel({
           <StudioCard 
             icon={FileBarChart} 
             title="Reports" 
+            onClick={() => setReportsModalOpen(true)}
             testId="studio-card-reports"
           />
           <StudioCard 
-            icon={Layers} 
-            title="Flashcards" 
-            testId="studio-card-flashcards"
+            icon={Globe} 
+            title="Hyper Browser" 
+            onClick={() => setActiveView('hyperbrowser')}
+            testId="studio-card-hyperbrowser"
           />
           <StudioCard 
-            icon={HelpCircle} 
-            title="Quiz" 
-            testId="studio-card-quiz"
+            icon={FileCode} 
+            title="AI Context File" 
+            onClick={() => setActiveView('context-file')}
+            testId="studio-card-context-file"
           />
           <StudioCard 
             icon={BarChart3} 
@@ -148,7 +182,7 @@ export default function StudioPanel({
           <StudioCard 
             icon={Mail} 
             title="Email Builder" 
-            onClick={() => setShowEmailBuilder(true)}
+            onClick={() => setActiveView('email')}
             testId="studio-card-email"
           />
         </div>
@@ -231,6 +265,14 @@ export default function StudioPanel({
           Add note
         </Button>
       </div>
+
+      <ReportsModal
+        open={reportsModalOpen}
+        onOpenChange={setReportsModalOpen}
+        onSelectReport={(reportType) => {
+          console.log('Selected report type:', reportType);
+        }}
+      />
     </div>
   );
 }

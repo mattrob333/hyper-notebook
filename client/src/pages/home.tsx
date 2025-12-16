@@ -298,6 +298,7 @@ export default function Home() {
               <StudioPanel
                 workflows={workflows}
                 reports={reports}
+                sources={sources}
                 onSaveWorkflow={handleSaveWorkflow}
                 onDeleteWorkflow={handleDeleteWorkflow}
                 onRunWorkflow={handleRunWorkflow}
@@ -305,6 +306,35 @@ export default function Home() {
                 onDownloadReport={(id) => console.log('Download report:', id)}
                 onOpenMindMap={() => console.log('Open Mind Map')}
                 onOpenEmailBuilder={() => console.log('Open Email Builder')}
+                onRunBrowserScript={(script) => {
+                  setShowBrowserMonitor(true);
+                  setBrowserStatus('running');
+                  setBrowserTotalSteps(5);
+                  setBrowserStepNum(1);
+                  setBrowserStep('Initializing browser...');
+                  setBrowserUrl('https://hyperbrowser.ai');
+                  
+                  const steps = [
+                    'Initializing browser...',
+                    'Loading target page...',
+                    'Executing script...',
+                    'Extracting data...',
+                    'Completing task...'
+                  ];
+                  
+                  let stepIndex = 0;
+                  const stepInterval = setInterval(() => {
+                    stepIndex++;
+                    if (stepIndex < steps.length) {
+                      setBrowserStepNum(stepIndex + 1);
+                      setBrowserStep(steps[stepIndex]);
+                    } else {
+                      clearInterval(stepInterval);
+                      setBrowserStatus('completed');
+                      setBrowserStep('Script completed');
+                    }
+                  }, 1000);
+                }}
               />
             </div>
           </ResizablePanel>
