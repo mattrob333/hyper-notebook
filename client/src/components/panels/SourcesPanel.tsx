@@ -2,7 +2,6 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Card } from "@/components/ui/card";
 import {
   Dialog,
   DialogContent,
@@ -29,8 +28,8 @@ import {
   Search,
   Sparkles,
   ArrowRight,
-  Zap,
-  CheckCircle2
+  Check,
+  ChevronDown
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -38,7 +37,6 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Checkbox } from "@/components/ui/checkbox";
 import type { Source } from "@/lib/types";
 
 interface SourcesPanelProps {
@@ -70,7 +68,7 @@ export default function SourcesPanel({
   const [textInput, setTextInput] = useState('');
   const [textName, setTextName] = useState('');
   const [deepResearchQuery, setDeepResearchQuery] = useState('');
-  const [selectedSources, setSelectedSources] = useState<Set<string>>(new Set());
+  const [selectedSources, setSelectedSources] = useState<Set<string>>(new Set(sources.map(s => s.id)));
 
   const handleAddSource = () => {
     if (newSourceType === 'url' && urlInput) {
@@ -101,7 +99,8 @@ export default function SourcesPanel({
     setDialogOpen(false);
   };
 
-  const toggleSourceSelection = (sourceId: string) => {
+  const toggleSourceSelection = (sourceId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
     const newSelected = new Set(selectedSources);
     if (newSelected.has(sourceId)) {
       newSelected.delete(sourceId);
@@ -120,139 +119,153 @@ export default function SourcesPanel({
 
   return (
     <div className="flex flex-col h-full" data-testid="sources-panel">
-      <div className="p-4 space-y-4">
+      <div className="p-4 border-b border-border/50">
         <div className="flex items-center justify-between">
           <h2 className="font-semibold text-base">Sources</h2>
-          <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-            <DialogTrigger asChild>
-              <Button size="icon" variant="ghost" data-testid="button-add-source">
-                <Plus className="w-5 h-5" />
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="rounded-2xl">
-              <DialogHeader>
-                <DialogTitle>Add Source</DialogTitle>
-              </DialogHeader>
-              <Tabs value={newSourceType} onValueChange={(v) => setNewSourceType(v as any)}>
-                <TabsList className="w-full rounded-xl">
-                  <TabsTrigger value="url" className="flex-1 rounded-lg" data-testid="tab-url">
-                    <Globe className="w-4 h-4 mr-1" />
-                    URL
-                  </TabsTrigger>
-                  <TabsTrigger value="pdf" className="flex-1 rounded-lg" data-testid="tab-pdf">
-                    <FileText className="w-4 h-4 mr-1" />
-                    PDF
-                  </TabsTrigger>
-                  <TabsTrigger value="text" className="flex-1 rounded-lg" data-testid="tab-text">
-                    <Type className="w-4 h-4 mr-1" />
-                    Text
-                  </TabsTrigger>
-                </TabsList>
-                <TabsContent value="url" className="space-y-4 mt-4">
-                  <Input 
-                    placeholder="https://example.com/article"
-                    value={urlInput}
-                    onChange={(e) => setUrlInput(e.target.value)}
-                    className="rounded-xl"
-                    data-testid="input-url"
-                  />
-                </TabsContent>
-                <TabsContent value="pdf" className="space-y-4 mt-4">
-                  <div className="border-2 border-dashed rounded-2xl p-8 text-center">
-                    <FileText className="w-8 h-8 mx-auto mb-2 text-muted-foreground" />
-                    <p className="text-sm text-muted-foreground">
-                      Drag & drop a PDF or click to browse
-                    </p>
-                    <Input 
-                      type="file" 
-                      accept=".pdf" 
-                      className="mt-2"
-                      data-testid="input-pdf-upload"
-                    />
-                  </div>
-                </TabsContent>
-                <TabsContent value="text" className="space-y-4 mt-4">
-                  <Input 
-                    placeholder="Source name"
-                    value={textName}
-                    onChange={(e) => setTextName(e.target.value)}
-                    className="rounded-xl"
-                    data-testid="input-text-name"
-                  />
-                  <Textarea 
-                    placeholder="Paste your text content here..."
-                    className="min-h-32 rounded-xl"
-                    value={textInput}
-                    onChange={(e) => setTextInput(e.target.value)}
-                    data-testid="input-text-content"
-                  />
-                </TabsContent>
-              </Tabs>
-              <DialogFooter>
-                <Button variant="outline" onClick={() => setDialogOpen(false)} className="rounded-xl">
-                  Cancel
-                </Button>
-                <Button onClick={handleAddSource} className="rounded-xl" data-testid="button-confirm-add-source">
-                  Add Source
-                </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
-        </div>
-
-        <Card className="p-4 rounded-2xl bg-gradient-to-br from-primary/10 to-primary/5 border-primary/20">
-          <div className="flex items-start gap-3">
-            <div className="p-2 rounded-xl bg-primary/20">
-              <Sparkles className="w-5 h-5 text-primary" />
-            </div>
-            <div className="flex-1">
-              <p className="text-sm font-medium mb-1">Try Deep Research</p>
-              <p className="text-xs text-muted-foreground mb-3">
-                for an in-depth report and new sources
-              </p>
-              <div className="flex gap-2">
-                <Input
-                  placeholder="Enter a research topic..."
-                  value={deepResearchQuery}
-                  onChange={(e) => setDeepResearchQuery(e.target.value)}
-                  className="rounded-xl text-sm h-9"
-                  onKeyDown={(e) => e.key === 'Enter' && handleDeepResearch()}
-                  data-testid="input-deep-research"
-                />
-                <Button 
-                  size="sm" 
-                  onClick={handleDeepResearch}
-                  disabled={!deepResearchQuery.trim()}
-                  className="rounded-xl shrink-0"
-                  data-testid="button-start-deep-research"
-                >
-                  <Zap className="w-4 h-4" />
-                </Button>
-              </div>
-            </div>
-          </div>
-        </Card>
-
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-          <Input 
-            placeholder="Search the web for new sources"
-            className="pl-9 rounded-xl"
-            data-testid="input-search-sources"
-          />
+          <Button size="icon" variant="ghost" className="h-8 w-8">
+            <FileText className="w-4 h-4" />
+          </Button>
         </div>
       </div>
 
-      <div className="px-4 pb-2 flex items-center justify-between">
+      <div className="p-4 space-y-3">
+        <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+          <DialogTrigger asChild>
+            <Button 
+              variant="outline" 
+              className="w-full rounded-full justify-center gap-2 h-10"
+              data-testid="button-add-source"
+            >
+              <Plus className="w-4 h-4" />
+              Add sources
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="rounded-2xl">
+            <DialogHeader>
+              <DialogTitle>Add Source</DialogTitle>
+            </DialogHeader>
+            <Tabs value={newSourceType} onValueChange={(v) => setNewSourceType(v as any)}>
+              <TabsList className="w-full rounded-xl">
+                <TabsTrigger value="url" className="flex-1 rounded-lg" data-testid="tab-url">
+                  <Globe className="w-4 h-4 mr-1" />
+                  URL
+                </TabsTrigger>
+                <TabsTrigger value="pdf" className="flex-1 rounded-lg" data-testid="tab-pdf">
+                  <FileText className="w-4 h-4 mr-1" />
+                  PDF
+                </TabsTrigger>
+                <TabsTrigger value="text" className="flex-1 rounded-lg" data-testid="tab-text">
+                  <Type className="w-4 h-4 mr-1" />
+                  Text
+                </TabsTrigger>
+              </TabsList>
+              <TabsContent value="url" className="space-y-4 mt-4">
+                <Input 
+                  placeholder="https://example.com/article"
+                  value={urlInput}
+                  onChange={(e) => setUrlInput(e.target.value)}
+                  className="rounded-xl"
+                  data-testid="input-url"
+                />
+              </TabsContent>
+              <TabsContent value="pdf" className="space-y-4 mt-4">
+                <div className="border-2 border-dashed rounded-2xl p-8 text-center">
+                  <FileText className="w-8 h-8 mx-auto mb-2 text-muted-foreground" />
+                  <p className="text-sm text-muted-foreground">
+                    Drag & drop a PDF or click to browse
+                  </p>
+                  <Input 
+                    type="file" 
+                    accept=".pdf" 
+                    className="mt-2"
+                    data-testid="input-pdf-upload"
+                  />
+                </div>
+              </TabsContent>
+              <TabsContent value="text" className="space-y-4 mt-4">
+                <Input 
+                  placeholder="Source name"
+                  value={textName}
+                  onChange={(e) => setTextName(e.target.value)}
+                  className="rounded-xl"
+                  data-testid="input-text-name"
+                />
+                <Textarea 
+                  placeholder="Paste your text content here..."
+                  className="min-h-32 rounded-xl"
+                  value={textInput}
+                  onChange={(e) => setTextInput(e.target.value)}
+                  data-testid="input-text-content"
+                />
+              </TabsContent>
+            </Tabs>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setDialogOpen(false)} className="rounded-xl">
+                Cancel
+              </Button>
+              <Button onClick={handleAddSource} className="rounded-xl" data-testid="button-confirm-add-source">
+                Add Source
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        <div className="flex items-center gap-2 p-3 rounded-xl bg-card border border-border/50">
+          <div className="p-1.5 rounded-lg bg-blue-500/20">
+            <Sparkles className="w-4 h-4 text-blue-400" />
+          </div>
+          <span className="text-sm">
+            <span className="text-blue-400 font-medium">Try Deep Research</span>
+            <span className="text-muted-foreground"> for an in-depth report and new sources!</span>
+          </span>
+        </div>
+
+        <div className="space-y-2">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <Input 
+              placeholder="Search the web for new sources"
+              value={deepResearchQuery}
+              onChange={(e) => setDeepResearchQuery(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && handleDeepResearch()}
+              className="pl-9 pr-10 rounded-xl bg-card"
+              data-testid="input-search-sources"
+            />
+            {deepResearchQuery && (
+              <Button 
+                size="icon"
+                variant="ghost"
+                className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7"
+                onClick={handleDeepResearch}
+                data-testid="button-start-deep-research"
+              >
+                <ArrowRight className="w-4 h-4" />
+              </Button>
+            )}
+          </div>
+          
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" className="rounded-full h-7 gap-1 text-xs px-3">
+              <Globe className="w-3 h-3" />
+              Web
+              <ChevronDown className="w-3 h-3" />
+            </Button>
+            <Button variant="outline" size="sm" className="rounded-full h-7 gap-1 text-xs px-3">
+              <Sparkles className="w-3 h-3" />
+              Fast Research
+              <ChevronDown className="w-3 h-3" />
+            </Button>
+          </div>
+        </div>
+      </div>
+
+      <div className="px-4 py-2 flex items-center justify-between border-t border-border/50">
         <span className="text-xs text-muted-foreground">
-          {selectedSources.size > 0 
-            ? `${selectedSources.size} selected` 
-            : `Select all sources`
-          }
+          Select all sources
         </span>
         <Button 
           variant="ghost" 
-          size="sm"
+          size="icon"
           onClick={() => {
             if (selectedSources.size === sources.length) {
               setSelectedSources(new Set());
@@ -260,15 +273,15 @@ export default function SourcesPanel({
               setSelectedSources(new Set(sources.map(s => s.id)));
             }
           }}
-          className="text-xs h-7"
+          className="h-6 w-6"
           data-testid="button-select-all"
         >
-          {selectedSources.size === sources.length ? 'Deselect all' : 'Select all'}
+          <Check className={`w-4 h-4 ${selectedSources.size === sources.length ? 'text-primary' : 'text-muted-foreground'}`} />
         </Button>
       </div>
 
-      <ScrollArea className="flex-1 px-2">
-        <div className="space-y-2 pb-4 px-2">
+      <ScrollArea className="flex-1">
+        <div className="px-4 pb-4">
           {sources.length === 0 ? (
             <div className="p-8 text-center">
               <FileText className="w-8 h-8 mx-auto mb-2 text-muted-foreground" />
@@ -280,46 +293,34 @@ export default function SourcesPanel({
               </p>
             </div>
           ) : (
-            sources.map((source) => {
-              const Icon = sourceTypeIcons[source.type];
-              const isSelected = selectedSources.has(source.id);
-              const isActive = selectedSourceId === source.id;
-              return (
-                <Card
-                  key={source.id}
-                  className={`group p-3 rounded-xl cursor-pointer transition-all ${
-                    isActive ? 'ring-2 ring-primary' : ''
-                  } ${isSelected ? 'bg-primary/5' : ''}`}
-                  onClick={() => onSelectSource(source)}
-                  data-testid={`source-item-${source.id}`}
-                >
-                  <div className="flex items-start gap-3">
-                    <Checkbox
-                      checked={isSelected}
-                      onCheckedChange={() => toggleSourceSelection(source.id)}
-                      onClick={(e) => e.stopPropagation()}
-                      className="mt-0.5 rounded-md"
-                      data-testid={`checkbox-source-${source.id}`}
-                    />
-                    <div className="p-2 rounded-lg bg-muted shrink-0">
+            <div className="space-y-1">
+              {sources.map((source) => {
+                const Icon = sourceTypeIcons[source.type];
+                const isSelected = selectedSources.has(source.id);
+                const isActive = selectedSourceId === source.id;
+                return (
+                  <div
+                    key={source.id}
+                    className={`group flex items-center gap-3 px-3 py-2.5 rounded-xl cursor-pointer transition-colors hover-elevate ${
+                      isActive ? 'bg-primary/10' : ''
+                    }`}
+                    onClick={() => onSelectSource(source)}
+                    data-testid={`source-item-${source.id}`}
+                  >
+                    <div className="p-1.5 rounded-lg bg-muted shrink-0">
                       <Icon className="w-4 h-4 text-muted-foreground" />
                     </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium truncate">{source.name}</p>
-                      <p className="text-xs text-muted-foreground truncate">
-                        {source.type === 'url' ? source.content : `${source.type.toUpperCase()} source`}
-                      </p>
-                    </div>
+                    <span className="flex-1 text-sm truncate">{source.name}</span>
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
                         <Button 
                           variant="ghost" 
                           size="icon" 
-                          className="opacity-0 group-hover:opacity-100 shrink-0 h-8 w-8"
+                          className="opacity-0 group-hover:opacity-100 shrink-0 h-6 w-6"
                           onClick={(e) => e.stopPropagation()}
                           data-testid={`button-source-menu-${source.id}`}
                         >
-                          <MoreVertical className="w-4 h-4" />
+                          <MoreVertical className="w-3.5 h-3.5" />
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end" className="rounded-xl">
@@ -338,10 +339,17 @@ export default function SourcesPanel({
                         </DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
+                    <button
+                      onClick={(e) => toggleSourceSelection(source.id, e)}
+                      className="shrink-0 flex items-center justify-center"
+                      data-testid={`checkbox-source-${source.id}`}
+                    >
+                      <Check className={`w-4 h-4 ${isSelected ? 'text-primary' : 'text-muted-foreground/30'}`} />
+                    </button>
                   </div>
-                </Card>
-              );
-            })
+                );
+              })}
+            </div>
           )}
         </div>
       </ScrollArea>
