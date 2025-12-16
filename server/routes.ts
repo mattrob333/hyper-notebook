@@ -74,6 +74,122 @@ export async function registerRoutes(
     }
   });
 
+  // Fetch URL metadata (title, description) for better source names
+  app.post("/api/url/metadata", async (req: Request, res: Response) => {
+    try {
+      const { url } = req.body;
+      
+      if (!url || typeof url !== 'string') {
+        return res.status(400).json({ error: "URL is required" });
+      }
+
+      // Validate URL
+      let parsedUrl: URL;
+      try {
+        parsedUrl = new URL(url);
+      } catch {
+        return res.status(400).json({ error: "Invalid URL" });
+      }
+
+      // Fetch the page to extract metadata
+      try {
+        const response = await fetch(url, {
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (compatible; NotebookBot/1.0)',
+          },
+          signal: AbortSignal.timeout(5000),
+        });
+        
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}`);
+        }
+        
+        const html = await response.text();
+        
+        // Extract title
+        let title = parsedUrl.hostname;
+        const titleMatch = html.match(/<title[^>]*>([^<]+)<\/title>/i);
+        if (titleMatch) {
+          title = titleMatch[1].trim();
+        }
+        
+        // Extract description
+        let description = '';
+        const descMatch = html.match(/<meta[^>]*name=["']description["'][^>]*content=["']([^"']+)["']/i) ||
+                          html.match(/<meta[^>]*content=["']([^"']+)["'][^>]*name=["']description["']/i);
+        if (descMatch) {
+          description = descMatch[1].trim();
+        }
+        
+        // Extract OG title if regular title is generic
+        if (title === parsedUrl.hostname) {
+          const ogTitleMatch = html.match(/<meta[^>]*property=["']og:title["'][^>]*content=["']([^"']+)["']/i);
+          if (ogTitleMatch) {
+            title = ogTitleMatch[1].trim();
+          }
+        }
+        
+        res.json({ title, description, url });
+      } catch (fetchErr) {
+        // Return hostname as fallback
+        res.json({ 
+          title: parsedUrl.hostname, 
+          description: '', 
+          url 
+        });
+      }
+    } catch (error) {
+      console.error('Metadata fetch error:', error);
+      res.status(500).json({ error: "Failed to fetch URL metadata" });
+    }
+  });
+
+  // Web search endpoint for finding sources
+  app.post("/api/search/web", async (req: Request, res: Response) => {
+    try {
+      const { query, type = 'web', mode = 'fast' } = req.body;
+      
+      if (!query || typeof query !== 'string') {
+        return res.status(400).json({ error: "Query is required" });
+      }
+
+      // Use AI to generate simulated search results based on the query
+      // In production, this would integrate with a real search API like Serper, Tavily, or SerpAPI
+      const searchPrompt = `Generate 5 realistic web search results for the query: "${query}". 
+      Search type: ${type}
+      
+      Return a JSON array with exactly 5 results. Each result should have:
+      - title: A realistic, descriptive page title
+      - url: A realistic URL from real websites
+      - description: A 1-2 sentence snippet describing the content
+      
+      Return ONLY valid JSON array, no other text. Example format:
+      [{"title": "Example Title", "url": "https://example.com/page", "description": "Description here"}]`;
+
+      const response = await chat([{ role: 'user', content: searchPrompt }], {
+        model: 'gpt-4.1',
+        systemPrompt: 'You are a search results generator. Return only valid JSON arrays.',
+      });
+
+      let results = [];
+      try {
+        // Extract JSON from response
+        const jsonMatch = response.match(/\[[\s\S]*\]/);
+        if (jsonMatch) {
+          results = JSON.parse(jsonMatch[0]);
+        }
+      } catch (parseErr) {
+        console.error('Failed to parse search results:', parseErr);
+        results = [];
+      }
+
+      res.json({ results });
+    } catch (error) {
+      console.error('Search error:', error);
+      res.status(500).json({ error: "Search failed" });
+    }
+  });
+
   app.post("/api/sources/upload", upload.single('file'), async (req: Request, res: Response) => {
     try {
       if (!req.file) {

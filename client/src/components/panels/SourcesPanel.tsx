@@ -27,8 +27,18 @@ import {
   Link as LinkIcon,
   Plus,
   Upload,
-  FileUp
+  FileUp,
+  Search,
+  ArrowRight,
+  Hourglass,
+  X
 } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import type { Source } from "@/lib/types";
@@ -63,6 +73,20 @@ export default function SourcesPanel({
   const [addSourcesModalOpen, setAddSourcesModalOpen] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  
+  // Web search state
+  const [webSearchQuery, setWebSearchQuery] = useState('');
+  const [searchType, setSearchType] = useState<'web' | 'youtube' | 'news'>('web');
+  const [researchMode, setResearchMode] = useState<'fast' | 'deep'>('fast');
+  const [searchResults, setSearchResults] = useState<Array<{
+    id: string;
+    title: string;
+    url: string;
+    description: string;
+    selected: boolean;
+  }>>([]);
+  const [isSearching, setIsSearching] = useState(false);
+  const [showSearchResults, setShowSearchResults] = useState(false);
 
   const { data: sources = [], isLoading, isError, error } = useQuery<Source[]>({
     queryKey: ['/api/sources'],
@@ -142,20 +166,39 @@ export default function SourcesPanel({
     },
   });
 
-  const handleAddUrl = () => {
+  const [isFetchingMetadata, setIsFetchingMetadata] = useState(false);
+  
+  const handleAddUrl = async () => {
     if (!urlInput.trim()) return;
+    
+    setIsFetchingMetadata(true);
+    setAddUrlDialogOpen(false);
+    
     let name = urlInput.slice(0, 30);
     try {
       name = new URL(urlInput).hostname;
     } catch {
       // Use truncated URL as name
     }
+    
+    // Try to fetch better metadata
+    try {
+      const res = await apiRequest('POST', '/api/url/metadata', { url: urlInput });
+      const metadata = await res.json();
+      if (metadata.title && metadata.title !== name) {
+        name = metadata.title;
+      }
+    } catch {
+      // Use hostname as fallback
+    }
+    
+    setIsFetchingMetadata(false);
+    
     createSourceMutation.mutate({
       type: 'url',
       name,
       content: urlInput,
     });
-    setAddUrlDialogOpen(false);
     setUrlInput('');
   };
 
@@ -213,6 +256,73 @@ export default function SourcesPanel({
     deepResearchMutation.mutate(researchTopic.trim());
   };
 
+  const handleWebSearch = async () => {
+    if (!webSearchQuery.trim()) return;
+    setIsSearching(true);
+    setShowSearchResults(true);
+    
+    try {
+      const res = await apiRequest('POST', '/api/search/web', {
+        query: webSearchQuery,
+        type: searchType,
+        mode: researchMode,
+      });
+      const data = await res.json();
+      setSearchResults(data.results.map((r: any, i: number) => ({
+        id: `search-${i}`,
+        title: r.title,
+        url: r.url,
+        description: r.description || '',
+        selected: false,
+      })));
+    } catch (err) {
+      toast({ 
+        title: "Search failed", 
+        description: err instanceof Error ? err.message : 'Unknown error',
+        variant: "destructive" 
+      });
+      setSearchResults([]);
+    } finally {
+      setIsSearching(false);
+    }
+  };
+
+  const toggleSearchResult = (id: string) => {
+    setSearchResults(prev => prev.map(r => 
+      r.id === id ? { ...r, selected: !r.selected } : r
+    ));
+  };
+
+  const addSelectedSearchResults = async () => {
+    const selected = searchResults.filter(r => r.selected);
+    for (const result of selected) {
+      let name = result.title;
+      if (!name) {
+        try {
+          name = new URL(result.url).hostname;
+        } catch {
+          name = result.url.slice(0, 50);
+        }
+      }
+      try {
+        await createSourceMutation.mutateAsync({
+          type: 'url',
+          name,
+          content: result.url,
+        });
+      } catch (err) {
+        toast({
+          title: "Failed to add source",
+          description: `Could not add: ${name}`,
+          variant: "destructive"
+        });
+      }
+    }
+    setSearchResults([]);
+    setShowSearchResults(false);
+    setWebSearchQuery('');
+  };
+
   const toggleSourceSelection = (sourceId: string) => {
     const newSelected = new Set(selectedSources);
     if (newSelected.has(sourceId)) {
@@ -238,20 +348,10 @@ export default function SourcesPanel({
   return (
     <div className="flex flex-col h-full" data-testid="sources-panel">
       <div className="p-4 border-b border-border/50">
-        <div className="flex items-center justify-between gap-2">
-          <h2 className="font-semibold text-base" data-testid="text-sources-title">Sources</h2>
-          <Button 
-            size="icon" 
-            variant="ghost" 
-            onClick={() => setDeepResearchDialogOpen(true)}
-            data-testid="button-deep-research"
-          >
-            <Sparkles className="w-4 h-4" />
-          </Button>
-        </div>
+        <h2 className="font-semibold text-base" data-testid="text-sources-title">Sources</h2>
       </div>
 
-      <div className="p-4 space-y-2">
+      <div className="p-4 space-y-3">
         <Button 
           variant="outline" 
           size="default"
@@ -262,7 +362,165 @@ export default function SourcesPanel({
           <Plus className="w-4 h-4" />
           Add sources
         </Button>
+
+        {/* Deep Research Banner */}
+        <button
+          className="w-full flex items-center gap-2 px-3 py-2 rounded-xl bg-primary/5 dark:bg-primary/10 border border-primary/20 hover-elevate transition-colors text-left"
+          onClick={() => setDeepResearchDialogOpen(true)}
+          data-testid="button-deep-research-banner"
+        >
+          <Hourglass className="w-4 h-4 text-primary shrink-0" />
+          <span className="text-sm">
+            <span className="text-primary font-medium">Try Deep Research</span>
+            <span className="text-muted-foreground"> for an in-depth report and new sources!</span>
+          </span>
+        </button>
+
+        {/* Web Search Section */}
+        <div className="space-y-2">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <Input
+              placeholder="Search the web for new sources"
+              value={webSearchQuery}
+              onChange={(e) => setWebSearchQuery(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && handleWebSearch()}
+              className="pl-9 pr-10 rounded-xl bg-muted/50"
+              data-testid="input-web-search"
+            />
+            <Button
+              size="icon"
+              variant="ghost"
+              className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7"
+              onClick={handleWebSearch}
+              disabled={isSearching || !webSearchQuery.trim()}
+              data-testid="button-search-submit"
+            >
+              {isSearching ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <ArrowRight className="w-4 h-4" />
+              )}
+            </Button>
+          </div>
+          
+          <div className="flex items-center gap-2">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm" className="gap-1 rounded-lg" data-testid="dropdown-search-type">
+                  <Globe className="w-3.5 h-3.5" />
+                  {searchType === 'web' ? 'Web' : searchType === 'youtube' ? 'YouTube' : 'News'}
+                  <ChevronDown className="w-3 h-3 ml-0.5" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start">
+                <DropdownMenuItem onClick={() => setSearchType('web')} data-testid="menu-item-web">
+                  Web
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setSearchType('youtube')} data-testid="menu-item-youtube">
+                  YouTube
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setSearchType('news')} data-testid="menu-item-news">
+                  News
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm" className="gap-1 rounded-lg" data-testid="dropdown-research-mode">
+                  <Hourglass className="w-3.5 h-3.5" />
+                  {researchMode === 'fast' ? 'Fast Research' : 'Deep Research'}
+                  <ChevronDown className="w-3 h-3 ml-0.5" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start">
+                <DropdownMenuItem onClick={() => setResearchMode('fast')} data-testid="menu-item-fast">
+                  Fast Research
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setResearchMode('deep')} data-testid="menu-item-deep">
+                  Deep Research
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+        </div>
       </div>
+
+      {/* Search Results */}
+      {showSearchResults && (
+        <div className="px-4 pb-2 border-b border-border/50">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-xs font-medium text-muted-foreground">
+              {isSearching ? 'Searching...' : `${searchResults.length} results found`}
+            </span>
+            <div className="flex items-center gap-2">
+              {searchResults.some(r => r.selected) && (
+                <Button
+                  size="sm"
+                  onClick={addSelectedSearchResults}
+                  disabled={createSourceMutation.isPending}
+                  className="h-7 text-xs"
+                  data-testid="button-add-selected-results"
+                >
+                  {createSourceMutation.isPending ? (
+                    <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+                  ) : (
+                    <Plus className="w-3 h-3 mr-1" />
+                  )}
+                  Add {searchResults.filter(r => r.selected).length} selected
+                </Button>
+              )}
+              <Button
+                size="icon"
+                variant="ghost"
+                className="h-7 w-7"
+                onClick={() => {
+                  setShowSearchResults(false);
+                  setSearchResults([]);
+                }}
+                data-testid="button-close-search-results"
+              >
+                <X className="w-4 h-4" />
+              </Button>
+            </div>
+          </div>
+          {isSearching ? (
+            <div className="space-y-2">
+              {[1, 2, 3].map((i) => (
+                <Skeleton key={i} className="h-16 w-full rounded-xl" />
+              ))}
+            </div>
+          ) : searchResults.length > 0 ? (
+            <ScrollArea className="max-h-48">
+              <div className="space-y-1">
+                {searchResults.map((result) => (
+                  <div
+                    key={result.id}
+                    className={`flex items-start gap-2 p-2 rounded-lg cursor-pointer hover-elevate transition-colors ${
+                      result.selected ? 'bg-primary/10' : ''
+                    }`}
+                    onClick={() => toggleSearchResult(result.id)}
+                    data-testid={`search-result-${result.id}`}
+                  >
+                    <Checkbox
+                      checked={result.selected}
+                      onCheckedChange={() => toggleSearchResult(result.id)}
+                      className="mt-0.5"
+                    />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium truncate">{result.title}</p>
+                      <p className="text-xs text-muted-foreground truncate">{result.description || result.url}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </ScrollArea>
+          ) : (
+            <p className="text-sm text-muted-foreground text-center py-4">No results found</p>
+          )}
+        </div>
+      )}
 
       <div className="px-4 py-2 flex items-center justify-between border-t border-border/50">
         <span className="text-xs text-muted-foreground" data-testid="text-select-all-label">
