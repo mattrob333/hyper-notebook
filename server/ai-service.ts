@@ -233,10 +233,11 @@ export async function generateContent(
 
 export async function summarizeSource(content: string, options: { model?: ModelId } = {}): Promise<string> {
   return chat(
-    [{ role: 'user', content: `Summarize the following content in 2-3 paragraphs:\n\n${content}` }],
+    [{ role: 'user', content: `Summarize the following content in 1-2 sentences only. Be brief and capture the main point:\n\n${content.slice(0, 5000)}` }],
     { 
       model: options.model || 'gpt-4.1-mini',
-      systemPrompt: 'You are a helpful assistant that creates clear, concise summaries.',
+      systemPrompt: 'You are a helpful assistant that creates very brief, 1-2 sentence summaries. Be concise.',
+      maxTokens: 150,
     }
   );
 }

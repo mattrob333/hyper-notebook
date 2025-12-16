@@ -342,7 +342,16 @@ export default function SourcesPanel({
   };
 
   const toggleExpand = (sourceId: string) => {
-    setExpandedSourceId(expandedSourceId === sourceId ? null : sourceId);
+    const newExpandedId = expandedSourceId === sourceId ? null : sourceId;
+    setExpandedSourceId(newExpandedId);
+    
+    // Auto-summarize when expanding a source without a summary
+    if (newExpandedId) {
+      const source = sources.find(s => s.id === newExpandedId);
+      if (source && !source.summary && !summarizeSourceMutation.isPending) {
+        summarizeSourceMutation.mutate(newExpandedId);
+      }
+    }
   };
 
   return (
@@ -378,20 +387,20 @@ export default function SourcesPanel({
 
         {/* Web Search Section */}
         <div className="space-y-2">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-            <Input
+          <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-muted/50 border border-border/50">
+            <Search className="w-4 h-4 text-muted-foreground shrink-0" />
+            <input
               placeholder="Search the web for new sources"
               value={webSearchQuery}
               onChange={(e) => setWebSearchQuery(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && handleWebSearch()}
-              className="pl-9 pr-10 rounded-xl bg-muted/50"
+              className="flex-1 bg-transparent border-none outline-none text-sm placeholder:text-muted-foreground"
               data-testid="input-web-search"
             />
             <Button
               size="icon"
               variant="ghost"
-              className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7"
+              className="h-6 w-6 shrink-0"
               onClick={handleWebSearch}
               disabled={isSearching || !webSearchQuery.trim()}
               data-testid="button-search-submit"
