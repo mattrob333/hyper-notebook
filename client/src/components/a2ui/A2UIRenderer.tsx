@@ -533,26 +533,27 @@ function buildMindmapNodesAndEdges(root: MindmapNode): { nodes: Node[]; edges: E
   const edges: Edge[] = [];
 
   function traverse(node: MindmapNode, x: number, y: number, level: number) {
+    const isHighlight = level > 1 && Math.random() > 0.6;
     nodes.push({
       id: node.id,
       position: { x, y },
       data: { label: node.label },
       style: {
-        background: level === 0 ? 'hsl(var(--primary))' : 'hsl(var(--card))',
-        color: level === 0 ? 'hsl(var(--primary-foreground))' : 'hsl(var(--foreground))',
-        border: '1px solid hsl(var(--border))',
-        borderRadius: '8px',
-        padding: '12px 16px',
-        fontSize: level === 0 ? '14px' : '12px',
+        background: isHighlight ? '#059669' : '#3a3f47',
+        color: '#ffffff',
+        border: isHighlight ? '1px solid #10b981' : '1px solid #4a5058',
+        borderRadius: '6px',
+        padding: '10px 16px',
+        fontSize: level === 0 ? '13px' : '12px',
         fontWeight: level === 0 ? '600' : '500',
-        minWidth: '120px',
+        minWidth: level === 0 ? '180px' : '140px',
         textAlign: 'center',
       },
     });
 
     if (node.children && node.children.length > 0) {
       const childCount = node.children.length;
-      const spacing = 150;
+      const spacing = 100;
       const startY = y - ((childCount - 1) * spacing) / 2;
 
       node.children.forEach((child, idx) => {
@@ -561,10 +562,9 @@ function buildMindmapNodesAndEdges(root: MindmapNode): { nodes: Node[]; edges: E
           source: node.id,
           target: child.id,
           type: 'smoothstep',
-          markerEnd: { type: MarkerType.ArrowClosed },
-          style: { stroke: 'hsl(var(--border))' },
+          style: { stroke: '#5a6068', strokeWidth: 2 },
         });
-        traverse(child, x + 250, startY + idx * spacing, level + 1);
+        traverse(child, x + 220, startY + idx * spacing, level + 1);
       });
     }
   }
@@ -593,33 +593,36 @@ function A2Mindmap({
     
     // Check if it's React Flow format (has nodes and edges arrays with format marker)
     if ('format' in data && data.format === 'reactflow' && 'nodes' in data && 'edges' in data) {
-      // Transform React Flow format nodes to proper Node objects
-      const nodes: Node[] = (data.nodes || []).map((node, idx) => ({
-        id: node.id || `node-${idx}`,
-        type: 'default',
-        position: node.position || { x: (idx % 4) * 250 + 50, y: Math.floor(idx / 4) * 150 + 50 },
-        data: { 
-          label: node.label || node.data?.label || node.id || 'Node' 
-        },
-        style: {
-          background: 'hsl(var(--card))',
-          border: '1px solid hsl(var(--border))',
-          borderRadius: '8px',
-          padding: '12px 16px',
-          fontSize: '12px',
-          fontWeight: '500',
-          minWidth: '120px',
-          textAlign: 'center',
-        },
-      }));
+      // Transform React Flow format nodes to proper Node objects with dark theme
+      const nodes: Node[] = (data.nodes || []).map((node, idx) => {
+        const isHighlight = node.highlight || (idx > 2 && Math.random() > 0.6);
+        return {
+          id: node.id || `node-${idx}`,
+          type: 'default',
+          position: node.position || { x: (idx % 4) * 220 + 50, y: Math.floor(idx / 4) * 100 + 50 },
+          data: { 
+            label: node.label || node.data?.label || node.id || 'Node' 
+          },
+          style: {
+            background: isHighlight ? '#059669' : '#3a3f47',
+            color: '#ffffff',
+            border: isHighlight ? '1px solid #10b981' : '1px solid #4a5058',
+            borderRadius: '6px',
+            padding: '10px 16px',
+            fontSize: '12px',
+            fontWeight: '500',
+            minWidth: '140px',
+            textAlign: 'center',
+          },
+        };
+      });
       
       const edges: Edge[] = (data.edges || []).map((edge, idx) => ({
         id: edge.id || `edge-${idx}`,
         source: edge.source,
         target: edge.target,
         type: 'smoothstep',
-        markerEnd: { type: MarkerType.ArrowClosed },
-        style: { stroke: 'hsl(var(--border))' },
+        style: { stroke: '#5a6068', strokeWidth: 2 },
       }));
       
       return { nodes, edges };
@@ -650,8 +653,12 @@ function A2Mindmap({
 
   return (
     <div className="w-full" data-testid="a2ui-mindmap">
-      {title && <h4 className="text-sm font-medium mb-3">{title}</h4>}
-      <div className="h-[400px] w-full rounded-lg border overflow-hidden">
+      {title && (
+        <div className="mb-3">
+          <h4 className="text-white font-medium text-base">{title}</h4>
+        </div>
+      )}
+      <div className="h-[500px] w-full rounded-lg overflow-hidden bg-[#2a2d32]">
         <ReactFlow
           nodes={nodes}
           edges={edges}
@@ -659,17 +666,18 @@ function A2Mindmap({
           onEdgesChange={onEdgesChange}
           onConnect={onConnect}
           fitView
+          fitViewOptions={{ padding: 0.2 }}
           attributionPosition="bottom-right"
+          proOptions={{ hideAttribution: true }}
+          style={{ background: '#2a2d32' }}
+          defaultEdgeOptions={{
+            type: 'smoothstep',
+            style: { stroke: '#5a6068', strokeWidth: 2 },
+          }}
         >
-          <Background gap={16} size={1} />
-          <Controls position="bottom-right" />
-          <MiniMap 
-            style={{ 
-              background: 'hsl(var(--muted))',
-              border: '1px solid hsl(var(--border))',
-              borderRadius: '4px',
-            }}
-            nodeColor="hsl(var(--primary))"
+          <Controls 
+            position="bottom-right"
+            className="!bg-[#3a3f47] !border-[#4a5058] !rounded-lg !shadow-lg [&>button]:!bg-[#3a3f47] [&>button]:!border-[#4a5058] [&>button]:!text-white [&>button:hover]:!bg-[#4a5058]"
           />
         </ReactFlow>
       </div>

@@ -276,7 +276,7 @@ export default function ChatPanel({
 
   return (
     <div className="flex-1 flex flex-col h-full min-w-0" data-testid="chat-panel">
-      <div className="h-14 border-b border-border/50 flex items-center justify-between gap-2 px-6 sticky top-0 bg-sidebar z-10">
+      <div className="h-14 border-b border-border/50 flex items-center justify-between gap-2 px-4 sticky top-0 bg-sidebar z-10">
         <div className="flex items-center gap-2 flex-wrap">
           <h2 className="font-semibold" data-testid="text-chat-title">Chat</h2>
           <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded-full" data-testid="text-source-count">
@@ -285,8 +285,8 @@ export default function ChatPanel({
         </div>
       </div>
 
-      <ScrollArea className="flex-1 px-6" ref={scrollRef} data-testid="scroll-messages">
-        <div className="max-w-3xl mx-auto py-6 space-y-6">
+      <ScrollArea className="flex-1 px-4" ref={scrollRef} data-testid="scroll-messages">
+        <div className="py-6 space-y-6">
           {messages.length === 0 && !streamingContent ? (
             <div className="text-center py-12" data-testid="container-empty-state">
               <div className="w-16 h-16 mx-auto mb-6 rounded-2xl bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center">
@@ -318,60 +318,68 @@ export default function ChatPanel({
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: 0.2 }}
-                  className={`flex gap-4 group ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
+                  className={`group ${message.role === 'user' ? 'flex justify-end' : ''}`}
                   data-testid={`container-message-${message.id}`}
                 >
-                  {message.role === 'assistant' && (
-                    <Avatar className="w-9 h-9 shrink-0 rounded-xl">
-                      <AvatarFallback className="bg-primary text-primary-foreground rounded-xl">
-                        <Bot className="w-5 h-5" />
-                      </AvatarFallback>
-                    </Avatar>
-                  )}
-                  <div className={`max-w-2xl ${message.role === 'user' ? 'order-first' : ''}`}>
-                    {message.content && (
-                      <Card
-                        className={`rounded-2xl px-4 py-3 ${
-                          message.role === 'user'
-                            ? 'bg-primary text-primary-foreground'
-                            : 'bg-muted'
-                        }`}
-                        data-testid={`card-message-content-${message.id}`}
-                      >
-                        <p className="text-sm whitespace-pre-wrap leading-relaxed">{message.content}</p>
-                      </Card>
-                    )}
-                    {message.a2uiComponents && message.a2uiComponents.length > 0 && (
-                      <div className="mt-3" data-testid={`container-a2ui-${message.id}`}>
-                        <A2UIRenderer components={message.a2uiComponents} />
+                  {message.role === 'user' ? (
+                    <div className="flex items-start gap-3 max-w-[85%]">
+                      <div className="flex flex-col items-end">
+                        <div
+                          className="bg-emerald-600 text-white rounded-2xl px-4 py-3"
+                          data-testid={`card-message-content-${message.id}`}
+                        >
+                          <p className="text-sm whitespace-pre-wrap leading-relaxed">{message.content}</p>
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-1 px-1" data-testid={`text-timestamp-${message.id}`}>
+                          {message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        </p>
                       </div>
-                    )}
-                    {message.role === 'assistant' && (
-                      <div className="flex items-center gap-1 mt-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <Button variant="ghost" size="icon" className="h-7 w-7" data-testid={`button-thumbsup-${message.id}`}>
-                          <ThumbsUp className="w-3.5 h-3.5" />
-                        </Button>
-                        <Button variant="ghost" size="icon" className="h-7 w-7" data-testid={`button-thumbsdown-${message.id}`}>
-                          <ThumbsDown className="w-3.5 h-3.5" />
-                        </Button>
-                        <Button variant="ghost" size="icon" className="h-7 w-7" data-testid={`button-copy-${message.id}`}>
-                          <Copy className="w-3.5 h-3.5" />
-                        </Button>
-                        <Button variant="ghost" size="icon" className="h-7 w-7" data-testid={`button-pin-${message.id}`}>
-                          <Pin className="w-3.5 h-3.5" />
-                        </Button>
+                      <Avatar className="w-8 h-8 shrink-0 rounded-full">
+                        <AvatarFallback className="rounded-full bg-muted">
+                          <User className="w-4 h-4" />
+                        </AvatarFallback>
+                      </Avatar>
+                    </div>
+                  ) : (
+                    <div className="flex items-start gap-3">
+                      <Avatar className="w-8 h-8 shrink-0 rounded-full mt-1">
+                        <AvatarFallback className="bg-emerald-600 text-white rounded-full">
+                          <Bot className="w-4 h-4" />
+                        </AvatarFallback>
+                      </Avatar>
+                      <div className="flex-1 min-w-0">
+                        {message.content && (
+                          <div
+                            className="text-sm whitespace-pre-wrap leading-relaxed prose prose-sm dark:prose-invert max-w-none"
+                            data-testid={`card-message-content-${message.id}`}
+                          >
+                            {message.content}
+                          </div>
+                        )}
+                        {message.a2uiComponents && message.a2uiComponents.length > 0 && (
+                          <div className="mt-3" data-testid={`container-a2ui-${message.id}`}>
+                            <A2UIRenderer components={message.a2uiComponents} />
+                          </div>
+                        )}
+                        <div className="flex items-center gap-1 mt-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <Button variant="ghost" size="icon" className="h-7 w-7" data-testid={`button-thumbsup-${message.id}`}>
+                            <ThumbsUp className="w-3.5 h-3.5" />
+                          </Button>
+                          <Button variant="ghost" size="icon" className="h-7 w-7" data-testid={`button-thumbsdown-${message.id}`}>
+                            <ThumbsDown className="w-3.5 h-3.5" />
+                          </Button>
+                          <Button variant="ghost" size="icon" className="h-7 w-7" data-testid={`button-copy-${message.id}`}>
+                            <Copy className="w-3.5 h-3.5" />
+                          </Button>
+                          <Button variant="ghost" size="icon" className="h-7 w-7" data-testid={`button-pin-${message.id}`}>
+                            <Pin className="w-3.5 h-3.5" />
+                          </Button>
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-1" data-testid={`text-timestamp-${message.id}`}>
+                          {message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        </p>
                       </div>
-                    )}
-                    <p className="text-xs text-muted-foreground mt-1 px-1" data-testid={`text-timestamp-${message.id}`}>
-                      {message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                    </p>
-                  </div>
-                  {message.role === 'user' && (
-                    <Avatar className="w-9 h-9 shrink-0 rounded-xl">
-                      <AvatarFallback className="rounded-xl">
-                        <User className="w-5 h-5" />
-                      </AvatarFallback>
-                    </Avatar>
+                    </div>
                   )}
                 </motion.div>
               ))}
@@ -381,28 +389,28 @@ export default function ChatPanel({
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
-              className="flex gap-4"
+              className="flex items-start gap-3"
               data-testid="container-streaming-message"
             >
-              <Avatar className="w-9 h-9 rounded-xl shrink-0">
-                <AvatarFallback className="bg-primary text-primary-foreground rounded-xl">
-                  <Bot className="w-5 h-5" />
+              <Avatar className="w-8 h-8 shrink-0 rounded-full mt-1">
+                <AvatarFallback className="bg-emerald-600 text-white rounded-full">
+                  <Bot className="w-4 h-4" />
                 </AvatarFallback>
               </Avatar>
-              <Card className="bg-muted rounded-2xl px-4 py-3 max-w-2xl">
+              <div className="flex-1 min-w-0">
                 {streamingContent ? (
-                  <p className="text-sm whitespace-pre-wrap leading-relaxed" data-testid="text-streaming-content">
+                  <div className="text-sm whitespace-pre-wrap leading-relaxed prose prose-sm dark:prose-invert max-w-none" data-testid="text-streaming-content">
                     {streamingContent}
                     <span className="inline-block w-2 h-4 bg-foreground/60 ml-0.5 animate-pulse" />
-                  </p>
+                  </div>
                 ) : (
-                  <div className="flex gap-1.5" data-testid="container-typing-indicator">
+                  <div className="flex gap-1.5 py-2" data-testid="container-typing-indicator">
                     <span className="w-2 h-2 bg-foreground/40 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
                     <span className="w-2 h-2 bg-foreground/40 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
                     <span className="w-2 h-2 bg-foreground/40 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
                   </div>
                 )}
-              </Card>
+              </div>
             </motion.div>
           )}
         </div>
