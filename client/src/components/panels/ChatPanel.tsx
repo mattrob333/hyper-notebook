@@ -414,7 +414,8 @@ export default function ChatPanel({
             <Textarea
               ref={textareaRef}
               placeholder="Reply..."
-              className="min-h-[24px] max-h-32 resize-none border-0 focus-visible:ring-0 focus:outline-none outline-none bg-transparent text-sm placeholder:text-muted-foreground/60 p-0"
+              className="min-h-[24px] max-h-32 resize-none border-0 shadow-none ring-0 focus:ring-0 focus:border-0 focus-visible:ring-0 focus-visible:ring-offset-0 focus-visible:outline-none focus:outline-none outline-none bg-transparent text-sm placeholder:text-muted-foreground/60 p-0"
+              style={{ outline: 'none', boxShadow: 'none' }}
               value={inputValue}
               onChange={(e) => setInputValue(e.target.value)}
               onKeyDown={handleKeyDown}

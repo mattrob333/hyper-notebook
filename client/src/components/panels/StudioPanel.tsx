@@ -115,30 +115,40 @@ const CONTENT_TYPES: Array<{
   icon: React.ComponentType<{ className?: string }>;
   title: string;
   description: string;
+  bgColor: string;
+  iconColor: string;
 }> = [
   {
     type: 'audio_overview',
     icon: Mic,
     title: 'Audio Overview',
-    description: 'Generate a podcast-style audio summary of your sources'
+    description: 'Generate a podcast-style audio summary of your sources',
+    bgColor: 'bg-purple-500/10 dark:bg-purple-500/20',
+    iconColor: 'text-purple-500',
   },
   {
     type: 'mindmap',
     icon: Network,
     title: 'Mind Map',
-    description: 'Generate an interactive mind map visualization'
+    description: 'Generate an interactive mind map visualization',
+    bgColor: 'bg-sky-500/10 dark:bg-sky-500/20',
+    iconColor: 'text-sky-500',
   },
   {
     type: 'infographic',
     icon: BarChart3,
     title: 'Infographic',
-    description: 'Create visual data representations'
+    description: 'Create visual data representations',
+    bgColor: 'bg-amber-500/10 dark:bg-amber-500/20',
+    iconColor: 'text-amber-500',
   },
   {
     type: 'slides',
     icon: Presentation,
     title: 'Slide Deck',
-    description: 'Generate presentation slides from your content'
+    description: 'Generate presentation slides from your content',
+    bgColor: 'bg-emerald-500/10 dark:bg-emerald-500/20',
+    iconColor: 'text-emerald-500',
   }
 ];
 
@@ -353,53 +363,49 @@ export default function StudioPanel({
         </div>
       </div>
 
-      <div className="px-4 py-2 flex items-center gap-2 flex-wrap">
-        <div className="flex items-center gap-1 flex-wrap">
+      <div className="p-3">
+        <div className="grid grid-cols-2 gap-2">
           {CONTENT_TYPES.map((item) => {
             const Icon = item.icon;
             return (
-              <Button
+              <button
                 key={item.type}
-                variant="ghost"
-                size="sm"
-                className="gap-1.5 text-xs"
+                className={`flex items-center gap-2 p-2.5 rounded-lg ${item.bgColor} hover-elevate transition-all text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1`}
                 onClick={() => handleGenerateContent(item.type)}
                 disabled={loadingType === item.type}
                 data-testid={`button-generate-${item.type.replace(/_/g, '-')}`}
               >
                 {loadingType === item.type ? (
-                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  <Loader2 className={`w-4 h-4 ${item.iconColor} animate-spin`} />
                 ) : (
-                  <Icon className="w-3.5 h-3.5" />
+                  <Icon className={`w-4 h-4 ${item.iconColor}`} />
                 )}
-                {item.title}
-              </Button>
+                <span className="text-xs font-medium">{item.title}</span>
+              </button>
             );
           })}
-          <Button
-            variant="ghost"
-            size="sm"
-            className="gap-1.5 text-xs"
+          <button
+            className="flex items-center gap-2 p-2.5 rounded-lg bg-rose-500/10 dark:bg-rose-500/20 hover-elevate transition-all text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1"
             onClick={() => setReportsModalOpen(true)}
             data-testid="button-reports"
           >
-            <FileBarChart className="w-3.5 h-3.5" />
-            Reports
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="gap-1.5 text-xs"
+            <FileBarChart className="w-4 h-4 text-rose-500" />
+            <span className="text-xs font-medium">Reports</span>
+          </button>
+          <button
+            className="flex items-center gap-2 p-2.5 rounded-lg bg-blue-500/10 dark:bg-blue-500/20 hover-elevate transition-all text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1"
             onClick={() => setActiveView('email')}
             data-testid="button-email-builder"
           >
-            <Mail className="w-3.5 h-3.5" />
-            Email
-          </Button>
+            <Mail className="w-4 h-4 text-blue-500" />
+            <span className="text-xs font-medium">Email</span>
+          </button>
+        </div>
+        <div className="flex justify-end mt-2">
           <Button
             variant="ghost"
             size="icon"
-            className="h-8 w-8"
+            className="h-7 w-7"
             onClick={() => setCustomDialogOpen(true)}
             data-testid="button-custom-generate"
           >

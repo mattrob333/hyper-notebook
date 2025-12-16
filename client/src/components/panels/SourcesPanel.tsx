@@ -24,7 +24,10 @@ import {
   Sparkles,
   Loader2,
   AlertCircle,
-  Link as LinkIcon
+  Link as LinkIcon,
+  Plus,
+  Upload,
+  FileUp
 } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -57,6 +60,7 @@ export default function SourcesPanel({
   const [researchTopic, setResearchTopic] = useState('');
   const [selectedSources, setSelectedSources] = useState<Set<string>>(new Set());
   const [expandedSourceId, setExpandedSourceId] = useState<string | null>(null);
+  const [addSourcesModalOpen, setAddSourcesModalOpen] = useState(false);
 
   const { data: sources = [], isLoading, isError, error } = useQuery<Source[]>({
     queryKey: ['/api/sources'],
@@ -209,28 +213,16 @@ export default function SourcesPanel({
       </div>
 
       <div className="p-4 space-y-2">
-        <div className="flex gap-2">
-          <Button 
-            variant="outline" 
-            size="sm"
-            className="flex-1 justify-center gap-2"
-            onClick={() => setAddUrlDialogOpen(true)}
-            data-testid="button-add-url"
-          >
-            <LinkIcon className="w-4 h-4" />
-            Add URL
-          </Button>
-          <Button 
-            variant="outline" 
-            size="sm"
-            className="flex-1 justify-center gap-2"
-            onClick={() => setAddTextDialogOpen(true)}
-            data-testid="button-add-text"
-          >
-            <Type className="w-4 h-4" />
-            Add Text
-          </Button>
-        </div>
+        <Button 
+          variant="outline" 
+          size="default"
+          className="w-full justify-center gap-2"
+          onClick={() => setAddSourcesModalOpen(true)}
+          data-testid="button-add-sources"
+        >
+          <Plus className="w-4 h-4" />
+          Add sources
+        </Button>
       </div>
 
       <div className="px-4 py-2 flex items-center justify-between border-t border-border/50">
@@ -484,6 +476,63 @@ export default function SourcesPanel({
               {deepResearchMutation.isPending ? 'Researching...' : 'Start Research'}
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={addSourcesModalOpen} onOpenChange={setAddSourcesModalOpen}>
+        <DialogContent className="rounded-2xl max-w-md" data-testid="dialog-add-sources">
+          <DialogHeader>
+            <DialogTitle>Add sources</DialogTitle>
+            <DialogDescription>
+              Add content to your notebook from URLs, files, or text
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            <button
+              className="w-full flex items-center gap-3 p-3 rounded-xl border border-border/50 hover-elevate transition-colors text-left"
+              onClick={() => {
+                setAddSourcesModalOpen(false);
+                setAddUrlDialogOpen(true);
+              }}
+              data-testid="button-modal-add-url"
+            >
+              <div className="w-10 h-10 rounded-lg bg-blue-500/10 dark:bg-blue-500/20 flex items-center justify-center">
+                <LinkIcon className="w-5 h-5 text-blue-500" />
+              </div>
+              <div>
+                <p className="text-sm font-medium">Website URL</p>
+                <p className="text-xs text-muted-foreground">Add a webpage or article</p>
+              </div>
+            </button>
+            <button
+              className="w-full flex items-center gap-3 p-3 rounded-xl border border-border/50 hover-elevate transition-colors text-left"
+              onClick={() => {
+                setAddSourcesModalOpen(false);
+                setAddTextDialogOpen(true);
+              }}
+              data-testid="button-modal-add-text"
+            >
+              <div className="w-10 h-10 rounded-lg bg-green-500/10 dark:bg-green-500/20 flex items-center justify-center">
+                <Type className="w-5 h-5 text-green-500" />
+              </div>
+              <div>
+                <p className="text-sm font-medium">Paste text</p>
+                <p className="text-xs text-muted-foreground">Add text content directly</p>
+              </div>
+            </button>
+            <button
+              className="w-full flex items-center gap-3 p-3 rounded-xl border border-border/50 hover-elevate transition-colors text-left opacity-60"
+              data-testid="button-modal-upload-file"
+            >
+              <div className="w-10 h-10 rounded-lg bg-purple-500/10 dark:bg-purple-500/20 flex items-center justify-center">
+                <FileUp className="w-5 h-5 text-purple-500" />
+              </div>
+              <div>
+                <p className="text-sm font-medium">Upload file</p>
+                <p className="text-xs text-muted-foreground">PDF, TXT, or other documents (coming soon)</p>
+              </div>
+            </button>
+          </div>
         </DialogContent>
       </Dialog>
     </div>
