@@ -1,5 +1,5 @@
 import type { ComponentType } from "react";
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 import { useEditor, EditorContent } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import Placeholder from "@tiptap/extension-placeholder";
@@ -60,7 +60,18 @@ import {
   Newspaper,
   Mail,
   Megaphone,
+  Send,
+  Eye,
+  Code,
+  Briefcase,
+  Heart,
+  Gift,
+  Calendar,
+  Trash2,
+  Plus,
+  Image as ImageIconLucide,
 } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
 
 interface EmailBuilderProps {
   onBack?: () => void;
@@ -82,13 +93,20 @@ interface EmailTemplate {
   signature: string;
 }
 
-const EMAIL_TEMPLATES: EmailTemplate[] = [
+interface EmailTemplateWithContent extends EmailTemplate {
+  defaultContent?: string;
+  category: 'business' | 'marketing' | 'personal';
+}
+
+const EMAIL_TEMPLATES: EmailTemplateWithContent[] = [
   {
     id: 'professional',
     name: 'Professional',
     icon: Mail,
+    category: 'business',
     letterhead: `<div style="text-align: center; padding: 20px; border-bottom: 2px solid #10b981;">
-      <h1 style="margin: 0; color: #10b981; font-size: 24px;">Your Company</h1>
+      {{logo}}
+      <h1 style="margin: 0; color: #10b981; font-size: 24px;">{{company}}</h1>
       <p style="margin: 4px 0 0 0; color: #6b7280; font-size: 14px;">Professional Excellence</p>
     </div>`,
     signature: `<div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #e5e7eb;">
@@ -97,42 +115,162 @@ const EMAIL_TEMPLATES: EmailTemplate[] = [
       <p style="margin: 4px 0; color: #6b7280; font-size: 14px;">{{company}}</p>
       <p style="margin: 8px 0 0 0; color: #10b981; font-size: 14px;">{{email}}</p>
     </div>`,
+    defaultContent: '<p>Dear {{recipient_name}},</p><p>I hope this email finds you well.</p><p></p><p>Best regards</p>',
   },
   {
     id: 'newsletter',
     name: 'Newsletter',
     icon: Newspaper,
+    category: 'marketing',
     letterhead: `<div style="background: linear-gradient(135deg, #10b981, #059669); padding: 30px; text-align: center; border-radius: 8px 8px 0 0;">
-      <h1 style="margin: 0; color: white; font-size: 28px;">Newsletter</h1>
-      <p style="margin: 8px 0 0 0; color: rgba(255,255,255,0.9); font-size: 16px;">Monthly Updates & Insights</p>
+      {{logo}}
+      <h1 style="margin: 0; color: white; font-size: 28px;">{{newsletter_title}}</h1>
+      <p style="margin: 8px 0 0 0; color: rgba(255,255,255,0.9); font-size: 16px;">{{newsletter_subtitle}}</p>
     </div>`,
     signature: `<div style="margin-top: 30px; padding: 20px; background: #f3f4f6; text-align: center; border-radius: 0 0 8px 8px;">
       <p style="margin: 0; font-size: 14px; color: #6b7280;">You're receiving this because you subscribed to our newsletter.</p>
-      <p style="margin: 8px 0 0 0;"><a href="#" style="color: #10b981; text-decoration: underline;">Unsubscribe</a></p>
+      <p style="margin: 8px 0 0 0;"><a href="#" style="color: #10b981; text-decoration: underline;">Unsubscribe</a> | <a href="#" style="color: #10b981; text-decoration: underline;">View in browser</a></p>
     </div>`,
+    defaultContent: `<h2 style="color: #059669;">📰 This Week's Highlights</h2>
+<p>Welcome to this week's newsletter! Here's what we've been up to:</p>
+<h3>🎯 Featured Article</h3>
+<p>Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore.</p>
+<h3>📊 By the Numbers</h3>
+<ul>
+<li><strong>50%</strong> increase in engagement</li>
+<li><strong>1,000+</strong> new subscribers</li>
+<li><strong>25</strong> articles published</li>
+</ul>
+<h3>🔗 Quick Links</h3>
+<p>• <a href="#">Read our latest blog post</a><br>• <a href="#">Check out new features</a><br>• <a href="#">Join our community</a></p>`,
+  },
+  {
+    id: 'proposal',
+    name: 'Business Proposal',
+    icon: Briefcase,
+    category: 'business',
+    letterhead: `<div style="background: linear-gradient(135deg, #1e3a5f, #2563eb); padding: 30px; text-align: center;">
+      {{logo}}
+      <h1 style="margin: 0; color: white; font-size: 28px;">Business Proposal</h1>
+      <p style="margin: 8px 0 0 0; color: rgba(255,255,255,0.8); font-size: 14px;">{{company}}</p>
+    </div>`,
+    signature: `<div style="margin-top: 30px; padding: 20px; background: #f8fafc; border-radius: 8px;">
+      <p style="margin: 0; font-weight: 600; color: #1e3a5f;">{{name}}</p>
+      <p style="margin: 4px 0; color: #64748b; font-size: 14px;">{{title}} | {{company}}</p>
+      <p style="margin: 8px 0 0 0; color: #2563eb; font-size: 14px;">{{email}} | {{phone}}</p>
+    </div>`,
+    defaultContent: `<h2>Executive Summary</h2>
+<p>Thank you for considering {{company}} for your upcoming project. We are excited to present this proposal outlining our approach, timeline, and investment.</p>
+<h2>Project Scope</h2>
+<p>Based on our discussion, we understand you need:</p>
+<ul>
+<li>Requirement 1</li>
+<li>Requirement 2</li>
+<li>Requirement 3</li>
+</ul>
+<h2>Our Approach</h2>
+<p>We will deliver this project in three phases:</p>
+<ol>
+<li><strong>Discovery Phase</strong> (Week 1-2)</li>
+<li><strong>Development Phase</strong> (Week 3-6)</li>
+<li><strong>Launch Phase</strong> (Week 7-8)</li>
+</ol>
+<h2>Investment</h2>
+<table style="width: 100%; border-collapse: collapse;">
+<tr style="background: #f1f5f9;"><td style="padding: 10px; border: 1px solid #e2e8f0;"><strong>Service</strong></td><td style="padding: 10px; border: 1px solid #e2e8f0;"><strong>Price</strong></td></tr>
+<tr><td style="padding: 10px; border: 1px solid #e2e8f0;">Service Package</td><td style="padding: 10px; border: 1px solid #e2e8f0;">$X,XXX</td></tr>
+</table>
+<h2>Next Steps</h2>
+<p>Please reply to this email or schedule a call to discuss this proposal further.</p>`,
+  },
+  {
+    id: 'welcome',
+    name: 'Welcome Email',
+    icon: Heart,
+    category: 'marketing',
+    letterhead: `<div style="background: linear-gradient(135deg, #ec4899, #f43f5e); padding: 40px; text-align: center;">
+      {{logo}}
+      <h1 style="margin: 0; color: white; font-size: 32px;">Welcome! 🎉</h1>
+    </div>`,
+    signature: `<div style="margin-top: 30px; padding: 20px; text-align: center; background: #fdf2f8; border-radius: 8px;">
+      <p style="margin: 0; color: #be185d;">Need help? Reply to this email or visit our <a href="#" style="color: #ec4899;">Help Center</a></p>
+    </div>`,
+    defaultContent: `<h2 style="text-align: center; color: #be185d;">You're officially part of the family!</h2>
+<p>Hi {{recipient_name}},</p>
+<p>We're thrilled to have you join us. Here's what you can do next:</p>
+<div style="background: #fdf2f8; padding: 20px; border-radius: 8px; margin: 20px 0;">
+<p style="margin: 0;"><strong>🚀 Get Started</strong></p>
+<p>Complete your profile to personalize your experience.</p>
+</div>
+<div style="background: #fdf2f8; padding: 20px; border-radius: 8px; margin: 20px 0;">
+<p style="margin: 0;"><strong>📚 Learn More</strong></p>
+<p>Check out our getting started guide.</p>
+</div>
+<div style="background: #fdf2f8; padding: 20px; border-radius: 8px; margin: 20px 0;">
+<p style="margin: 0;"><strong>💬 Connect</strong></p>
+<p>Join our community and meet other members.</p>
+</div>`,
+  },
+  {
+    id: 'event',
+    name: 'Event Invitation',
+    icon: Calendar,
+    category: 'marketing',
+    letterhead: `<div style="background: linear-gradient(135deg, #8b5cf6, #6366f1); padding: 40px; text-align: center;">
+      {{logo}}
+      <p style="margin: 0 0 10px 0; color: rgba(255,255,255,0.9); font-size: 14px; text-transform: uppercase; letter-spacing: 2px;">You're Invited</p>
+      <h1 style="margin: 0; color: white; font-size: 28px;">{{event_name}}</h1>
+      <p style="margin: 10px 0 0 0; color: white; font-size: 18px;">📅 {{event_date}} | 📍 {{event_location}}</p>
+    </div>`,
+    signature: `<div style="margin-top: 30px; padding: 20px; text-align: center; background: #f5f3ff; border-radius: 8px;">
+      <a href="#" style="display: inline-block; background: #8b5cf6; color: white; padding: 12px 30px; border-radius: 6px; text-decoration: none; font-weight: 600;">RSVP Now</a>
+      <p style="margin: 15px 0 0 0; color: #6b7280; font-size: 12px;">Can't make it? <a href="#" style="color: #8b5cf6;">Let us know</a></p>
+    </div>`,
+    defaultContent: `<p>Dear {{recipient_name}},</p>
+<p>We're excited to invite you to our upcoming event!</p>
+<h3>Event Details</h3>
+<ul>
+<li><strong>What:</strong> {{event_name}}</li>
+<li><strong>When:</strong> {{event_date}}</li>
+<li><strong>Where:</strong> {{event_location}}</li>
+</ul>
+<h3>What to Expect</h3>
+<p>Join us for an evening of networking, insights, and inspiration. You'll have the opportunity to:</p>
+<ul>
+<li>Connect with industry leaders</li>
+<li>Learn about the latest trends</li>
+<li>Enjoy refreshments and networking</li>
+</ul>
+<p>Space is limited, so please RSVP as soon as possible.</p>`,
   },
   {
     id: 'announcement',
     name: 'Announcement',
     icon: Megaphone,
+    category: 'marketing',
     letterhead: `<div style="background: #1f2937; padding: 24px; text-align: center;">
+      {{logo}}
       <h1 style="margin: 0; color: #10b981; font-size: 32px; letter-spacing: 2px;">ANNOUNCEMENT</h1>
     </div>`,
     signature: `<div style="margin-top: 30px; padding: 20px; background: #1f2937; text-align: center;">
       <p style="margin: 0; color: #9ca3af; font-size: 12px;">{{company}} | All Rights Reserved</p>
     </div>`,
+    defaultContent: '<h2 style="text-align: center;">Big News!</h2><p>We have some exciting news to share with you...</p>',
   },
   {
     id: 'minimal',
     name: 'Minimal',
     icon: FileText,
+    category: 'business',
     letterhead: `<div style="padding: 10px 0; border-bottom: 1px solid #e5e7eb;">
+      {{logo}}
       <p style="margin: 0; font-weight: 600; font-size: 18px;">{{company}}</p>
     </div>`,
     signature: `<div style="margin-top: 30px;">
       <p style="margin: 0;">Best regards,</p>
       <p style="margin: 8px 0 0 0; font-weight: 600;">{{name}}</p>
     </div>`,
+    defaultContent: '<p>Dear {{recipient_name}},</p><p></p><p>Best regards</p>',
   },
 ];
 
@@ -149,15 +287,26 @@ const highlightColors = [
 
 export default function EmailBuilder({ onBack }: EmailBuilderProps) {
   const [subject, setSubject] = useState("");
-  const [selectedTemplate, setSelectedTemplate] = useState<EmailTemplate>(EMAIL_TEMPLATES[0]);
+  const [selectedTemplate, setSelectedTemplate] = useState<EmailTemplateWithContent>(EMAIL_TEMPLATES[0]);
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [currentContactIndex, setCurrentContactIndex] = useState(0);
   const [logoUrl, setLogoUrl] = useState("");
+  const [logoFile, setLogoFile] = useState<string | null>(null);
   const [senderName, setSenderName] = useState("Your Name");
   const [senderTitle, setSenderTitle] = useState("Your Title");
   const [senderCompany, setSenderCompany] = useState("Your Company");
   const [senderEmail, setSenderEmail] = useState("you@company.com");
+  const [senderPhone, setSenderPhone] = useState("");
+  const [previewMode, setPreviewMode] = useState<'edit' | 'preview' | 'html'>('edit');
+  const [isSending, setIsSending] = useState(false);
+  const [newsletterTitle, setNewsletterTitle] = useState("Monthly Newsletter");
+  const [newsletterSubtitle, setNewsletterSubtitle] = useState("Updates & Insights");
+  const [eventName, setEventName] = useState("Annual Conference 2025");
+  const [eventDate, setEventDate] = useState("January 15, 2025");
+  const [eventLocation, setEventLocation] = useState("Virtual Event");
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const logoInputRef = useRef<HTMLInputElement>(null);
+  const { toast } = useToast();
 
   const editor = useEditor({
     extensions: [
@@ -200,6 +349,12 @@ export default function EmailBuilder({ onBack }: EmailBuilderProps) {
 
   const currentContact = contacts[currentContactIndex] || null;
 
+  // Get the effective logo (file upload takes priority over URL)
+  const effectiveLogo = logoFile || logoUrl;
+  const logoHtml = effectiveLogo 
+    ? `<img src="${effectiveLogo}" alt="Logo" style="max-height: 60px; max-width: 200px; margin-bottom: 10px;" />`
+    : '';
+
   const replaceVariables = (text: string): string => {
     let result = text;
     if (currentContact) {
@@ -207,11 +362,102 @@ export default function EmailBuilder({ onBack }: EmailBuilderProps) {
         result = result.replace(new RegExp(`{{${key}}}`, 'g'), value || '');
       });
     }
+    // Replace logo placeholder
+    result = result.replace(/{{logo}}/g, logoHtml);
+    // Sender info
     result = result.replace(/{{name}}/g, senderName);
     result = result.replace(/{{title}}/g, senderTitle);
     result = result.replace(/{{company}}/g, senderCompany);
     result = result.replace(/{{email}}/g, senderEmail);
+    result = result.replace(/{{phone}}/g, senderPhone);
+    // Newsletter variables
+    result = result.replace(/{{newsletter_title}}/g, newsletterTitle);
+    result = result.replace(/{{newsletter_subtitle}}/g, newsletterSubtitle);
+    // Event variables
+    result = result.replace(/{{event_name}}/g, eventName);
+    result = result.replace(/{{event_date}}/g, eventDate);
+    result = result.replace(/{{event_location}}/g, eventLocation);
+    // Recipient placeholder
+    result = result.replace(/{{recipient_name}}/g, currentContact?.name || '[Recipient Name]');
     return result;
+  };
+
+  // Handle logo file upload
+  const handleLogoUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      toast({
+        title: 'Invalid file type',
+        description: 'Please upload an image file (PNG, JPG, etc.)',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    // Validate file size (max 2MB)
+    if (file.size > 2 * 1024 * 1024) {
+      toast({
+        title: 'File too large',
+        description: 'Please upload an image smaller than 2MB',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const dataUrl = e.target?.result as string;
+      setLogoFile(dataUrl);
+      setLogoUrl(''); // Clear URL when file is uploaded
+      toast({
+        title: 'Logo uploaded',
+        description: 'Your logo has been added to the email',
+      });
+    };
+    reader.readAsDataURL(file);
+  };
+
+  // Load template content when template changes
+  useEffect(() => {
+    if (editor && selectedTemplate.defaultContent) {
+      editor.commands.setContent(selectedTemplate.defaultContent);
+    }
+  }, [selectedTemplate.id]);
+
+  // Handle sending email
+  const handleSendEmail = async () => {
+    if (!subject.trim()) {
+      toast({
+        title: 'Subject required',
+        description: 'Please enter an email subject',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    if (contacts.length === 0) {
+      toast({
+        title: 'No recipients',
+        description: 'Please upload a CSV with contacts or add recipients',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setIsSending(true);
+    
+    // Simulate sending (in production, this would call an email API)
+    await new Promise(resolve => setTimeout(resolve, 1500));
+    
+    toast({
+      title: 'Emails sent!',
+      description: `Successfully sent to ${contacts.length} recipient${contacts.length > 1 ? 's' : ''}`,
+    });
+    
+    setIsSending(false);
   };
 
   const handleCSVUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -326,6 +572,35 @@ export default function EmailBuilder({ onBack }: EmailBuilderProps) {
             <h2 className="font-semibold text-base">Email Builder</h2>
           </div>
           <div className="flex items-center gap-2">
+            {/* Preview Mode Toggle */}
+            <div className="flex items-center border rounded-lg overflow-hidden">
+              <Button
+                variant={previewMode === 'edit' ? 'default' : 'ghost'}
+                size="sm"
+                className="rounded-none h-8 px-3"
+                onClick={() => setPreviewMode('edit')}
+              >
+                Edit
+              </Button>
+              <Button
+                variant={previewMode === 'preview' ? 'default' : 'ghost'}
+                size="sm"
+                className="rounded-none h-8 px-3"
+                onClick={() => setPreviewMode('preview')}
+              >
+                <Eye className="w-3 h-3 mr-1" />
+                Preview
+              </Button>
+              <Button
+                variant={previewMode === 'html' ? 'default' : 'ghost'}
+                size="sm"
+                className="rounded-none h-8 px-3"
+                onClick={() => setPreviewMode('html')}
+              >
+                <Code className="w-3 h-3 mr-1" />
+                HTML
+              </Button>
+            </div>
             <Button
               variant="outline"
               size="sm"
@@ -336,13 +611,27 @@ export default function EmailBuilder({ onBack }: EmailBuilderProps) {
               Save
             </Button>
             <Button
-              variant="default"
+              variant="outline"
               size="sm"
               onClick={handleExport}
               data-testid="button-export-email"
             >
               <Download className="w-4 h-4 mr-2" />
-              Export HTML
+              Export
+            </Button>
+            <Button
+              variant="default"
+              size="sm"
+              onClick={handleSendEmail}
+              disabled={isSending || contacts.length === 0}
+              data-testid="button-send-email"
+            >
+              {isSending ? (
+                <span className="animate-spin mr-2">⏳</span>
+              ) : (
+                <Send className="w-4 h-4 mr-2" />
+              )}
+              {isSending ? 'Sending...' : 'Send'}
             </Button>
           </div>
         </div>
@@ -485,24 +774,72 @@ export default function EmailBuilder({ onBack }: EmailBuilderProps) {
           </TabsContent>
 
           <TabsContent value="templates" className="flex-1 overflow-auto p-3">
-            <div className="space-y-2">
-              <p className="text-xs text-muted-foreground mb-3">Choose a template for your email</p>
-              {EMAIL_TEMPLATES.map((template) => {
-                const Icon = template.icon;
-                return (
-                  <Card
-                    key={template.id}
-                    className={`p-3 cursor-pointer hover-elevate ${selectedTemplate.id === template.id ? 'ring-2 ring-primary' : ''}`}
-                    onClick={() => setSelectedTemplate(template)}
-                    data-testid={`template-${template.id}`}
-                  >
-                    <div className="flex items-center gap-3">
-                      <Icon className="w-5 h-5 text-primary" />
-                      <span className="text-sm font-medium">{template.name}</span>
-                    </div>
-                  </Card>
-                );
-              })}
+            <div className="space-y-4">
+              <p className="text-xs text-muted-foreground">Choose a template for your email</p>
+              
+              {/* Business Templates */}
+              <div>
+                <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
+                  💼 Business
+                </h4>
+                <div className="space-y-2">
+                  {EMAIL_TEMPLATES.filter(t => t.category === 'business').map((template) => {
+                    const Icon = template.icon;
+                    return (
+                      <Card
+                        key={template.id}
+                        className={`p-3 cursor-pointer hover-elevate transition-all ${selectedTemplate.id === template.id ? 'ring-2 ring-primary bg-primary/5' : ''}`}
+                        onClick={() => setSelectedTemplate(template)}
+                        data-testid={`template-${template.id}`}
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className="p-2 rounded-lg bg-blue-500/10">
+                            <Icon className="w-4 h-4 text-blue-500" />
+                          </div>
+                          <div>
+                            <span className="text-sm font-medium">{template.name}</span>
+                            {template.defaultContent && (
+                              <p className="text-xs text-muted-foreground">Pre-filled template</p>
+                            )}
+                          </div>
+                        </div>
+                      </Card>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Marketing Templates */}
+              <div>
+                <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
+                  📣 Marketing
+                </h4>
+                <div className="space-y-2">
+                  {EMAIL_TEMPLATES.filter(t => t.category === 'marketing').map((template) => {
+                    const Icon = template.icon;
+                    return (
+                      <Card
+                        key={template.id}
+                        className={`p-3 cursor-pointer hover-elevate transition-all ${selectedTemplate.id === template.id ? 'ring-2 ring-primary bg-primary/5' : ''}`}
+                        onClick={() => setSelectedTemplate(template)}
+                        data-testid={`template-${template.id}`}
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className="p-2 rounded-lg bg-emerald-500/10">
+                            <Icon className="w-4 h-4 text-emerald-500" />
+                          </div>
+                          <div>
+                            <span className="text-sm font-medium">{template.name}</span>
+                            {template.defaultContent && (
+                              <p className="text-xs text-muted-foreground">Pre-filled template</p>
+                            )}
+                          </div>
+                        </div>
+                      </Card>
+                    );
+                  })}
+                </div>
+              </div>
             </div>
           </TabsContent>
 
@@ -580,65 +917,200 @@ export default function EmailBuilder({ onBack }: EmailBuilderProps) {
           </TabsContent>
 
           <TabsContent value="signature" className="flex-1 overflow-auto p-3">
-            <div className="space-y-3">
-              <p className="text-xs text-muted-foreground">Configure your signature details</p>
-              
-              <div className="space-y-2">
-                <Label htmlFor="logo-url" className="text-xs">Logo URL</Label>
-                <Input
-                  id="logo-url"
-                  placeholder="https://example.com/logo.png"
-                  value={logoUrl}
-                  onChange={(e) => setLogoUrl(e.target.value)}
-                  className="text-sm"
-                  data-testid="input-logo-url"
-                />
-              </div>
+            <ScrollArea className="h-full">
+              <div className="space-y-4">
+                <p className="text-xs text-muted-foreground">Configure your branding and signature</p>
+                
+                {/* Logo Upload Section */}
+                <div className="space-y-2">
+                  <Label className="text-xs font-semibold">Company Logo</Label>
+                  <div className="border-2 border-dashed border-border rounded-lg p-4 text-center">
+                    {effectiveLogo ? (
+                      <div className="space-y-3">
+                        <img 
+                          src={effectiveLogo} 
+                          alt="Logo preview" 
+                          className="max-h-16 max-w-[200px] mx-auto object-contain"
+                        />
+                        <div className="flex items-center justify-center gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => logoInputRef.current?.click()}
+                          >
+                            Change
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => {
+                              setLogoFile(null);
+                              setLogoUrl('');
+                            }}
+                          >
+                            <Trash2 className="w-4 h-4 mr-1" />
+                            Remove
+                          </Button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div 
+                        className="cursor-pointer py-4"
+                        onClick={() => logoInputRef.current?.click()}
+                      >
+                        <ImageIconLucide className="w-10 h-10 mx-auto text-muted-foreground mb-2" />
+                        <p className="text-sm font-medium">Upload your logo</p>
+                        <p className="text-xs text-muted-foreground">PNG, JPG up to 2MB</p>
+                      </div>
+                    )}
+                    <input
+                      type="file"
+                      accept="image/*"
+                      ref={logoInputRef}
+                      onChange={handleLogoUpload}
+                      className="hidden"
+                    />
+                  </div>
+                  <p className="text-xs text-muted-foreground">Or enter a URL:</p>
+                  <Input
+                    placeholder="https://example.com/logo.png"
+                    value={logoUrl}
+                    onChange={(e) => {
+                      setLogoUrl(e.target.value);
+                      setLogoFile(null);
+                    }}
+                    className="text-sm"
+                    data-testid="input-logo-url"
+                  />
+                </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="sender-name" className="text-xs">Your Name</Label>
-                <Input
-                  id="sender-name"
-                  value={senderName}
-                  onChange={(e) => setSenderName(e.target.value)}
-                  className="text-sm"
-                  data-testid="input-sender-name"
-                />
-              </div>
+                <Separator />
 
-              <div className="space-y-2">
-                <Label htmlFor="sender-title" className="text-xs">Your Title</Label>
-                <Input
-                  id="sender-title"
-                  value={senderTitle}
-                  onChange={(e) => setSenderTitle(e.target.value)}
-                  className="text-sm"
-                  data-testid="input-sender-title"
-                />
-              </div>
+                {/* Sender Info */}
+                <div className="space-y-3">
+                  <Label className="text-xs font-semibold">Sender Information</Label>
+                  
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1">
+                      <Label htmlFor="sender-name" className="text-xs text-muted-foreground">Name</Label>
+                      <Input
+                        id="sender-name"
+                        value={senderName}
+                        onChange={(e) => setSenderName(e.target.value)}
+                        className="text-sm"
+                        data-testid="input-sender-name"
+                      />
+                    </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="sender-company" className="text-xs">Company</Label>
-                <Input
-                  id="sender-company"
-                  value={senderCompany}
-                  onChange={(e) => setSenderCompany(e.target.value)}
-                  className="text-sm"
-                  data-testid="input-sender-company"
-                />
-              </div>
+                    <div className="space-y-1">
+                      <Label htmlFor="sender-title" className="text-xs text-muted-foreground">Title</Label>
+                      <Input
+                        id="sender-title"
+                        value={senderTitle}
+                        onChange={(e) => setSenderTitle(e.target.value)}
+                        className="text-sm"
+                        data-testid="input-sender-title"
+                      />
+                    </div>
+                  </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="sender-email" className="text-xs">Email</Label>
-                <Input
-                  id="sender-email"
-                  value={senderEmail}
-                  onChange={(e) => setSenderEmail(e.target.value)}
-                  className="text-sm"
-                  data-testid="input-sender-email"
-                />
+                  <div className="space-y-1">
+                    <Label htmlFor="sender-company" className="text-xs text-muted-foreground">Company</Label>
+                    <Input
+                      id="sender-company"
+                      value={senderCompany}
+                      onChange={(e) => setSenderCompany(e.target.value)}
+                      className="text-sm"
+                      data-testid="input-sender-company"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1">
+                      <Label htmlFor="sender-email" className="text-xs text-muted-foreground">Email</Label>
+                      <Input
+                        id="sender-email"
+                        value={senderEmail}
+                        onChange={(e) => setSenderEmail(e.target.value)}
+                        className="text-sm"
+                        data-testid="input-sender-email"
+                      />
+                    </div>
+
+                    <div className="space-y-1">
+                      <Label htmlFor="sender-phone" className="text-xs text-muted-foreground">Phone</Label>
+                      <Input
+                        id="sender-phone"
+                        value={senderPhone}
+                        onChange={(e) => setSenderPhone(e.target.value)}
+                        placeholder="+1 (555) 123-4567"
+                        className="text-sm"
+                        data-testid="input-sender-phone"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Template-specific variables */}
+                {(selectedTemplate.id === 'newsletter') && (
+                  <>
+                    <Separator />
+                    <div className="space-y-3">
+                      <Label className="text-xs font-semibold">Newsletter Settings</Label>
+                      <div className="space-y-1">
+                        <Label className="text-xs text-muted-foreground">Newsletter Title</Label>
+                        <Input
+                          value={newsletterTitle}
+                          onChange={(e) => setNewsletterTitle(e.target.value)}
+                          className="text-sm"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs text-muted-foreground">Subtitle</Label>
+                        <Input
+                          value={newsletterSubtitle}
+                          onChange={(e) => setNewsletterSubtitle(e.target.value)}
+                          className="text-sm"
+                        />
+                      </div>
+                    </div>
+                  </>
+                )}
+
+                {(selectedTemplate.id === 'event') && (
+                  <>
+                    <Separator />
+                    <div className="space-y-3">
+                      <Label className="text-xs font-semibold">Event Details</Label>
+                      <div className="space-y-1">
+                        <Label className="text-xs text-muted-foreground">Event Name</Label>
+                        <Input
+                          value={eventName}
+                          onChange={(e) => setEventName(e.target.value)}
+                          className="text-sm"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs text-muted-foreground">Date & Time</Label>
+                        <Input
+                          value={eventDate}
+                          onChange={(e) => setEventDate(e.target.value)}
+                          className="text-sm"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs text-muted-foreground">Location</Label>
+                        <Input
+                          value={eventLocation}
+                          onChange={(e) => setEventLocation(e.target.value)}
+                          className="text-sm"
+                        />
+                      </div>
+                    </div>
+                  </>
+                )}
               </div>
-            </div>
+            </ScrollArea>
           </TabsContent>
         </Tabs>
       </div>
