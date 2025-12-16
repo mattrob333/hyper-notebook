@@ -1,4 +1,9 @@
 import { useState, useEffect } from "react";
+import { 
+  ResizablePanelGroup, 
+  ResizablePanel, 
+  ResizableHandle 
+} from "@/components/ui/resizable";
 import Navbar from "@/components/Navbar";
 import SourcesPanel from "@/components/panels/SourcesPanel";
 import ChatPanel from "@/components/panels/ChatPanel";
@@ -247,51 +252,63 @@ export default function Home() {
     <div className="h-screen flex flex-col bg-background" data-testid="home-page">
       <Navbar isDarkMode={isDarkMode} onToggleDarkMode={() => setIsDarkMode(!isDarkMode)} />
       
-      {/* Floating Card Layout - 3 columns with gaps */}
-      <div className="flex-1 flex gap-4 p-4 overflow-hidden">
-        {/* Left Panel - Sources */}
-        <div className="w-[280px] shrink-0 bg-sidebar rounded-2xl border border-sidebar-border overflow-hidden">
-          <SourcesPanel
-            sources={sources}
-            selectedSourceId={selectedSourceId}
-            onAddSource={handleAddSource}
-            onDeleteSource={handleDeleteSource}
-            onSelectSource={(source) => setSelectedSourceId(source.id)}
-            onStartDeepResearch={handleStartDeepResearch}
-          />
-        </div>
-        
-        {/* Center Panel - Chat or Source Detail */}
-        <div className="flex-1 min-w-0 bg-sidebar rounded-2xl border border-sidebar-border overflow-hidden">
-          {selectedSourceId ? (
-            <SourceDetailView 
-              source={sources.find(s => s.id === selectedSourceId)!}
-              onClose={() => setSelectedSourceId(undefined)}
-            />
-          ) : (
-            <ChatPanel
-              sources={sources}
-              messages={messages}
-              onNewMessage={handleNewMessage}
-              isLoading={isLoading}
-            />
-          )}
-        </div>
-        
-        {/* Right Panel - Studio */}
-        <div className="w-[320px] shrink-0 bg-sidebar rounded-2xl border border-sidebar-border overflow-hidden">
-          <StudioPanel
-            workflows={workflows}
-            reports={reports}
-            onSaveWorkflow={handleSaveWorkflow}
-            onDeleteWorkflow={handleDeleteWorkflow}
-            onRunWorkflow={handleRunWorkflow}
-            onDeleteReport={(id) => console.log('Delete report:', id)}
-            onDownloadReport={(id) => console.log('Download report:', id)}
-            onOpenMindMap={() => console.log('Open Mind Map')}
-            onOpenEmailBuilder={() => console.log('Open Email Builder')}
-          />
-        </div>
+      {/* Floating Card Layout with resizable panels */}
+      <div className="flex-1 p-4 overflow-hidden">
+        <ResizablePanelGroup direction="horizontal" className="h-full gap-3">
+          {/* Left Panel - Sources */}
+          <ResizablePanel defaultSize={20} minSize={15} maxSize={30}>
+            <div className="h-full bg-sidebar rounded-2xl border border-sidebar-border overflow-hidden">
+              <SourcesPanel
+                sources={sources}
+                selectedSourceId={selectedSourceId}
+                onAddSource={handleAddSource}
+                onDeleteSource={handleDeleteSource}
+                onSelectSource={(source) => setSelectedSourceId(source.id)}
+                onStartDeepResearch={handleStartDeepResearch}
+              />
+            </div>
+          </ResizablePanel>
+          
+          <ResizableHandle className="w-1 bg-transparent hover:bg-primary/20 transition-colors rounded-full" />
+          
+          {/* Center Panel - Chat or Source Detail */}
+          <ResizablePanel defaultSize={55} minSize={35}>
+            <div className="h-full bg-sidebar rounded-2xl border border-sidebar-border overflow-hidden">
+              {selectedSourceId ? (
+                <SourceDetailView 
+                  source={sources.find(s => s.id === selectedSourceId)!}
+                  onClose={() => setSelectedSourceId(undefined)}
+                />
+              ) : (
+                <ChatPanel
+                  sources={sources}
+                  messages={messages}
+                  onNewMessage={handleNewMessage}
+                  isLoading={isLoading}
+                />
+              )}
+            </div>
+          </ResizablePanel>
+          
+          <ResizableHandle className="w-1 bg-transparent hover:bg-primary/20 transition-colors rounded-full" />
+          
+          {/* Right Panel - Studio */}
+          <ResizablePanel defaultSize={25} minSize={18} maxSize={35}>
+            <div className="h-full bg-sidebar rounded-2xl border border-sidebar-border overflow-hidden">
+              <StudioPanel
+                workflows={workflows}
+                reports={reports}
+                onSaveWorkflow={handleSaveWorkflow}
+                onDeleteWorkflow={handleDeleteWorkflow}
+                onRunWorkflow={handleRunWorkflow}
+                onDeleteReport={(id) => console.log('Delete report:', id)}
+                onDownloadReport={(id) => console.log('Download report:', id)}
+                onOpenMindMap={() => console.log('Open Mind Map')}
+                onOpenEmailBuilder={() => console.log('Open Email Builder')}
+              />
+            </div>
+          </ResizablePanel>
+        </ResizablePanelGroup>
       </div>
 
       <BrowserAgentMonitor
