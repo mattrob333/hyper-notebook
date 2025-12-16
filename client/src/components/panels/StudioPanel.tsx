@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
@@ -22,7 +22,10 @@ import {
   Loader2,
   Sparkles,
   FileBarChart,
-  X
+  X,
+  ArrowLeft,
+  Maximize2,
+  Minimize2
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -165,7 +168,7 @@ const CONTENT_TYPE_DEFAULT_MODELS: Partial<Record<ContentType, string>> = {
   'infographic': 'gemini-2.5-pro',
 };
 
-type ActiveView = 'main' | 'email' | 'hyperbrowser' | 'context-file';
+type ActiveView = 'main' | 'email' | 'hyperbrowser' | 'context-file' | 'canvas';
 
 export default function StudioPanel({
   selectedSourceIds = [],
@@ -174,7 +177,7 @@ export default function StudioPanel({
   const [reportsModalOpen, setReportsModalOpen] = useState(false);
   const [loadingType, setLoadingType] = useState<ContentType | null>(null);
   const [generatedContent, setGeneratedContent] = useState<GeneratedContent | null>(null);
-  const [resultModalOpen, setResultModalOpen] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
   const [customDialogOpen, setCustomDialogOpen] = useState(false);
   const [customType, setCustomType] = useState<ContentType>('study_guide');
   const [customPrompt, setCustomPrompt] = useState('');
@@ -187,6 +190,25 @@ export default function StudioPanel({
   const [configType, setConfigType] = useState<ContentType | null>(null);
   const [configModel, setConfigModel] = useState('gemini-2.5-pro');
   const [configPrompt, setConfigPrompt] = useState('');
+
+  // Handle Escape key to exit fullscreen
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && isFullscreen) {
+        setIsFullscreen(false);
+      }
+    };
+    
+    if (isFullscreen) {
+      document.addEventListener('keydown', handleKeyDown);
+      document.body.style.overflow = 'hidden';
+    }
+    
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+      document.body.style.overflow = '';
+    };
+  }, [isFullscreen]);
 
   const { data: sources = [] } = useQuery<Source[]>({
     queryKey: ['/api/sources'],
@@ -217,7 +239,7 @@ export default function StudioPanel({
     },
     onSuccess: (data: GeneratedContent) => {
       setGeneratedContent(data);
-      setResultModalOpen(true);
+      setActiveView('canvas');
       setLoadingType(null);
       queryClient.invalidateQueries({ queryKey: ['/api/generated'] });
       toast({
@@ -322,7 +344,6 @@ export default function StudioPanel({
     
     // Check if it's an array of slides (has slideType property)
     if (Array.isArray(content) && content.length > 0 && content[0].slideType) {
-      // Transform slides to match A2Slides expected format
       const transformedSlides = content.map((slide: any) => ({
         title: slide.title,
         content: slide.bullets?.length > 0 
@@ -335,6 +356,30 @@ export default function StudioPanel({
         type: 'slides',
         properties: {},
         data: { slides: transformedSlides }
+      }];
+    }
+    
+    // Check if it's mind map data (has nodes and edges arrays - React Flow format)
+    if (!Array.isArray(content) && content.nodes && content.edges && Array.isArray(content.nodes)) {
+      return [{
+        id: 'mindmap-content',
+        type: 'mindmap',
+        properties: {},
+        data: { 
+          nodes: content.nodes, 
+          edges: content.edges,
+          format: 'reactflow'
+        }
+      }];
+    }
+    
+    // Check if it's hierarchical mind map data (has id, label, children)
+    if (!Array.isArray(content) && content.id && content.label) {
+      return [{
+        id: 'mindmap-content',
+        type: 'mindmap',
+        properties: {},
+        data: content
       }];
     }
     
@@ -404,6 +449,63 @@ export default function StudioPanel({
         sources={sources}
       />
     );
+  }
+
+  // Canvas view for displaying generated content
+  if (activeView === 'canvas' && generatedContent) {
+    const contentTypeInfo = CONTENT_TYPES.find(t => t.type === generatedContent.type);
+    const Icon = contentTypeInfo?.icon || FileText;
+    
+    const canvasView = (
+      <div 
+        className={`flex flex-col h-full ${isFullscreen ? 'fixed inset-0 z-50 bg-background' : ''}`}
+        data-testid="studio-canvas"
+      >
+        <div className="flex items-center justify-between gap-2 p-3 border-b border-border/50 shrink-0">
+          <div className="flex items-center gap-2">
+            <Button 
+              variant="ghost" 
+              size="icon"
+              onClick={() => {
+                setActiveView('main');
+                setIsFullscreen(false);
+              }}
+              data-testid="button-canvas-back"
+            >
+              <ArrowLeft className="w-4 h-4" />
+            </Button>
+            <div className={`p-1.5 rounded-lg ${contentTypeInfo?.bgColor || 'bg-muted'}`}>
+              <Icon className={`w-4 h-4 ${contentTypeInfo?.iconColor || 'text-muted-foreground'}`} />
+            </div>
+            <div className="min-w-0">
+              <h3 className="font-medium text-sm truncate">{generatedContent.title}</h3>
+              <p className="text-xs text-muted-foreground">
+                {generatedContent.sourceIds?.length || 0} sources
+              </p>
+            </div>
+          </div>
+          <Button 
+            variant="ghost" 
+            size="icon"
+            onClick={() => setIsFullscreen(!isFullscreen)}
+            data-testid="button-canvas-fullscreen"
+          >
+            {isFullscreen ? (
+              <Minimize2 className="w-4 h-4" />
+            ) : (
+              <Maximize2 className="w-4 h-4" />
+            )}
+          </Button>
+        </div>
+        <ScrollArea className="flex-1">
+          <div className="p-4">
+            <A2UIRenderer components={parseA2UIComponents(generatedContent.content)} />
+          </div>
+        </ScrollArea>
+      </div>
+    );
+    
+    return canvasView;
   }
 
   return (
@@ -516,7 +618,7 @@ export default function StudioPanel({
                     data-testid={`content-item-${content.id}`}
                     onClick={() => {
                       setGeneratedContent(content);
-                      setResultModalOpen(true);
+                      setActiveView('canvas');
                     }}
                   >
                     <div className="flex items-start gap-3">
@@ -613,39 +715,6 @@ export default function StudioPanel({
           });
         }}
       />
-
-      <Dialog open={resultModalOpen} onOpenChange={setResultModalOpen}>
-        <DialogContent className="max-w-3xl max-h-[80vh] overflow-hidden flex flex-col" data-testid="dialog-generated-content">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              {generatedContent && (
-                <>
-                  {CONTENT_TYPES.find(t => t.type === generatedContent.type)?.icon && (
-                    (() => {
-                      const Icon = CONTENT_TYPES.find(t => t.type === generatedContent.type)!.icon;
-                      return <Icon className="w-5 h-5" />;
-                    })()
-                  )}
-                  {generatedContent.title}
-                </>
-              )}
-            </DialogTitle>
-            <DialogDescription>
-              Generated from {generatedContent?.sourceIds?.length || 0} source(s)
-            </DialogDescription>
-          </DialogHeader>
-          <ScrollArea className="flex-1 -mx-6 px-6">
-            {generatedContent && (
-              <A2UIRenderer components={parseA2UIComponents(generatedContent.content)} />
-            )}
-          </ScrollArea>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setResultModalOpen(false)} data-testid="button-close-result">
-              Close
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
 
       <Dialog open={customDialogOpen} onOpenChange={setCustomDialogOpen}>
         <DialogContent className="max-w-lg" data-testid="dialog-custom-generate">

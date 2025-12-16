@@ -575,17 +575,59 @@ function buildMindmapNodesAndEdges(root: MindmapNode): { nodes: Node[]; edges: E
   return { nodes, edges };
 }
 
+interface ReactFlowMindmapData {
+  nodes: Array<{ id: string; label?: string; type?: string; [key: string]: any }>;
+  edges: Array<{ source: string; target: string; id?: string; [key: string]: any }>;
+  format: 'reactflow';
+}
+
 function A2Mindmap({ 
   data,
   title
 }: { 
-  data?: MindmapNode;
+  data?: MindmapNode | ReactFlowMindmapData;
   title?: string;
 }) {
-  const { nodes: initialNodes, edges: initialEdges } = useMemo(
-    () => data ? buildMindmapNodesAndEdges(data) : { nodes: [], edges: [] },
-    [data]
-  );
+  const { nodes: initialNodes, edges: initialEdges } = useMemo(() => {
+    if (!data) return { nodes: [], edges: [] };
+    
+    // Check if it's React Flow format (has nodes and edges arrays with format marker)
+    if ('format' in data && data.format === 'reactflow' && 'nodes' in data && 'edges' in data) {
+      // Transform React Flow format nodes to proper Node objects
+      const nodes: Node[] = (data.nodes || []).map((node, idx) => ({
+        id: node.id || `node-${idx}`,
+        type: 'default',
+        position: node.position || { x: (idx % 4) * 250 + 50, y: Math.floor(idx / 4) * 150 + 50 },
+        data: { 
+          label: node.label || node.data?.label || node.id || 'Node' 
+        },
+        style: {
+          background: 'hsl(var(--card))',
+          border: '1px solid hsl(var(--border))',
+          borderRadius: '8px',
+          padding: '12px 16px',
+          fontSize: '12px',
+          fontWeight: '500',
+          minWidth: '120px',
+          textAlign: 'center',
+        },
+      }));
+      
+      const edges: Edge[] = (data.edges || []).map((edge, idx) => ({
+        id: edge.id || `edge-${idx}`,
+        source: edge.source,
+        target: edge.target,
+        type: 'smoothstep',
+        markerEnd: { type: MarkerType.ArrowClosed },
+        style: { stroke: 'hsl(var(--border))' },
+      }));
+      
+      return { nodes, edges };
+    }
+    
+    // Otherwise treat as hierarchical MindmapNode format
+    return buildMindmapNodesAndEdges(data as MindmapNode);
+  }, [data]);
 
   const [nodes, , onNodesChange] = useNodesState(initialNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
@@ -595,7 +637,7 @@ function A2Mindmap({
     [setEdges]
   );
 
-  if (!data) {
+  if (!data || initialNodes.length === 0) {
     return (
       <div 
         className="w-full h-64 flex items-center justify-center text-muted-foreground bg-muted/20 rounded-lg"
