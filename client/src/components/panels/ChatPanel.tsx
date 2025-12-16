@@ -4,7 +4,14 @@ import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Card } from "@/components/ui/card";
-import { Send, Paperclip, Loader2, Bot, User, Sparkles, ThumbsUp, ThumbsDown, Copy, Pin } from "lucide-react";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Send, Paperclip, Loader2, Bot, User, Sparkles, ThumbsUp, ThumbsDown, Copy, Pin, ChevronDown } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import A2UIRenderer from "../a2ui/A2UIRenderer";
 import type { ChatMessage, Source } from "@/lib/types";
@@ -18,6 +25,7 @@ interface ChatPanelProps {
 
 export default function ChatPanel({ sources, messages, onNewMessage, isLoading }: ChatPanelProps) {
   const [inputValue, setInputValue] = useState('');
+  const [selectedModel, setSelectedModel] = useState('gpt-4o');
   const scrollRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -173,33 +181,44 @@ export default function ChatPanel({ sources, messages, onNewMessage, isLoading }
         </div>
       </ScrollArea>
 
-      <div className="border-t p-4 bg-background">
-        <div className="max-w-3xl mx-auto">
-          <Card className="flex items-end gap-2 p-2 rounded-2xl">
-            <Button variant="ghost" size="icon" className="shrink-0 h-9 w-9" data-testid="button-attach">
-              <Paperclip className="w-4 h-4" />
+      <div className="p-6 flex items-center justify-center">
+        <div className="w-full max-w-2xl">
+          <div className="flex items-center gap-3 p-3 bg-card rounded-2xl border border-border/50">
+            <Button variant="ghost" size="icon" className="shrink-0 h-9 w-9 rounded-xl" data-testid="button-attach">
+              <Paperclip className="w-4 h-4 text-muted-foreground" />
             </Button>
             <Textarea
               ref={textareaRef}
               placeholder="Ask about your sources..."
-              className="min-h-[44px] max-h-32 resize-none border-0 focus-visible:ring-0 bg-transparent rounded-xl"
+              className="min-h-[40px] max-h-32 resize-none border-0 focus-visible:ring-0 bg-transparent text-sm"
               value={inputValue}
               onChange={(e) => setInputValue(e.target.value)}
               onKeyDown={handleKeyDown}
               data-testid="input-chat"
             />
-            <Button 
-              onClick={handleSubmit}
-              disabled={!inputValue.trim() || isLoading}
-              className="shrink-0 rounded-xl"
-              data-testid="button-send"
-            >
-              {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
-            </Button>
-          </Card>
-          <p className="text-xs text-center text-muted-foreground mt-2">
-            NotebookLM can make mistakes. Consider verifying important information.
-          </p>
+            <div className="flex items-center gap-2 shrink-0">
+              <Select value={selectedModel} onValueChange={setSelectedModel}>
+                <SelectTrigger className="h-8 w-[100px] rounded-lg text-xs border-border/50 bg-muted/50" data-testid="select-model">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className="rounded-xl">
+                  <SelectItem value="gpt-4o" className="rounded-lg text-xs">GPT-4o</SelectItem>
+                  <SelectItem value="gpt-4o-mini" className="rounded-lg text-xs">GPT-4o Mini</SelectItem>
+                  <SelectItem value="claude-3.5" className="rounded-lg text-xs">Claude 3.5</SelectItem>
+                  <SelectItem value="gemini-pro" className="rounded-lg text-xs">Gemini Pro</SelectItem>
+                </SelectContent>
+              </Select>
+              <Button 
+                onClick={handleSubmit}
+                disabled={!inputValue.trim() || isLoading}
+                size="icon"
+                className="shrink-0 h-9 w-9 rounded-full"
+                data-testid="button-send"
+              >
+                {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+              </Button>
+            </div>
+          </div>
         </div>
       </div>
     </div>
