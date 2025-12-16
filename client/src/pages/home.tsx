@@ -8,6 +8,7 @@ import Navbar from "@/components/Navbar";
 import SourcesPanel from "@/components/panels/SourcesPanel";
 import ChatPanel from "@/components/panels/ChatPanel";
 import StudioPanel from "@/components/panels/StudioPanel";
+import SourceDetailView from "@/components/panels/SourceDetailView";
 import BrowserAgentMonitor from "@/components/browser/BrowserAgentMonitor";
 import type { Source, Workflow, ChatMessage, A2UIComponent } from "@/lib/types";
 
@@ -266,12 +267,19 @@ export default function Home() {
         <ResizableHandle withHandle />
         
         <ResizablePanel defaultSize={55} minSize={30}>
-          <ChatPanel
-            sources={sources}
-            messages={messages}
-            onNewMessage={handleNewMessage}
-            isLoading={isLoading}
-          />
+          {selectedSourceId ? (
+            <SourceDetailView 
+              source={sources.find(s => s.id === selectedSourceId)!}
+              onClose={() => setSelectedSourceId(undefined)}
+            />
+          ) : (
+            <ChatPanel
+              sources={sources}
+              messages={messages}
+              onNewMessage={handleNewMessage}
+              isLoading={isLoading}
+            />
+          )}
         </ResizablePanel>
         
         <ResizableHandle withHandle />
