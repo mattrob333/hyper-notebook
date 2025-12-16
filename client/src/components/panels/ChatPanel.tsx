@@ -11,7 +11,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Send, Paperclip, Loader2, Bot, User, Sparkles, ThumbsUp, ThumbsDown, Copy, Pin } from "lucide-react";
+import { Send, Paperclip, Loader2, Bot, User, Sparkles, ThumbsUp, ThumbsDown, Copy, Pin, Plus, SlidersHorizontal, History, ChevronDown, ArrowUp } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import A2UIRenderer from "../a2ui/A2UIRenderer";
 import type { ChatMessage, Source, A2UIComponent } from "@/lib/types";
@@ -408,38 +408,68 @@ export default function ChatPanel({
         </div>
       </ScrollArea>
 
-      <div className="p-6 flex items-center justify-center">
-        <div className="w-full max-w-2xl">
-          <div className="flex items-center gap-3 p-3 bg-card rounded-2xl border border-border/50">
-            <Button 
-              variant="ghost" 
-              size="icon" 
-              className="shrink-0 h-9 w-9 rounded-xl" 
-              data-testid="button-attach"
-            >
-              <Paperclip className="w-4 h-4 text-muted-foreground" />
-            </Button>
+      <div className="px-4 pb-4 pt-2">
+        <div className="bg-[hsl(var(--muted)/0.6)] dark:bg-[hsl(220_10%_18%)] rounded-2xl overflow-hidden">
+          <div className="px-4 pt-3 pb-2">
             <Textarea
               ref={textareaRef}
-              placeholder="Ask about your sources..."
-              className="min-h-[40px] max-h-32 resize-none border-0 focus-visible:ring-0 bg-transparent text-sm"
+              placeholder="Reply..."
+              className="min-h-[24px] max-h-32 resize-none border-0 focus-visible:ring-0 bg-transparent text-sm placeholder:text-muted-foreground/60 p-0"
               value={inputValue}
               onChange={(e) => setInputValue(e.target.value)}
               onKeyDown={handleKeyDown}
               disabled={isLoading}
+              rows={1}
               data-testid="input-chat"
             />
-            <div className="flex items-center gap-2 shrink-0">
+          </div>
+          <div className="flex items-center justify-between px-3 pb-3 gap-2">
+            <div className="flex items-center gap-1">
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                className="h-8 w-8 rounded-lg text-muted-foreground" 
+                data-testid="button-sparkles"
+              >
+                <Sparkles className="w-4 h-4" />
+              </Button>
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                className="h-8 w-8 rounded-lg text-muted-foreground" 
+                data-testid="button-attach"
+              >
+                <Plus className="w-4 h-4" />
+              </Button>
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                className="h-8 w-8 rounded-lg text-muted-foreground" 
+                data-testid="button-settings"
+              >
+                <SlidersHorizontal className="w-4 h-4" />
+              </Button>
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                className="h-8 w-8 rounded-lg text-muted-foreground" 
+                data-testid="button-history"
+              >
+                <History className="w-4 h-4" />
+              </Button>
+            </div>
+            <div className="flex items-center gap-2">
               <Select 
                 value={selectedModel} 
                 onValueChange={(value) => setSelectedModel(value as ModelId)}
                 disabled={isLoading}
               >
                 <SelectTrigger 
-                  className="h-8 w-[120px] rounded-lg text-xs border-border/50 bg-muted/50" 
+                  className="h-8 border-0 bg-transparent text-xs text-muted-foreground gap-1 px-2" 
                   data-testid="select-model"
                 >
                   <SelectValue />
+                  <ChevronDown className="w-3 h-3 opacity-50" />
                 </SelectTrigger>
                 <SelectContent className="rounded-xl">
                   <SelectItem value="gpt-4.1" className="rounded-lg text-xs" data-testid="option-gpt-4.1">
@@ -460,10 +490,10 @@ export default function ChatPanel({
                 onClick={handleSubmit}
                 disabled={!inputValue.trim() || isLoading}
                 size="icon"
-                className="shrink-0 h-9 w-9 rounded-full"
+                className="shrink-0 h-8 w-8 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white"
                 data-testid="button-send"
               >
-                {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+                {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <ArrowUp className="w-4 h-4" />}
               </Button>
             </div>
           </div>
