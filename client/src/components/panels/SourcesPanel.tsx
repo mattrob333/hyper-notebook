@@ -267,8 +267,8 @@ export default function SourcesPanel({
         </Button>
       </div>
 
-      <ScrollArea className="flex-1 px-4">
-        <div className="space-y-2 pb-4">
+      <ScrollArea className="flex-1 px-2">
+        <div className="space-y-2 pb-4 px-2">
           {sources.length === 0 ? (
             <div className="p-8 text-center">
               <FileText className="w-8 h-8 mx-auto mb-2 text-muted-foreground" />

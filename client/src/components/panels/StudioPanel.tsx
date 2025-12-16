@@ -1,18 +1,31 @@
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { 
-  Workflow, 
+  Mic, 
+  Video, 
+  BrainCircuit, 
   FileBarChart, 
-  AudioLines,
+  Layers, 
+  HelpCircle, 
+  BarChart3, 
+  Presentation,
+  Mail,
+  Pencil,
+  FileText,
+  MoreVertical,
   Plus,
   Play,
-  Sparkles,
-  Clock,
-  Download
+  Trash2,
+  Workflow
 } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import WorkflowStudio from "../studio/WorkflowStudio";
 import type { Workflow as WorkflowType } from "@/lib/types";
 
@@ -31,6 +44,31 @@ interface StudioPanelProps {
   onRunWorkflow: (workflow: WorkflowType) => void;
   onDeleteReport: (id: string) => void;
   onDownloadReport: (id: string) => void;
+  onOpenMindMap?: () => void;
+  onOpenEmailBuilder?: () => void;
+}
+
+interface StudioCardProps {
+  icon: React.ComponentType<{ className?: string }>;
+  title: string;
+  onClick?: () => void;
+  testId?: string;
+}
+
+function StudioCard({ icon: Icon, title, onClick, testId }: StudioCardProps) {
+  return (
+    <Card 
+      className="flex flex-col items-center justify-center p-3 rounded-xl cursor-pointer hover-elevate transition-all gap-2 bg-muted/30 border-border/50 group"
+      onClick={onClick}
+      data-testid={testId}
+    >
+      <div className="flex items-center justify-between w-full">
+        <Icon className="w-5 h-5 text-primary" />
+        <Pencil className="w-3 h-3 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+      </div>
+      <span className="text-xs font-medium text-foreground self-start">{title}</span>
+    </Card>
+  );
 }
 
 export default function StudioPanel({
@@ -41,43 +79,80 @@ export default function StudioPanel({
   onRunWorkflow,
   onDeleteReport,
   onDownloadReport,
+  onOpenMindMap,
+  onOpenEmailBuilder,
 }: StudioPanelProps) {
   return (
     <div className="flex flex-col h-full bg-background" data-testid="studio-panel">
-      <div className="p-4 space-y-4">
+      <div className="p-4 border-b border-border/50">
         <div className="flex items-center justify-between">
           <h2 className="font-semibold text-base">Studio</h2>
+          <Button variant="ghost" size="icon" className="h-8 w-8">
+            <Layers className="w-4 h-4" />
+          </Button>
         </div>
-
-        <Card className="p-4 rounded-2xl">
-          <div className="text-center">
-            <h3 className="font-semibold text-lg mb-1">AI-Executable PRD</h3>
-            <p className="text-xs text-muted-foreground mb-3">
-              Based on {reports.length} sources
-            </p>
-            <div className="grid grid-cols-2 gap-2">
-              <Button variant="outline" className="rounded-xl text-xs h-9">
-                <FileBarChart className="w-4 h-4 mr-1" />
-                View Report
-              </Button>
-              <Button variant="outline" className="rounded-xl text-xs h-9">
-                <Download className="w-4 h-4 mr-1" />
-                Export
-              </Button>
-            </div>
-          </div>
-        </Card>
       </div>
 
-      <Tabs defaultValue="reports" className="flex-1 flex flex-col">
+      <div className="p-4">
+        <div className="grid grid-cols-4 gap-2">
+          <StudioCard 
+            icon={Mic} 
+            title="Audio Overview" 
+            testId="studio-card-audio"
+          />
+          <StudioCard 
+            icon={Video} 
+            title="Video Overview" 
+            testId="studio-card-video"
+          />
+          <StudioCard 
+            icon={BrainCircuit} 
+            title="Mind Map" 
+            onClick={onOpenMindMap}
+            testId="studio-card-mindmap"
+          />
+          <StudioCard 
+            icon={FileBarChart} 
+            title="Reports" 
+            testId="studio-card-reports"
+          />
+          <StudioCard 
+            icon={Layers} 
+            title="Flashcards" 
+            testId="studio-card-flashcards"
+          />
+          <StudioCard 
+            icon={HelpCircle} 
+            title="Quiz" 
+            testId="studio-card-quiz"
+          />
+          <StudioCard 
+            icon={BarChart3} 
+            title="Infographic" 
+            testId="studio-card-infographic"
+          />
+          <StudioCard 
+            icon={Presentation} 
+            title="Slide Deck" 
+            testId="studio-card-slides"
+          />
+        </div>
+
+        <div className="mt-3">
+          <StudioCard 
+            icon={Mail} 
+            title="Email Builder" 
+            onClick={onOpenEmailBuilder}
+            testId="studio-card-email"
+          />
+        </div>
+      </div>
+
+      <Tabs defaultValue="notes" className="flex-1 flex flex-col min-h-0">
         <TabsList className="mx-4 rounded-xl bg-muted/50">
-          <TabsTrigger value="reports" className="flex-1 gap-1 rounded-lg text-xs" data-testid="tab-reports">
-            <FileBarChart className="w-4 h-4" />
-            Report
-          </TabsTrigger>
-          <TabsTrigger value="audio" className="flex-1 gap-1 rounded-lg text-xs" data-testid="tab-audio">
-            <AudioLines className="w-4 h-4" />
-            Audio
+          <TabsTrigger value="notes" className="flex-1 gap-1 rounded-lg text-xs" data-testid="tab-notes">
+            <FileText className="w-4 h-4" />
+            Notes
           </TabsTrigger>
           <TabsTrigger value="workflows" className="flex-1 gap-1 rounded-lg text-xs" data-testid="tab-workflows">
             <Workflow className="w-4 h-4" />
@@ -85,67 +160,53 @@ export default function StudioPanel({
           </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="reports" className="flex-1 mt-0 overflow-hidden">
-          <ScrollArea className="h-full">
-            <div className="p-4 space-y-3">
-              {reports.length === 0 ? (
-                <div className="text-center py-8">
-                  <FileBarChart className="w-10 h-10 mx-auto mb-3 text-muted-foreground" />
-                  <p className="text-sm text-muted-foreground">No reports yet</p>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Generate reports from your sources
-                  </p>
-                </div>
-              ) : (
-                reports.map((report) => (
-                  <Card 
-                    key={report.id} 
-                    className="p-3 rounded-xl hover-elevate cursor-pointer"
-                    data-testid={`report-item-${report.id}`}
-                  >
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium truncate">{report.name}</p>
-                        <div className="flex items-center gap-2 mt-1">
-                          <Badge variant="secondary" className="text-xs">
-                            {report.type}
-                          </Badge>
-                          <span className="text-xs text-muted-foreground flex items-center gap-1">
-                            <Clock className="w-3 h-3" />
-                            {report.createdAt.toLocaleDateString()}
-                          </span>
-                        </div>
-                      </div>
-                      <Button 
-                        variant="ghost" 
-                        size="icon" 
-                        className="h-8 w-8 shrink-0"
-                        onClick={() => onDownloadReport(report.id)}
-                      >
-                        <Download className="w-4 h-4" />
-                      </Button>
+        <TabsContent value="notes" className="flex-1 mt-0 overflow-hidden">
+          <ScrollArea className="h-full px-2">
+            <div className="px-2 space-y-2 py-4">
+              {reports.map((report) => (
+                <Card 
+                  key={report.id} 
+                  className="p-3 rounded-xl hover-elevate cursor-pointer"
+                  data-testid={`report-item-${report.id}`}
+                >
+                  <div className="flex items-start gap-3">
+                    <div className="p-2 rounded-lg bg-muted shrink-0">
+                      <FileText className="w-4 h-4 text-muted-foreground" />
                     </div>
-                  </Card>
-                ))
-              )}
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium truncate">{report.name}</p>
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        Create Your Own · {Math.floor(Math.random() * 10 + 5)} sources · {formatTimeAgo(report.createdAt)}
+                      </p>
+                    </div>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0">
+                          <MoreVertical className="w-4 h-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end" className="rounded-xl">
+                        <DropdownMenuItem 
+                          className="rounded-lg"
+                          onClick={() => onDownloadReport(report.id)}
+                        >
+                          <FileBarChart className="w-4 h-4 mr-2" />
+                          Download
+                        </DropdownMenuItem>
+                        <DropdownMenuItem 
+                          className="rounded-lg text-destructive"
+                          onClick={() => onDeleteReport(report.id)}
+                        >
+                          <Trash2 className="w-4 h-4 mr-2" />
+                          Delete
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
+                </Card>
+              ))}
             </div>
           </ScrollArea>
-        </TabsContent>
-
-        <TabsContent value="audio" className="flex-1 mt-0">
-          <div className="p-4">
-            <Card className="p-6 rounded-2xl text-center">
-              <AudioLines className="w-10 h-10 mx-auto mb-3 text-muted-foreground" />
-              <h4 className="font-medium mb-1">Audio Overview</h4>
-              <p className="text-xs text-muted-foreground mb-4">
-                Generate an audio discussion of your sources
-              </p>
-              <Button className="rounded-xl">
-                <Sparkles className="w-4 h-4 mr-2" />
-                Generate Audio
-              </Button>
-            </Card>
-          </div>
         </TabsContent>
 
         <TabsContent value="workflows" className="flex-1 mt-0 overflow-hidden">
@@ -158,24 +219,24 @@ export default function StudioPanel({
         </TabsContent>
       </Tabs>
 
-      <div className="p-4 border-t space-y-2">
-        <div className="grid grid-cols-2 gap-2">
-          <Button variant="outline" size="sm" className="rounded-xl text-xs justify-start gap-2">
-            <span className="text-lg">Save to note</span>
-          </Button>
-          <div className="flex gap-1 justify-end">
-            <Button variant="ghost" size="icon" className="h-8 w-8">
-              <span className="text-lg">{"📎"}</span>
-            </Button>
-            <Button variant="ghost" size="icon" className="h-8 w-8">
-              <span className="text-lg">{"❤️"}</span>
-            </Button>
-            <Button variant="ghost" size="icon" className="h-8 w-8">
-              <span className="text-lg">{"📤"}</span>
-            </Button>
-          </div>
-        </div>
+      <div className="p-4 border-t flex justify-center">
+        <Button variant="outline" size="sm" className="rounded-full gap-2">
+          <Plus className="w-4 h-4" />
+          Add note
+        </Button>
       </div>
     </div>
   );
+}
+
+function formatTimeAgo(date: Date): string {
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+  const diffMins = Math.floor(diffMs / 60000);
+  const diffHours = Math.floor(diffMins / 60);
+  const diffDays = Math.floor(diffHours / 24);
+
+  if (diffMins < 60) return `${diffMins}m ago`;
+  if (diffHours < 24) return `${diffHours}h ago`;
+  return `${diffDays}d ago`;
 }

@@ -54,7 +54,8 @@ export default function Home() {
   ]);
 
   const [reports] = useState<Report[]>([
-    { id: '1', name: 'AI-Executable PRD: The Hyper-Interactive Notebook', type: 'summary', createdAt: new Date() },
+    { id: '1', name: 'AI-Executable PRD: The Hyper-Interactive Notebook', type: 'summary', createdAt: new Date(Date.now() - 31 * 60000) },
+    { id: '2', name: 'Project Blueprint: The Hyper-Interactive Notebook', type: 'analysis', createdAt: new Date(Date.now() - 60 * 60000) },
   ]);
 
   useEffect(() => {
@@ -284,6 +285,8 @@ export default function Home() {
             onRunWorkflow={handleRunWorkflow}
             onDeleteReport={(id) => console.log('Delete report:', id)}
             onDownloadReport={(id) => console.log('Download report:', id)}
+            onOpenMindMap={() => console.log('Open Mind Map')}
+            onOpenEmailBuilder={() => console.log('Open Email Builder')}
           />
         </ResizablePanel>
       </ResizablePanelGroup>

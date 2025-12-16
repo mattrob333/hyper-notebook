@@ -1,0 +1,264 @@
+To replicate this dashboard (which appears to be Google's NotebookLM interface) using the **Claude/Anthropic Dark Mode** aesthetic, I have broken down the design into its core components and created a complete "Builder Prompt" you can give to an AI coding agent.
+
+I have also provided the **direct code** below if you want to run it immediately.
+
+### 1\. The Design System: "Claude Dark"
+
+The user specifically requested "Claude dark colors" to replace the standard slate blue. Based on Anthropic's brand guidelines, here is the palette we will use:
+
+  * **Background:** `#191918` (Warm charcoal, not cold black)
+  * **Surface/Cards:** `#222221` (Slightly lighter warm gray)
+  * **Text (Primary):** `#EDEDE9` (Warm off-white/beige)
+  * **Text (Secondary):** `#9F9E9B` (Muted warm gray)
+  * **Accent:** `#D97757` (The signature Anthropic "Clay/Terracotta" orange)
+  * **Borders:** `#353533` (Subtle warm borders)
+
+-----
+
+### 2\. Prompt for a Builder Agent
+
+If you want another AI (like Cursor, v0, or Bolt) to build this for you, copy and paste the block below. It contains the exact structural requirements.
+
+> **System Instruction:**
+> Build a React dashboard matching the Google NotebookLM 3-column layout, but strictly using the "Claude/Anthropic Dark Mode" color palette (Warm charcoal `#191918` background, `#D97757` clay accent, `#EDEDE9` text).
+>
+> **Layout Requirements:**
+>
+> 1.  **Header:** Full width. Title: "Agent-to-User Interface and AI Research Tools". Icons on right: Create notebook, Analytics, Share, Settings, Profile.
+> 2.  **3-Column Grid:** Fixed height (viewport).
+>       * **Left Col (Sources, width \~20%):** Header "Sources". Action button "Add sources". Search bars for "Deep Research" and "Web". List of file items (PDF/Link icons) with checkboxes.
+>       * **Center Col (Chat/Reading, width \~55%):** Header "Chat". Large scrollable reading area with markdown text, citations in blue pills `[1]`, and bold headers. Bottom fixed input area: "Start typing..." with attachment clips. Above input: Suggested query chips (e.g., "What is A2UI's current version?").
+>       * **Right Col (Studio, width \~25%):** Header "Studio". A 2x4 grid of action cards (Audio Overview, Video Overview, Mind Map, Reports, Flashcards, Quiz, Infographic, Slide Deck). Below that: List of "Saved Notebooks" (e.g., "AI-Executable PRD..."). Bottom button: "Add note".
+>
+> **Styling Details:**
+>
+>   * Use `lucide-react` for icons.
+>   * Font: Inter or similar clean sans-serif.
+>   * Radius: `rounded-lg` for cards, `rounded-full` for chips/buttons.
+>   * **Strict Color Enforcement:** No blue/slate backgrounds. Use `#191918` for app bg, `#222221` for panels/cards, `#353533` for borders.
+
+-----
+
+### 3\. The Code (React + Tailwind CSS)
+
+Here is the complete code. You can drop this into a single file in a Next.js or React project.
+
+```tsx
+import React from 'react';
+import { 
+  Search, Plus, MoreHorizontal, Settings, Share2, 
+  MessageSquare, FileText, Globe, Github, Image as ImageIcon,
+  Mic, Video, BrainCircuit, FileBarChart, Layers, 
+  HelpCircle, Presentation, FileCode, Paperclip, ArrowUp
+} from 'lucide-react';
+
+// --- Components ---
+
+const IconButton = ({ icon: Icon, className = "" }) => (
+  <button className={`p-2 hover:bg-[#353533] rounded-full transition-colors text-[#9F9E9B] hover:text-[#EDEDE9] ${className}`}>
+    <Icon size={18} />
+  </button>
+);
+
+const Chip = ({ text }) => (
+  <button className="px-4 py-2 bg-[#222221] border border-[#353533] rounded-full text-xs text-[#EDEDE9] hover:bg-[#2A2A29] transition-colors text-left truncate max-w-full">
+    {text}
+  </button>
+);
+
+const SourceItem = ({ icon: Icon, title, type = "pdf" }) => (
+  <div className="flex items-center gap-3 p-2 hover:bg-[#222221] rounded-md group cursor-pointer">
+    <div className={`p-2 rounded-md ${type === 'github' ? 'bg-[#222221]' : 'bg-[#D97757]/20 text-[#D97757]'}`}>
+      <Icon size={16} />
+    </div>
+    <span className="text-sm text-[#EDEDE9] truncate flex-1">{title}</span>
+    <input type="checkbox" className="opacity-0 group-hover:opacity-100 accent-[#D97757]" />
+  </div>
+);
+
+const StudioCard = ({ icon: Icon, title }) => (
+  <div className="flex flex-col items-center justify-center p-4 bg-[#222221] border border-[#353533] rounded-xl hover:border-[#D97757]/50 cursor-pointer transition-all gap-2">
+    <Icon size={20} className="text-[#D97757]" />
+    <span className="text-xs font-medium text-[#EDEDE9]">{title}</span>
+  </div>
+);
+
+const Citation = ({ num }) => (
+  <span className="inline-flex items-center justify-center w-4 h-4 text-[10px] bg-[#D97757]/20 text-[#D97757] font-bold rounded-full ml-1 cursor-pointer hover:bg-[#D97757] hover:text-white">
+    {num}
+  </span>
+);
+
+export default function ClaudeDashboard() {
+  return (
+    <div className="flex flex-col h-screen w-full bg-[#191918] text-[#EDEDE9] font-sans overflow-hidden">
+      
+      {/* --- Header --- */}
+      <header className="h-14 border-b border-[#353533] flex items-center justify-between px-4 shrink-0">
+        <div className="flex items-center gap-2">
+          <div className="w-6 h-6 bg-[#D97757] rounded-md flex items-center justify-center">
+            <span className="font-bold text-[#191918] text-xs">N</span>
+          </div>
+          <h1 className="text-sm font-medium text-[#EDEDE9]">Agent-to-User Interface and AI Research Tools</h1>
+        </div>
+        <div className="flex items-center gap-2">
+          <button className="flex items-center gap-2 px-3 py-1.5 bg-[#EDEDE9] text-[#191918] rounded-full text-sm font-medium hover:bg-white transition">
+            <Plus size={14} /> Create notebook
+          </button>
+          <IconButton icon={FileBarChart} />
+          <IconButton icon={Share2} />
+          <IconButton icon={Settings} />
+          <div className="w-7 h-7 bg-[#D97757] rounded-full ml-2 border-2 border-[#191918] ring-1 ring-[#353533]"></div>
+        </div>
+      </header>
+
+      {/* --- Main Content Grid --- */}
+      <main className="flex-1 flex overflow-hidden">
+        
+        {/* --- Left Column: Sources --- */}
+        <aside className="w-72 border-r border-[#353533] flex flex-col bg-[#191918]">
+          <div className="p-4 flex items-center justify-between">
+            <h2 className="text-xs font-bold text-[#9F9E9B] uppercase tracking-wider">Sources</h2>
+            <IconButton icon={Plus} className="!p-1" />
+          </div>
+          
+          <div className="px-4 space-y-3 mb-4">
+            <div className="p-3 rounded-lg bg-[#222221] border border-[#353533] flex items-center gap-2 cursor-pointer hover:border-[#D97757]/50">
+              <div className="w-4 h-4 rounded-full border border-[#D97757] flex items-center justify-center">
+                <div className="w-2 h-2 bg-[#D97757] rounded-full"></div>
+              </div>
+              <span className="text-xs text-[#D97757] font-medium">Try Deep Research</span>
+            </div>
+            
+            <div className="relative">
+              <Search className="absolute left-3 top-2.5 text-[#9F9E9B]" size={14} />
+              <input 
+                type="text" 
+                placeholder="Search the web for sources" 
+                className="w-full bg-[#191918] border border-[#353533] rounded-full py-2 pl-9 pr-3 text-sm focus:outline-none focus:border-[#D97757] placeholder-[#5c5b59]"
+              />
+            </div>
+          </div>
+
+          <div className="flex-1 overflow-y-auto px-2 space-y-1">
+            <SourceItem icon={FileText} title="AZUI" />
+            <SourceItem icon={FileText} title="Agent Engineering: A New Discipline" />
+            <SourceItem icon={FileText} title="Cognitive Procurement Engine Spec" />
+            <SourceItem icon={Github} title="Github - google/A2UI" type="github" />
+            <SourceItem icon={Github} title="Github - hyperbrowser/hyperbook" type="github" />
+            <SourceItem icon={Globe} title="Home - Hyperbrowser" />
+            <SourceItem icon={FileText} title="Project Blueprint: The Notebook" />
+            <SourceItem icon={ImageIcon} title="Screenshot 2025-12-15" />
+            <SourceItem icon={ImageIcon} title="Screenshot 2025-12-15" />
+          </div>
+        </aside>
+
+        {/* --- Center Column: Chat --- */}
+        <section className="flex-1 flex flex-col min-w-0 bg-[#191918]">
+          <div className="h-12 border-b border-[#353533] flex items-center justify-between px-6">
+            <div className="flex items-center gap-2 text-[#9F9E9B]">
+              <MessageSquare size={16} />
+              <span className="text-sm font-medium text-[#EDEDE9]">Chat</span>
+            </div>
+            <IconButton icon={MoreHorizontal} />
+          </div>
+
+          {/* Chat Content */}
+          <div className="flex-1 overflow-y-auto p-8 max-w-3xl mx-auto w-full space-y-6 text-[#D1D1CF] leading-relaxed">
+            <p>
+              Your second idea — presenting the agent's browser activity in a resizable screen (e.g., top-right corner) within the main interface — can be addressed using AZUI's framework agnostic and progressive rendering capabilities.
+            </p>
+
+            <ul className="space-y-4">
+              <li className="pl-4 border-l-2 border-[#353533]">
+                <strong className="text-[#EDEDE9]">Decoupling UI and Execution:</strong> A key feature of AZUI is that it separates the UI structure from the UI implementation, making it <strong className="text-[#EDEDE9]">framework-agnostic</strong><Citation num="4" />. The agent sends a declarative JSON format describing the intent of the UI, and the client (built on Angular, Flutter, React, etc.) renders it using its own native widgets<Citation num="8" />. This means you have the flexibility to design the overall interface (like a resizable panel) in your client application.
+              </li>
+              <li className="pl-4 border-l-2 border-[#353533]">
+                 <strong className="text-[#EDEDE9]">Secure Browsing View:</strong> AZUI allows for the mapping of server-side types to custom client implementations, including secure iframe containers for legacy content<Citation num="6" />.
+              </li>
+              <li className="pl-4 border-l-2 border-[#353533]">
+                <strong className="text-[#EDEDE9]">Progressive Rendering:</strong> AZUI supports progressive rendering, where UI updates are streamed as they are generated<Citation num="7" />. This means instead of waiting for a complete response, users see the interface building in real-time.
+              </li>
+            </ul>
+
+            <p className="text-sm text-[#9F9E9B] italic">
+              In summary, the technology for AI-powered browser automation exists...
+            </p>
+          </div>
+
+          {/* Input Area */}
+          <div className="p-6 max-w-3xl mx-auto w-full space-y-4">
+            <div className="flex gap-2 overflow-x-auto pb-2 no-scrollbar">
+              <Chip text="What is AZUI's current version?" />
+              <Chip text="Which database does CPE leverage?" />
+              <Chip text="What is Agent Engineering's core cycle?" />
+            </div>
+            
+            <div className="relative bg-[#222221] border border-[#353533] rounded-3xl p-2 flex items-center shadow-lg">
+              <button className="p-3 text-[#9F9E9B] hover:text-[#EDEDE9] transition-colors rounded-full hover:bg-[#353533]">
+                <Paperclip size={20} />
+              </button>
+              <input 
+                type="text" 
+                placeholder="Start typing..." 
+                className="flex-1 bg-transparent border-none focus:ring-0 text-[#EDEDE9] placeholder-[#5c5b59] px-2"
+              />
+              <button className="p-2 bg-[#D97757] text-[#191918] rounded-full hover:bg-[#c4694a] transition-colors">
+                <ArrowUp size={20} />
+              </button>
+            </div>
+            <div className="text-center">
+               <span className="text-[10px] text-[#5c5b59]">NotebookLM can make mistakes. Please double check its responses.</span>
+            </div>
+          </div>
+        </section>
+
+        {/* --- Right Column: Studio --- */}
+        <aside className="w-80 border-l border-[#353533] flex flex-col bg-[#191918]">
+          <div className="p-4 border-b border-[#353533]">
+            <h2 className="text-lg font-medium text-[#EDEDE9] mb-4">Studio</h2>
+            <div className="grid grid-cols-2 gap-2">
+              <StudioCard icon={Mic} title="Audio Overview" />
+              <StudioCard icon={Video} title="Video Overview" />
+              <StudioCard icon={BrainCircuit} title="Mind Map" />
+              <StudioCard icon={FileBarChart} title="Reports" />
+              <StudioCard icon={Layers} title="Flashcards" />
+              <StudioCard icon={HelpCircle} title="Quiz" />
+              <StudioCard icon={Presentation} title="Infographic" />
+              <StudioCard icon={FileCode} title="Slide Deck" />
+            </div>
+          </div>
+
+          <div className="flex-1 overflow-y-auto p-4 space-y-3">
+             <div className="group flex flex-col p-3 rounded-lg hover:bg-[#222221] cursor-pointer transition-colors border border-transparent hover:border-[#353533]">
+               <div className="flex items-center gap-2 mb-1">
+                 <FileText size={16} className="text-[#D97757]" />
+                 <span className="text-sm font-medium text-[#EDEDE9]">AI-Executable PRD...</span>
+               </div>
+               <span className="text-xs text-[#9F9E9B] ml-6">Created from 10 sources • 31m ago</span>
+             </div>
+
+             <div className="group flex flex-col p-3 rounded-lg hover:bg-[#222221] cursor-pointer transition-colors border border-transparent hover:border-[#353533]">
+               <div className="flex items-center gap-2 mb-1">
+                 <FileText size={16} className="text-[#D97757]" />
+                 <span className="text-sm font-medium text-[#EDEDE9]">Project Blueprint: The...</span>
+               </div>
+               <span className="text-xs text-[#9F9E9B] ml-6">Created from 7 sources • 1h ago</span>
+             </div>
+          </div>
+
+          <div className="p-4 border-t border-[#353533]">
+            <button className="w-full flex items-center justify-center gap-2 py-2 bg-[#222221] hover:bg-[#2A2A29] text-[#EDEDE9] rounded-full text-sm font-medium border border-[#353533] transition-all">
+              <Plus size={16} /> Add note
+            </button>
+          </div>
+        </aside>
+
+      </main>
+    </div>
+  );
+}
+```
+
+This video covers the specific design details of the interface you are trying to replicate (NotebookLM) including the rationale behind its 3-panel layout.
+[Designing NotebookLM](https://www.google.com/search?q=https://www.youtube.com/watch%3Fv%3DS2540RjkUjs)
