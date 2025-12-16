@@ -1,8 +1,14 @@
 import { useState, useEffect } from "react";
+import { 
+  ResizablePanelGroup, 
+  ResizablePanel, 
+  ResizableHandle 
+} from "@/components/ui/resizable";
 import Navbar from "@/components/Navbar";
 import SourcesPanel from "@/components/panels/SourcesPanel";
 import ChatPanel from "@/components/panels/ChatPanel";
 import StudioPanel from "@/components/panels/StudioPanel";
+import BrowserAgentMonitor from "@/components/browser/BrowserAgentMonitor";
 import type { Source, Workflow, ChatMessage, A2UIComponent } from "@/lib/types";
 
 interface Report {
@@ -12,24 +18,24 @@ interface Report {
   createdAt: Date;
 }
 
-interface Email {
-  id: string;
-  to: string;
-  subject: string;
-  status: 'draft' | 'sent' | 'failed';
-  sentAt?: Date;
-}
-
 export default function Home() {
-  const [isDarkMode, setIsDarkMode] = useState(false);
+  const [isDarkMode, setIsDarkMode] = useState(true);
   const [selectedSourceId, setSelectedSourceId] = useState<string>();
   const [isLoading, setIsLoading] = useState(false);
+  const [showBrowserMonitor, setShowBrowserMonitor] = useState(false);
+  const [browserStatus, setBrowserStatus] = useState<'idle' | 'running' | 'paused' | 'completed' | 'error'>('idle');
+  const [browserStep, setBrowserStep] = useState<string>('');
+  const [browserStepNum, setBrowserStepNum] = useState(0);
+  const [browserTotalSteps, setBrowserTotalSteps] = useState(0);
+  const [browserUrl, setBrowserUrl] = useState('about:blank');
 
-  // todo: remove mock functionality
   const [sources, setSources] = useState<Source[]>([
-    { id: '1', type: 'url', name: 'OpenAI Blog', content: 'https://openai.com/blog' },
-    { id: '2', type: 'pdf', name: 'Research Paper.pdf', content: 'research-paper.pdf' },
-    { id: '3', type: 'text', name: 'Meeting Notes', content: 'Notes from the Q4 planning meeting...' },
+    { id: '1', type: 'url', name: 'A2UI', content: 'https://a2ui.dev' },
+    { id: '2', type: 'url', name: 'Agent Engineering: A New Discipline', content: 'https://blog.langchain.dev/agent-engineering' },
+    { id: '3', type: 'url', name: 'Cognitive Procurement Engine', content: 'https://docs.procurement.ai' },
+    { id: '4', type: 'url', name: 'GitHub - google2Ax1i', content: 'https://github.com/google/a2ui' },
+    { id: '5', type: 'url', name: 'Home - Hyperbrowser', content: 'https://hyperbrowser.ai' },
+    { id: '6', type: 'url', name: 'Project Blueprint: The Hyper-Interactive Notebook', content: 'https://notion.so/blueprint' },
   ]);
 
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -48,12 +54,7 @@ export default function Home() {
   ]);
 
   const [reports] = useState<Report[]>([
-    { id: '1', name: 'Q4 Competitor Report', type: 'comparison', createdAt: new Date() },
-    { id: '2', name: 'Market Analysis', type: 'analysis', createdAt: new Date(Date.now() - 86400000) },
-  ]);
-
-  const [emails, setEmails] = useState<Email[]>([
-    { id: '1', to: 'team@company.com', subject: 'Weekly Report', status: 'sent', sentAt: new Date() },
+    { id: '1', name: 'AI-Executable PRD: The Hyper-Interactive Notebook', type: 'summary', createdAt: new Date() },
   ]);
 
   useEffect(() => {
@@ -65,6 +66,10 @@ export default function Home() {
     }
   }, [isDarkMode]);
 
+  useEffect(() => {
+    document.documentElement.classList.add('dark');
+  }, []);
+
   const handleNewMessage = async (content: string) => {
     const userMessage: ChatMessage = {
       id: Date.now().toString(),
@@ -75,7 +80,6 @@ export default function Home() {
     setMessages((prev) => [...prev, userMessage]);
     setIsLoading(true);
 
-    // todo: replace with actual API call
     setTimeout(() => {
       const mockA2UIComponents: A2UIComponent[] = content.toLowerCase().includes('analyze') || content.toLowerCase().includes('compare')
         ? [
@@ -126,6 +130,13 @@ export default function Home() {
   };
 
   const handleRunWorkflow = (workflow: Workflow) => {
+    setShowBrowserMonitor(true);
+    setBrowserStatus('running');
+    setBrowserTotalSteps(workflow.steps.length);
+    setBrowserStepNum(1);
+    setBrowserStep(`Executing: ${workflow.steps[0].action}`);
+    setBrowserUrl('https://hyperbrowser.ai/agent');
+
     const userMessage: ChatMessage = {
       id: Date.now().toString(),
       role: 'user',
@@ -135,74 +146,162 @@ export default function Home() {
     setMessages((prev) => [...prev, userMessage]);
     setIsLoading(true);
 
-    // todo: replace with actual workflow execution
-    setTimeout(() => {
-      const assistantMessage: ChatMessage = {
-        id: (Date.now() + 1).toString(),
-        role: 'assistant',
-        content: `Workflow "${workflow.name}" completed successfully with ${workflow.steps.length} steps.`,
-        a2uiComponents: [
-          {
-            id: 'workflow-result-' + Date.now(),
-            type: 'card',
-            properties: {
-              title: 'Workflow Complete',
-              description: workflow.description,
-              actions: [
-                { label: 'View Results', variant: 'default' },
-                { label: 'Run Again', variant: 'outline' },
-              ],
+    let stepIndex = 0;
+    const stepInterval = setInterval(() => {
+      stepIndex++;
+      if (stepIndex < workflow.steps.length) {
+        setBrowserStepNum(stepIndex + 1);
+        setBrowserStep(`Executing: ${workflow.steps[stepIndex].action}`);
+      } else {
+        clearInterval(stepInterval);
+        setBrowserStatus('completed');
+        setBrowserStep('All steps completed');
+        
+        const assistantMessage: ChatMessage = {
+          id: (Date.now() + 1).toString(),
+          role: 'assistant',
+          content: `Workflow "${workflow.name}" completed successfully with ${workflow.steps.length} steps.`,
+          a2uiComponents: [
+            {
+              id: 'workflow-result-' + Date.now(),
+              type: 'card',
+              properties: {
+                title: 'Workflow Complete',
+                description: workflow.description,
+                actions: [
+                  { label: 'View Results', variant: 'default' },
+                  { label: 'Run Again', variant: 'outline' },
+                ],
+              },
             },
-          },
-        ],
-        timestamp: new Date(),
-      };
-      setMessages((prev) => [...prev, assistantMessage]);
-      setIsLoading(false);
-    }, 2000);
+          ],
+          timestamp: new Date(),
+        };
+        setMessages((prev) => [...prev, assistantMessage]);
+        setIsLoading(false);
+      }
+    }, 1500);
   };
 
-  const handleSendEmail = (email: Omit<Email, 'id' | 'status'>) => {
-    setEmails([
-      ...emails,
-      { ...email, id: Date.now().toString(), status: 'sent', sentAt: new Date() },
-    ]);
-  };
+  const handleStartDeepResearch = (query: string) => {
+    setShowBrowserMonitor(true);
+    setBrowserStatus('running');
+    setBrowserTotalSteps(5);
+    setBrowserStepNum(1);
+    setBrowserStep('Searching the web for sources...');
+    setBrowserUrl('https://www.google.com/search?q=' + encodeURIComponent(query));
 
-  const handleDeleteEmail = (id: string) => {
-    setEmails(emails.filter((e) => e.id !== id));
+    const userMessage: ChatMessage = {
+      id: Date.now().toString(),
+      role: 'user',
+      content: `Deep Research: ${query}`,
+      timestamp: new Date(),
+    };
+    setMessages((prev) => [...prev, userMessage]);
+    setIsLoading(true);
+
+    const steps = [
+      'Searching the web for sources...',
+      'Analyzing search results...',
+      'Extracting key information...',
+      'Cross-referencing sources...',
+      'Generating research report...'
+    ];
+
+    let stepIndex = 0;
+    const stepInterval = setInterval(() => {
+      stepIndex++;
+      if (stepIndex < steps.length) {
+        setBrowserStepNum(stepIndex + 1);
+        setBrowserStep(steps[stepIndex]);
+      } else {
+        clearInterval(stepInterval);
+        setBrowserStatus('completed');
+        setBrowserStep('Research complete');
+        
+        const assistantMessage: ChatMessage = {
+          id: (Date.now() + 1).toString(),
+          role: 'assistant',
+          content: `Deep research on "${query}" completed. I found several relevant sources and synthesized the information into a comprehensive report.`,
+          a2uiComponents: [
+            {
+              id: 'research-result-' + Date.now(),
+              type: 'card',
+              properties: {
+                title: 'Research Report',
+                description: `Based on 12 sources found for: ${query}`,
+                content: 'The analysis reveals key insights across multiple dimensions. View the full report for detailed findings.',
+                actions: [
+                  { label: 'View Full Report', variant: 'default' },
+                  { label: 'Add Sources', variant: 'outline' },
+                ],
+              },
+            },
+          ],
+          timestamp: new Date(),
+        };
+        setMessages((prev) => [...prev, assistantMessage]);
+        setIsLoading(false);
+      }
+    }, 1200);
   };
 
   return (
     <div className="h-screen flex flex-col bg-background" data-testid="home-page">
       <Navbar isDarkMode={isDarkMode} onToggleDarkMode={() => setIsDarkMode(!isDarkMode)} />
-      <div className="flex-1 flex overflow-hidden">
-        <SourcesPanel
-          sources={sources}
-          selectedSourceId={selectedSourceId}
-          onAddSource={handleAddSource}
-          onDeleteSource={handleDeleteSource}
-          onSelectSource={(source) => setSelectedSourceId(source.id)}
-        />
-        <ChatPanel
-          sources={sources}
-          messages={messages}
-          onNewMessage={handleNewMessage}
-          isLoading={isLoading}
-        />
-        <StudioPanel
-          workflows={workflows}
-          reports={reports}
-          emails={emails}
-          onSaveWorkflow={handleSaveWorkflow}
-          onDeleteWorkflow={handleDeleteWorkflow}
-          onRunWorkflow={handleRunWorkflow}
-          onDeleteReport={(id) => console.log('Delete report:', id)}
-          onDownloadReport={(id) => console.log('Download report:', id)}
-          onSendEmail={handleSendEmail}
-          onDeleteEmail={handleDeleteEmail}
-        />
-      </div>
+      
+      <ResizablePanelGroup direction="horizontal" className="flex-1">
+        <ResizablePanel defaultSize={20} minSize={15} maxSize={35}>
+          <SourcesPanel
+            sources={sources}
+            selectedSourceId={selectedSourceId}
+            onAddSource={handleAddSource}
+            onDeleteSource={handleDeleteSource}
+            onSelectSource={(source) => setSelectedSourceId(source.id)}
+            onStartDeepResearch={handleStartDeepResearch}
+          />
+        </ResizablePanel>
+        
+        <ResizableHandle withHandle />
+        
+        <ResizablePanel defaultSize={55} minSize={30}>
+          <ChatPanel
+            sources={sources}
+            messages={messages}
+            onNewMessage={handleNewMessage}
+            isLoading={isLoading}
+          />
+        </ResizablePanel>
+        
+        <ResizableHandle withHandle />
+        
+        <ResizablePanel defaultSize={25} minSize={20} maxSize={40}>
+          <StudioPanel
+            workflows={workflows}
+            reports={reports}
+            onSaveWorkflow={handleSaveWorkflow}
+            onDeleteWorkflow={handleDeleteWorkflow}
+            onRunWorkflow={handleRunWorkflow}
+            onDeleteReport={(id) => console.log('Delete report:', id)}
+            onDownloadReport={(id) => console.log('Download report:', id)}
+          />
+        </ResizablePanel>
+      </ResizablePanelGroup>
+
+      <BrowserAgentMonitor
+        isVisible={showBrowserMonitor}
+        onDismiss={() => setShowBrowserMonitor(false)}
+        status={browserStatus}
+        currentStep={browserStep}
+        stepNumber={browserStepNum}
+        totalSteps={browserTotalSteps}
+        currentUrl={browserUrl}
+        logs={[
+          '> Initializing browser agent...',
+          '> Connected to Hyperbrowser SDK',
+          '> Starting workflow execution...'
+        ]}
+      />
     </div>
   );
 }
