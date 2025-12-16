@@ -53,6 +53,7 @@ interface StudioPanelProps {
   onOpenMindMap?: () => void;
   onOpenEmailBuilder?: () => void;
   onRunBrowserScript?: (script: string) => void;
+  onMinimizeBrowser?: () => void;
 }
 
 interface StudioCardProps {
@@ -91,6 +92,7 @@ export default function StudioPanel({
   onDownloadReport,
   onOpenMindMap,
   onRunBrowserScript,
+  onMinimizeBrowser,
 }: StudioPanelProps) {
   const [activeView, setActiveView] = useState<ActiveView>('main');
   const [reportsModalOpen, setReportsModalOpen] = useState(false);
@@ -105,6 +107,10 @@ export default function StudioPanel({
         onBack={() => setActiveView('main')} 
         onRun={(script) => {
           onRunBrowserScript?.(script);
+        }}
+        onMinimize={() => {
+          setActiveView('main');
+          onMinimizeBrowser?.();
         }}
       />
     );

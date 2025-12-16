@@ -307,12 +307,11 @@ export default function Home() {
                 onOpenMindMap={() => console.log('Open Mind Map')}
                 onOpenEmailBuilder={() => console.log('Open Email Builder')}
                 onRunBrowserScript={(script) => {
-                  setShowBrowserMonitor(true);
                   setBrowserStatus('running');
                   setBrowserTotalSteps(5);
                   setBrowserStepNum(1);
                   setBrowserStep('Initializing browser...');
-                  setBrowserUrl('https://hyperbrowser.ai');
+                  setBrowserUrl('https://news.ycombinator.com');
                   
                   const steps = [
                     'Initializing browser...',
@@ -334,6 +333,9 @@ export default function Home() {
                       setBrowserStep('Script completed');
                     }
                   }, 1000);
+                }}
+                onMinimizeBrowser={() => {
+                  setShowBrowserMonitor(true);
                 }}
               />
             </div>
