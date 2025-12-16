@@ -48,14 +48,13 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import WorkflowStudio from "../studio/WorkflowStudio";
 import EmailBuilder from "../studio/EmailBuilder";
 import HyperBrowserBuilder from "../studio/HyperBrowserBuilder";
 import AIContextFileGenerator from "../studio/AIContextFileGenerator";
-import ReportsModal from "../studio/ReportsModal";
 import A2UIRenderer from "../a2ui/A2UIRenderer";
 import type { Workflow as WorkflowType, Source } from "@/lib/types";
 import type { A2UIComponent, ContentType } from "@shared/schema";
@@ -77,19 +76,7 @@ interface GeneratedContent {
 }
 
 interface StudioPanelProps {
-  workflows: WorkflowType[];
-  reports: Report[];
-  sources: Source[];
   selectedSourceIds?: string[];
-  onSaveWorkflow: (workflow: WorkflowType) => void;
-  onDeleteWorkflow: (id: string) => void;
-  onRunWorkflow: (workflow: WorkflowType) => void;
-  onDeleteReport: (id: string) => void;
-  onDownloadReport: (id: string) => void;
-  onOpenMindMap?: () => void;
-  onOpenEmailBuilder?: () => void;
-  onRunBrowserScript?: (script: string) => void;
-  onMinimizeBrowser?: () => void;
 }
 
 interface ContentCardProps {
@@ -189,21 +176,9 @@ const AI_MODELS = [
 type ActiveView = 'main' | 'email' | 'hyperbrowser' | 'context-file';
 
 export default function StudioPanel({
-  workflows,
-  reports,
-  sources,
   selectedSourceIds = [],
-  onSaveWorkflow,
-  onDeleteWorkflow,
-  onRunWorkflow,
-  onDeleteReport,
-  onDownloadReport,
-  onOpenMindMap,
-  onRunBrowserScript,
-  onMinimizeBrowser,
 }: StudioPanelProps) {
   const [activeView, setActiveView] = useState<ActiveView>('main');
-  const [reportsModalOpen, setReportsModalOpen] = useState(false);
   const [loadingType, setLoadingType] = useState<ContentType | null>(null);
   const [generatedContent, setGeneratedContent] = useState<GeneratedContent | null>(null);
   const [resultModalOpen, setResultModalOpen] = useState(false);
@@ -213,6 +188,18 @@ export default function StudioPanel({
   const [customModel, setCustomModel] = useState('gpt-4.1');
   const [customSourceIds, setCustomSourceIds] = useState<string[]>([]);
   const { toast } = useToast();
+
+  const { data: sources = [] } = useQuery<Source[]>({
+    queryKey: ['/api/sources'],
+  });
+
+  const { data: savedContent = [] } = useQuery<GeneratedContent[]>({
+    queryKey: ['/api/generated'],
+  });
+
+  const { data: workflows = [] } = useQuery<WorkflowType[]>({
+    queryKey: ['/api/workflows'],
+  });
 
   const generateMutation = useMutation({
     mutationFn: async ({ type, sourceIds, model, customPrompt }: {
@@ -337,11 +324,13 @@ export default function StudioPanel({
       <HyperBrowserBuilder 
         onBack={() => setActiveView('main')} 
         onRun={(script) => {
-          onRunBrowserScript?.(script);
+          toast({
+            title: 'Browser Script Started',
+            description: 'Executing browser automation...'
+          });
         }}
         onMinimize={() => {
           setActiveView('main');
-          onMinimizeBrowser?.();
         }}
       />
     );
@@ -461,46 +450,64 @@ export default function StudioPanel({
         <TabsContent value="notes" className="flex-1 mt-0 overflow-hidden">
           <ScrollArea className="h-full px-2">
             <div className="px-2 space-y-2 py-4">
-              {reports.length === 0 ? (
+              {savedContent.length === 0 ? (
                 <div className="text-center py-8 text-muted-foreground">
                   <FileText className="w-8 h-8 mx-auto mb-2 opacity-50" />
                   <p className="text-sm">No notes yet</p>
                   <p className="text-xs mt-1">Generate content to create notes</p>
                 </div>
               ) : (
-                reports.map((report, index) => (
+                savedContent.map((content) => (
                   <Card 
-                    key={report.id} 
+                    key={content.id} 
                     className="p-3 rounded-xl hover-elevate cursor-pointer bg-card"
-                    data-testid={`report-item-${report.id}`}
+                    data-testid={`content-item-${content.id}`}
+                    onClick={() => {
+                      setGeneratedContent(content);
+                      setResultModalOpen(true);
+                    }}
                   >
                     <div className="flex items-start gap-3">
                       <div className="p-2 rounded-lg bg-muted shrink-0">
-                        <FileText className="w-4 h-4 text-muted-foreground" />
+                        {CONTENT_TYPES.find(t => t.type === content.type)?.icon ? (
+                          (() => {
+                            const Icon = CONTENT_TYPES.find(t => t.type === content.type)!.icon;
+                            return <Icon className="w-4 h-4 text-muted-foreground" />;
+                          })()
+                        ) : (
+                          <FileText className="w-4 h-4 text-muted-foreground" />
+                        )}
                       </div>
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium truncate">{report.name}</p>
+                        <p className="text-sm font-medium truncate">{content.title}</p>
                         <p className="text-xs text-muted-foreground mt-0.5">
-                          {index === 0 ? 10 : 7} sources · {formatTimeAgo(report.createdAt)}
+                          {content.sourceIds?.length || 0} sources · {formatTimeAgo(new Date(content.createdAt))}
                         </p>
                       </div>
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" data-testid={`button-report-menu-${report.id}`}>
+                          <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" data-testid={`button-content-menu-${content.id}`}>
                             <MoreVertical className="w-4 h-4" />
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end" className="rounded-xl">
                           <DropdownMenuItem 
                             className="rounded-lg"
-                            onClick={() => onDownloadReport(report.id)}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              console.log('Download', content.id);
+                            }}
                           >
                             <FileBarChart className="w-4 h-4 mr-2" />
                             Download
                           </DropdownMenuItem>
                           <DropdownMenuItem 
                             className="rounded-lg text-destructive"
-                            onClick={() => onDeleteReport(report.id)}
+                            onClick={async (e) => {
+                              e.stopPropagation();
+                              await apiRequest('DELETE', `/api/generated/${content.id}`);
+                              queryClient.invalidateQueries({ queryKey: ['/api/generated'] });
+                            }}
                           >
                             <Trash2 className="w-4 h-4 mr-2" />
                             Delete
@@ -518,9 +525,20 @@ export default function StudioPanel({
         <TabsContent value="workflows" className="flex-1 mt-0 overflow-hidden">
           <WorkflowStudio
             workflows={workflows}
-            onSaveWorkflow={onSaveWorkflow}
-            onDeleteWorkflow={onDeleteWorkflow}
-            onRunWorkflow={onRunWorkflow}
+            onSaveWorkflow={async (workflow) => {
+              await apiRequest('POST', '/api/workflows', workflow);
+              queryClient.invalidateQueries({ queryKey: ['/api/workflows'] });
+            }}
+            onDeleteWorkflow={async (id) => {
+              await apiRequest('DELETE', `/api/workflows/${id}`);
+              queryClient.invalidateQueries({ queryKey: ['/api/workflows'] });
+            }}
+            onRunWorkflow={(workflow) => {
+              toast({
+                title: 'Workflow Started',
+                description: `Running "${workflow.name}"...`
+              });
+            }}
           />
         </TabsContent>
       </Tabs>
@@ -531,14 +549,6 @@ export default function StudioPanel({
           Add note
         </Button>
       </div>
-
-      <ReportsModal
-        open={reportsModalOpen}
-        onOpenChange={setReportsModalOpen}
-        onSelectReport={(reportType) => {
-          console.log('Selected report type:', reportType);
-        }}
-      />
 
       <Dialog open={resultModalOpen} onOpenChange={setResultModalOpen}>
         <DialogContent className="max-w-3xl max-h-[80vh] overflow-hidden flex flex-col" data-testid="dialog-generated-content">

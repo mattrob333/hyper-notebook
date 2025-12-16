@@ -53,17 +53,25 @@ interface WorkflowStudioProps {
 }
 
 const actionIcons: Record<WorkflowStep['action'], React.ReactNode> = {
+  navigate: <Globe className="w-4 h-4" />,
+  click: <LayoutGrid className="w-4 h-4" />,
+  type: <FileText className="w-4 h-4" />,
   scrape: <Globe className="w-4 h-4" />,
+  screenshot: <LayoutGrid className="w-4 h-4" />,
+  wait: <LayoutGrid className="w-4 h-4" />,
+  extract: <Sparkles className="w-4 h-4" />,
   summarize: <FileText className="w-4 h-4" />,
-  generate_mindmap: <Sparkles className="w-4 h-4" />,
-  generate_ui: <LayoutGrid className="w-4 h-4" />,
 };
 
 const actionLabels: Record<WorkflowStep['action'], string> = {
-  scrape: 'Scrape URL',
+  navigate: 'Navigate',
+  click: 'Click',
+  type: 'Type',
+  scrape: 'Scrape',
+  screenshot: 'Screenshot',
+  wait: 'Wait',
+  extract: 'Extract',
   summarize: 'Summarize',
-  generate_mindmap: 'Generate Mindmap',
-  generate_ui: 'Generate UI',
 };
 
 export default function WorkflowStudio({ 
@@ -98,10 +106,15 @@ export default function WorkflowStudio({
 
   const handleSave = () => {
     if (newWorkflow.name && newWorkflow.steps.length > 0) {
-      onSaveWorkflow({
+      const workflow: Workflow = {
         id: Date.now().toString(),
-        ...newWorkflow,
-      });
+        name: newWorkflow.name,
+        description: newWorkflow.description || null,
+        steps: newWorkflow.steps,
+        isActive: false,
+        createdAt: new Date(),
+      };
+      onSaveWorkflow(workflow);
       setNewWorkflow({ name: '', description: '', steps: [] });
       setDialogOpen(false);
     }
@@ -168,10 +181,14 @@ export default function WorkflowStudio({
                     <SelectValue placeholder="Add a step..." />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="scrape">Scrape URL</SelectItem>
+                    <SelectItem value="navigate">Navigate to URL</SelectItem>
+                    <SelectItem value="click">Click Element</SelectItem>
+                    <SelectItem value="type">Type Text</SelectItem>
+                    <SelectItem value="scrape">Scrape Content</SelectItem>
+                    <SelectItem value="screenshot">Take Screenshot</SelectItem>
+                    <SelectItem value="wait">Wait</SelectItem>
+                    <SelectItem value="extract">Extract Data</SelectItem>
                     <SelectItem value="summarize">Summarize</SelectItem>
-                    <SelectItem value="generate_mindmap">Generate Mindmap</SelectItem>
-                    <SelectItem value="generate_ui">Generate UI</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -217,7 +234,7 @@ export default function WorkflowStudio({
                     <div className="flex items-center gap-2 text-left">
                       <span className="font-medium text-sm">{workflow.name}</span>
                       <Badge variant="secondary">
-                        {workflow.steps.length} step{workflow.steps.length !== 1 ? 's' : ''}
+                        {(workflow.steps || []).length} step{(workflow.steps || []).length !== 1 ? 's' : ''}
                       </Badge>
                     </div>
                   </AccordionTrigger>
@@ -226,7 +243,7 @@ export default function WorkflowStudio({
                       {workflow.description}
                     </p>
                     <div className="space-y-2 mb-3">
-                      {workflow.steps.map((step, idx) => (
+                      {(workflow.steps || []).map((step, idx) => (
                         <div key={step.id} className="flex items-center gap-2 text-sm">
                           <Badge variant="outline" className="shrink-0">
                             {idx + 1}
