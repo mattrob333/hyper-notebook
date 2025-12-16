@@ -63,7 +63,7 @@ export default function EmailBuilder({ onBack }: EmailBuilderProps) {
   };
 
   return (
-    <div className="flex flex-col h-full bg-sidebar" data-testid="email-builder">
+    <div className="flex flex-col h-full" data-testid="email-builder">
       <div className="p-4 border-b border-border/50">
         <div className="flex items-center gap-3">
           <Button 

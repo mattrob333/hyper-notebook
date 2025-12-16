@@ -1,0 +1,56 @@
+This is a classic UI design problem: **Depth vs. Borders.**
+
+Your current build relies on **borders** (lines) to separate content, making it look like a spreadsheet or a terminal app.
+NotebookLM relies on **depth** (layers) to separate content, making it look like a modern application.
+
+Here is the exact prompt to paste into Replit. It translates "make it look like NotebookLM" into the specific CSS/Tailwind architecture changes required to switch from a "Grid Layout" to a "floating Card Layout," while keeping the Claude colors we discussed.
+
+***
+
+### **Prompt for Replit**
+
+> **System Instruction: UI Refactor - "Floating Card" Architecture**
+>
+> **The Problem:** The current dashboard looks flat and "grid-like" because it uses full-height borders (`border-r`, `border-l`) to separate the three main columns. It looks like a table.
+>
+> **The Goal:** Replicate the Google NotebookLM aesthetic, which uses a "Floating Card" architecture. The columns should look like distinct panels floating on top of a background canvas.
+>
+> **Specific Styling Instructions (Tailwind CSS):**
+>
+> **1. The "Canvas" Background**
+> * Set the main app container background to the Deepest Claude Charcoal: `bg-[#191918]`.
+> * This is the "floor" of the app. Everything else sits on top of this.
+>
+> **2. Kill the Grid Lines**
+> * **Remove** all `border-r` and `border-l` classes between the main `Sources`, `Chat`, and `Studio` columns.
+> * Separation must be created by **gaps**, not lines.
+>
+> **3. Create "Floating Islands" (The 3 Columns)**
+> * Wrap the contents of the Left, Center, and Right columns into their own individual container `divs`.
+> * **Color:** Give these column containers a slightly lighter background: `bg-[#222221]`.
+> * **Borders:** Give them a subtle, full-surround border: `border border-[#353533]`.
+> * **Radius:** This is critical. Apply `rounded-2xl` (approx 16px) to these column containers.
+> * **Height:** Ensure they don't touch the bottom of the screen. Give them `h-[calc(100vh-80px)]` (or similar) so they look suspended.
+>
+> **4. The Gutter (Spacing)**
+> * Apply `gap-4` (16px) to the parent flex container holding the three columns.
+> * This gap reveals the `#191918` background behind the panels, creating visual separation without needing a harsh line.
+>
+> **5. Header Adjustment**
+> * The Header should span the full width at the top.
+> * The three columns should sit *below* the header, with a `p-4` (padding) on the main container so the columns don't touch the edges of the screen.
+>
+> **Summary of Visual Hierarchy:**
+> * **Layer 0 (App Bg):** `#191918`
+> * **Layer 1 (Panels/Cards):** `#222221` + `rounded-2xl` + `border-[#353533]`
+> * **Layer 2 (Inputs/Buttons):** `#2A2A29` (Slightly lighter than panels)
+>
+> **Execute this refactor now.**
+
+***
+
+### **Why this fixes it (The Design Theory)**
+
+* **The "Gutter" is key:** In your current screenshot, the chat panel touches the studio panel. In NotebookLM, there is a visible gap between them. That gap lets the darker background show through, which tells your brain "these are two different objects."
+* **Rounded Corners are "Containers":** When you have square corners (like your current build), the eye follows the line to infinity. When you have rounded corners (`rounded-2xl`), the eye is contained within the box. It feels cozier and more organized.
+* **Padding is Luxury:** "Modern" interfaces use screen real estate inefficiently on purpose. By adding padding around the edges so the cards don't touch the browser window, it feels less cramped.

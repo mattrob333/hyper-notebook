@@ -89,7 +89,7 @@ export default function StudioPanel({
   }
 
   return (
-    <div className="flex flex-col h-full bg-sidebar" data-testid="studio-panel">
+    <div className="flex flex-col h-full" data-testid="studio-panel">
       <div className="p-4 border-b border-border/50">
         <div className="flex items-center justify-between">
           <h2 className="font-semibold text-base">Studio</h2>

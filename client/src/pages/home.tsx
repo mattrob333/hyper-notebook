@@ -1,9 +1,4 @@
 import { useState, useEffect } from "react";
-import { 
-  ResizablePanelGroup, 
-  ResizablePanel, 
-  ResizableHandle 
-} from "@/components/ui/resizable";
 import Navbar from "@/components/Navbar";
 import SourcesPanel from "@/components/panels/SourcesPanel";
 import ChatPanel from "@/components/panels/ChatPanel";
@@ -252,8 +247,10 @@ export default function Home() {
     <div className="h-screen flex flex-col bg-background" data-testid="home-page">
       <Navbar isDarkMode={isDarkMode} onToggleDarkMode={() => setIsDarkMode(!isDarkMode)} />
       
-      <ResizablePanelGroup direction="horizontal" className="flex-1">
-        <ResizablePanel defaultSize={20} minSize={15} maxSize={35}>
+      {/* Floating Card Layout - 3 columns with gaps */}
+      <div className="flex-1 flex gap-4 p-4 overflow-hidden">
+        {/* Left Panel - Sources */}
+        <div className="w-[280px] shrink-0 bg-sidebar rounded-2xl border border-sidebar-border overflow-hidden">
           <SourcesPanel
             sources={sources}
             selectedSourceId={selectedSourceId}
@@ -262,11 +259,10 @@ export default function Home() {
             onSelectSource={(source) => setSelectedSourceId(source.id)}
             onStartDeepResearch={handleStartDeepResearch}
           />
-        </ResizablePanel>
+        </div>
         
-        <ResizableHandle withHandle />
-        
-        <ResizablePanel defaultSize={55} minSize={30}>
+        {/* Center Panel - Chat or Source Detail */}
+        <div className="flex-1 min-w-0 bg-sidebar rounded-2xl border border-sidebar-border overflow-hidden">
           {selectedSourceId ? (
             <SourceDetailView 
               source={sources.find(s => s.id === selectedSourceId)!}
@@ -280,11 +276,10 @@ export default function Home() {
               isLoading={isLoading}
             />
           )}
-        </ResizablePanel>
+        </div>
         
-        <ResizableHandle withHandle />
-        
-        <ResizablePanel defaultSize={25} minSize={20} maxSize={40}>
+        {/* Right Panel - Studio */}
+        <div className="w-[320px] shrink-0 bg-sidebar rounded-2xl border border-sidebar-border overflow-hidden">
           <StudioPanel
             workflows={workflows}
             reports={reports}
@@ -296,8 +291,8 @@ export default function Home() {
             onOpenMindMap={() => console.log('Open Mind Map')}
             onOpenEmailBuilder={() => console.log('Open Email Builder')}
           />
-        </ResizablePanel>
-      </ResizablePanelGroup>
+        </div>
+      </div>
 
       <BrowserAgentMonitor
         isVisible={showBrowserMonitor}

@@ -70,8 +70,8 @@ Data science measures performance and analyzes patterns:
   `;
 
   return (
-    <div className="flex-1 flex flex-col h-full min-w-0 bg-sidebar" data-testid="source-detail-view">
-      <div className="h-14 border-b flex items-center justify-between px-6 sticky top-0 bg-background z-10">
+    <div className="flex-1 flex flex-col h-full min-w-0" data-testid="source-detail-view">
+      <div className="h-14 border-b border-border/50 flex items-center justify-between px-6 sticky top-0 bg-sidebar z-10">
         <div className="flex items-center gap-3">
           <h2 className="font-semibold truncate">{source.name}</h2>
           <Badge variant="secondary" className="shrink-0">

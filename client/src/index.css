@@ -93,17 +93,21 @@
   --opaque-button-border-intensity: 9;
   --elevate-1: rgba(255,255,255, .04);
   --elevate-2: rgba(255,255,255, .09);
-  /* Claude/Anthropic Dark Palette - Layered depth */
-  --background: 60 3% 8%;
+  /* Floating Card Architecture - NotebookLM Style */
+  /* Layer 0: Canvas (deepest) #191918 */
+  --background: 60 3% 9%;
   --foreground: 60 6% 93%;
-  --border: 60 3% 18%;
-  --card: 60 3% 13%;
+  /* Layer 1: Panels #222221 */
+  --panel: 60 2% 13%;
+  --panel-border: 60 2% 20%;
+  --border: 60 2% 20%;
+  /* Layer 2: Cards/Inputs #2A2A29 */
+  --card: 60 2% 16%;
   --card-foreground: 60 6% 93%;
-  --card-border: 60 3% 16%;
-  --sidebar: 60 3% 11%;
+  --card-border: 60 2% 22%;
+  --sidebar: 60 2% 13%;
   --sidebar-foreground: 60 6% 93%;
-  --sidebar-border: 60 3% 16%;
-  --panel: 60 3% 10%;
+  --sidebar-border: 60 2% 20%;
   --sidebar-primary: 150 45% 28%;
   --sidebar-primary-foreground: 60 6% 93%;
   --sidebar-accent: 60 3% 16%;
