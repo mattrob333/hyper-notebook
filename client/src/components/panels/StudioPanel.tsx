@@ -156,9 +156,14 @@ const AI_MODELS = [
   { value: 'gpt-4.1', label: 'GPT-4.1' },
   { value: 'gpt-4o', label: 'GPT-4o' },
   { value: 'gpt-4o-mini', label: 'GPT-4o Mini' },
-  { value: 'gemini-2.0-flash', label: 'Gemini 2.0 Flash' },
-  { value: 'gemini-2.5-flash-preview-05-20', label: 'Gemini 2.5 Flash' },
+  { value: 'gemini-2.5-pro', label: 'Gemini 2.5 Pro' },
+  { value: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash' },
 ];
+
+const CONTENT_TYPE_DEFAULT_MODELS: Partial<Record<ContentType, string>> = {
+  'slides': 'gemini-2.5-pro',
+  'infographic': 'gemini-2.5-pro',
+};
 
 type ActiveView = 'main' | 'email' | 'hyperbrowser' | 'context-file';
 
@@ -176,6 +181,12 @@ export default function StudioPanel({
   const [customModel, setCustomModel] = useState('gpt-4.1');
   const [customSourceIds, setCustomSourceIds] = useState<string[]>([]);
   const { toast } = useToast();
+  
+  // Config dialog for slides/infographics
+  const [configDialogOpen, setConfigDialogOpen] = useState(false);
+  const [configType, setConfigType] = useState<ContentType | null>(null);
+  const [configModel, setConfigModel] = useState('gemini-2.5-pro');
+  const [configPrompt, setConfigPrompt] = useState('');
 
   const { data: sources = [] } = useQuery<Source[]>({
     queryKey: ['/api/sources'],
@@ -234,6 +245,15 @@ export default function StudioPanel({
       return;
     }
 
+    // Show config dialog for slides and infographics
+    if (type === 'slides' || type === 'infographic') {
+      setConfigType(type);
+      setConfigModel(CONTENT_TYPE_DEFAULT_MODELS[type] || 'gemini-2.5-pro');
+      setConfigPrompt('');
+      setConfigDialogOpen(true);
+      return;
+    }
+
     const idsToUse = selectedSourceIds.length > 0 
       ? selectedSourceIds 
       : sources.map(s => s.id);
@@ -243,6 +263,23 @@ export default function StudioPanel({
       type,
       sourceIds: idsToUse,
       model: 'gpt-4.1'
+    });
+  };
+
+  const handleConfigGenerate = () => {
+    if (!configType) return;
+    
+    const idsToUse = selectedSourceIds.length > 0 
+      ? selectedSourceIds 
+      : sources.map(s => s.id);
+    
+    setConfigDialogOpen(false);
+    setLoadingType(configType);
+    generateMutation.mutate({
+      type: configType,
+      sourceIds: idsToUse,
+      model: configModel,
+      customPrompt: configPrompt || undefined
     });
   };
 
@@ -282,8 +319,44 @@ export default function StudioPanel({
 
   const parseA2UIComponents = (content: any): A2UIComponent[] => {
     if (!content) return [];
-    if (Array.isArray(content)) return content;
+    
+    // Check if it's an array of slides (has slideType property)
+    if (Array.isArray(content) && content.length > 0 && content[0].slideType) {
+      // Transform slides to match A2Slides expected format
+      const transformedSlides = content.map((slide: any) => ({
+        title: slide.title,
+        content: slide.bullets?.length > 0 
+          ? slide.bullets.join('\n\n') 
+          : slide.notes || '',
+      }));
+      
+      return [{
+        id: 'slides-content',
+        type: 'slides',
+        properties: {},
+        data: { slides: transformedSlides }
+      }];
+    }
+    
+    // Check if it's an array of A2UI components (has type and id)
+    if (Array.isArray(content) && content.length > 0 && content[0].type && content[0].id) {
+      return content;
+    }
+    
+    // Check if it's a raw array of other content
+    if (Array.isArray(content)) {
+      return [{
+        id: 'generated-list',
+        type: 'card',
+        properties: {
+          title: 'Generated Content',
+          content: JSON.stringify(content, null, 2)
+        }
+      }];
+    }
+    
     if (content.components) return content.components;
+    
     if (typeof content === 'object') {
       return [{
         id: 'generated-content',
@@ -673,6 +746,97 @@ export default function StudioPanel({
               onClick={handleCustomGenerate}
               disabled={generateMutation.isPending}
               data-testid="button-generate-custom"
+            >
+              {generateMutation.isPending ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Generating...
+                </>
+              ) : (
+                <>
+                  <Sparkles className="w-4 h-4 mr-2" />
+                  Generate
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Configuration Dialog for Slides/Infographics */}
+      <Dialog open={configDialogOpen} onOpenChange={setConfigDialogOpen}>
+        <DialogContent className="sm:max-w-md" data-testid="dialog-config">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              {configType && (
+                <>
+                  {CONTENT_TYPES.find(t => t.type === configType)?.icon && (
+                    (() => {
+                      const Icon = CONTENT_TYPES.find(t => t.type === configType)!.icon;
+                      const color = CONTENT_TYPES.find(t => t.type === configType)!.iconColor;
+                      return <Icon className={`w-5 h-5 ${color}`} />;
+                    })()
+                  )}
+                  {CONTENT_TYPES.find(t => t.type === configType)?.title}
+                </>
+              )}
+            </DialogTitle>
+            <DialogDescription>
+              Configure your {configType?.replace(/_/g, ' ')} generation settings
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="config-model">AI Model</Label>
+              <Select value={configModel} onValueChange={setConfigModel}>
+                <SelectTrigger id="config-model" data-testid="select-config-model">
+                  <SelectValue placeholder="Select AI model" />
+                </SelectTrigger>
+                <SelectContent>
+                  {AI_MODELS.map((model) => (
+                    <SelectItem key={model.value} value={model.value} data-testid={`option-config-model-${model.value}`}>
+                      {model.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                Gemini 2.5 Pro is recommended for best results
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="config-prompt">Additional Instructions (optional)</Label>
+              <Textarea
+                id="config-prompt"
+                placeholder={
+                  configType === 'slides' 
+                    ? "e.g., Focus on key takeaways, limit to 10 slides..."
+                    : "e.g., Use a modern color scheme, emphasize statistics..."
+                }
+                value={configPrompt}
+                onChange={(e) => setConfigPrompt(e.target.value)}
+                className="min-h-[80px]"
+                data-testid="input-config-prompt"
+              />
+            </div>
+
+            <div className="p-3 bg-muted/50 rounded-lg text-sm">
+              <span className="text-muted-foreground">Using </span>
+              <span className="font-medium">{selectedSourceIds.length > 0 ? selectedSourceIds.length : sources.length}</span>
+              <span className="text-muted-foreground"> source(s) for generation</span>
+            </div>
+          </div>
+
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setConfigDialogOpen(false)} data-testid="button-cancel-config">
+              Cancel
+            </Button>
+            <Button 
+              onClick={handleConfigGenerate}
+              disabled={generateMutation.isPending}
+              data-testid="button-generate-config"
             >
               {generateMutation.isPending ? (
                 <>
