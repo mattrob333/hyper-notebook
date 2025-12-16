@@ -1,0 +1,371 @@
+AI-Executable PRD: The Hyper-Interactive Notebook
+
+This Product Requirements Document (PRD) is a comprehensive technical blueprint designed to be directly consumed and executed by an AI coding agent. Its purpose is to guide the construction of "The Hyper-Interactive Notebook," an AI-native workspace, with zero ambiguity. Every specification, from technology stack to build order, is defined herein to ensure the agent can construct a robust, scalable, and fully functional application that aligns perfectly with the project's vision.
+
+
+--------------------------------------------------------------------------------
+
+
+I. Project Overview
+
+This section defines the "what" and "why" of the project, establishing the core mission for the AI agent. It clarifies the strategic context, articulates the problem being solved, and provides a clear, measurable definition of success. This overview serves as the guiding star for all subsequent development activities.
+
+Project Name
+
+The Hyper-Interactive Notebook
+
+Project Description
+
+The project's mission is to evolve the intuitive 'NotebookLM'-inspired interface of hyperbooklm into a unified agentic workspace for research, analysis, and workflow execution. This will be achieved by integrating three core technology pillars: the hyperbooklm frontend foundation, Google's A2UI protocol for generative user interfaces, and the Hyperbrowser SDK for powerful web automation. The result will be a single, cohesive workspace where users can orchestrate complex tasks and interact with results through dynamic, application-grade interfaces.
+
+Core User Problem
+
+The system is designed to transform the user experience from passive information consumption to active, agent-driven creation. It addresses the limitations of traditional text-in, text-out AI interactions by replacing them with a dynamic workspace. Users will no longer be confined to static responses; instead, they will be able to orchestrate complex web automation workflows and interact with the results via rich, interactive UIs generated on the fly, directly within their conversation.
+
+Success Criteria
+
+The initial build will be considered complete and successful upon the delivery of a functional application that successfully integrates the three core technology pillars. Specifically, the system must be capable of executing the "Automated Competitor Analysis" workflow as described in this document. The final application must meet all requirements of the "Phased Implementation Plan," culminating in a functional end-to-end user experience where a user can define, trigger, and receive an interactive A2UI-based response from a multi-step workflow.
+
+This vision will be enabled by a precise and carefully selected set of technologies.
+
+
+--------------------------------------------------------------------------------
+
+
+II. Technology Stack Decisions
+
+This section provides an explicit and non-negotiable declaration of all technologies to be used in the construction of the application. These choices have been pre-determined to eliminate ambiguity, ensure system consistency, and provide the AI agent with a clear and stable foundation upon which to build.
+
+Layer	Technology	Version / Details	Purpose
+Frontend	Next.js	v15 (App Router)	High-performance, server-rendered React framework for the UI.
+React	v19	Core UI library for building components.	
+Tailwind CSS	Latest	A utility-first CSS framework for rapid, custom UI development.	
+shadcn/ui	N/A	Component library for building an accessible and consistent UI.	
+TypeScript	Strict Mode	Provides static typing to enhance code quality and maintainability.	
+Framer Motion	Latest	Library for animations and transitions.	
+React Flow	Latest	Library for visualizing the interactive mindmaps.	
+Generative UI	A2UI Protocol	v0.8	Declarative JSON format for agents to generate interactive UI.
+A2UI Renderer	Custom Build	A client-side renderer to interpret A2UI JSON and render React components.	
+Backend	Next.js API Routes	v15	Server-side logic and API endpoint hosting.
+Web Automation	Hyperbrowser SDK	Latest	SDK for orchestrating cloud browsers for web scraping and automation.
+PDF Processing	unpdf	Latest	Client-side parsing and analysis of PDF documents.
+AI Models	OpenAI	gpt-5-nano, gpt-4o-mini	Powers core chat, summarization, and mindmap generation.
+Google Gemini	gemini-3-pro-image-preview	Powers slide deck generation from sources.	
+ElevenLabs	eleven_turbo_v2_5	Powers the podcast-style audio overview generation.	
+Deployment	Vercel	N/A	Target platform for deploying the Next.js application.
+
+The chosen technologies will be organized within a precise and scalable project structure.
+
+
+--------------------------------------------------------------------------------
+
+
+III. File & Folder Structure
+
+A precise and consistent file structure is critical for an AI agent to build a scalable and maintainable application. The following structure, which extends the foundational hyperbooklm project, must be created exactly as specified. This organization ensures a clean separation of concerns and provides a logical home for all new components and services.
+
+/hyper-interactive-notebook
+├── /app
+│   ├── /api
+│   │   ├── /chat                # Main endpoint for agentic orchestration
+│   │   ├── /scrape              # Hyperbrowser integration
+│   │   ├── /workflows           # CRUD for Workflow Studio
+│   │   └── ... (other routes from hyperbooklm)
+│   ├── page.tsx                 # Main application page component
+│   └── globals.css              # Global styles
+├── /components
+│   ├── /ui                      # shadcn/ui components
+│   ├── /panels
+│   │   ├── SourcesPanel.tsx     # Left-side source management
+│   │   ├── ChatPanel.tsx        # Center panel for user interaction
+│   │   └── StudioPanel.tsx      # Right-side command center
+│   ├── /studio
+│   │   ├── WorkflowStudio.tsx
+│   │   ├── CustomReports.tsx
+│   │   └── EmailStudio.tsx
+│   ├── /a2ui
+│   │   ├── A2UIRenderer.tsx     # Renders UI from A2UI JSON
+│   │   └── /catalog             # Pre-approved, trusted React components
+│   │       ├── Card.tsx
+│   │       ├── Form.tsx
+│   │       └── Map.tsx
+│   └── Navbar.tsx
+├── /lib
+│   ├── /api-clients
+│   │   └── hyperbrowser.ts      # Client for Hyperbrowser SDK
+│   ├── hooks.ts
+│   └── types.ts                 # Core TypeScript interfaces
+├── /public
+│   └── ...
+├── .env.local                   # Local environment variables
+├── next.config.mjs
+├── package.json
+└── tsconfig.json
+
+
+This structure will house the application's core data models and type definitions, ensuring consistency across the system.
+
+
+--------------------------------------------------------------------------------
+
+
+IV. Data Models & Types
+
+This section defines the core data structures of the application. These TypeScript interfaces are the single source of truth for all data shapes, ensuring type safety and clear contracts between the frontend components and backend services. The AI agent must implement these types exactly as specified in /lib/types.ts.
+
+/**
+ * Represents a single source of information ingested by the user.
+ */
+export interface Source {
+  id: string;
+  type: 'url' | 'pdf' | 'text';
+  content: string; // URL or parsed text content
+  name: string;
+}
+
+
+/**
+ * Defines a reusable, multi-step agentic workflow created in the Studio.
+ */
+export interface Workflow {
+  id: string;
+  name: string;
+  description: string;
+  steps: WorkflowStep[];
+}
+
+/**
+ * Represents a single action within a Workflow.
+ */
+export interface WorkflowStep {
+  id: string;
+  action: 'scrape' | 'summarize' | 'generate_mindmap' | 'generate_ui';
+  params: Record<string, any>; // Parameters for the action, e.g., { urls: ['...'] }
+}
+
+
+/**
+ * Represents a single component in the A2UI declarative format.
+ * Based on the A2UI specification for a flat, streaming JSON structure.
+ */
+export interface A2UIComponent {
+  id: string; // Unique identifier for the component
+  type: string; // e.g., 'card', 'form', 'text-field' from the component catalog
+  parentId?: string; // ID of the parent component to build the tree
+  properties: Record<string, any>; // Props for the component, e.g., { "label": "Name" }
+  data?: any; // Data binding
+}
+
+
+These data models will be consumed and rendered by the application's primary UI components.
+
+
+--------------------------------------------------------------------------------
+
+
+V. Component Specification
+
+This section breaks down the primary UI components into detailed specifications. For each component, its purpose, properties (props), and core behaviors are defined to guide the AI agent in its construction. These components will form the interactive shell of the application.
+
+ChatPanel.tsx
+
+* Description: The central interactive surface where the user communicates with the agent and where A2UI-generated interfaces are rendered.
+* Props:
+
+Prop Name	Type	Description
+sources	Source[]	An array of currently active sources for context.
+onNewMessage	(message: string) => void	Callback function to handle sending a new user message.
+
+A2UIRenderer.tsx
+
+* Description: A critical component nested within ChatPanel. It receives A2UI JSON messages, interprets them, and maps them to the corresponding React components from the pre-approved catalog.
+* Props:
+
+Prop Name	Type	Description
+uiStream	A2UIComponent[]	An array of component nodes streamed from the backend.
+
+StudioPanel.tsx
+
+* Description: The right-hand command center that houses tabs for managing reusable assets and workflows like the Workflow Studio, Custom Reports, and Email Studio.
+* Props:
+
+Prop Name	Type	Description
+workflows	Workflow[]	The list of saved workflows to be managed.
+onSaveWorkflow	(workflow: Workflow) => void	Callback to save a new or updated workflow.
+
+These components must be constructed in a specific, logical sequence to ensure all dependencies are met.
+
+
+--------------------------------------------------------------------------------
+
+
+VI. Build Order (Critical)
+
+This section provides the explicit, numbered sequence of implementation steps that the AI agent MUST follow without deviation. This phased approach is critical for managing dependencies, establishing a testable foundation at each stage, and ensuring the project is built in a logical and verifiable order.
+
+Phase 1: Foundation & Setup
+
+1. Initialize the project by cloning the hyperbooklm repository: git clone https://github.com/hyperbrowserai/hyperbooklm.git hyper-interactive-notebook.
+2. Install all Node.js dependencies using yarn install.
+3. Create the .env.local file from the example template and populate it with placeholder API keys for OpenAI, Google Gemini, and Hyperbrowser.
+4. Run the baseline application with yarn dev and confirm that all original features are functional at http://localhost:3000.
+5. Create the new file and folder structure manually as specified in Section III to prepare the scaffold for new components and services.
+
+Phase 2: Core Components & UI Scaffolding
+
+1. Build the static UI for the three main panels: SourcesPanel.tsx, ChatPanel.tsx, and StudioPanel.tsx.
+2. Build the UI for the individual studio tabs: WorkflowStudio.tsx, CustomReports.tsx, and EmailStudio.tsx. Populate with mock data for visualization.
+3. Build the A2UIRenderer.tsx component. Initially, it should be capable of rendering a hardcoded, sample A2UI JSON object to verify its rendering logic.
+4. Create the initial component catalog under /components/a2ui/catalog/ with simple, functional placeholder components for Card.tsx, Form.tsx, and Map.tsx.
+
+Phase 3: Core Technology Integration
+
+1. Implement the backend API route /api/scrape to integrate the Hyperbrowser SDK. Create a test function to verify that it can successfully initiate a scraping job.
+2. Implement the backend logic in /api/chat to stream back a hardcoded A2UI JSON response. This de-risks the client-server communication for A2UI.
+3. Connect the ChatPanel.tsx frontend to the /api/chat endpoint, ensuring it can receive and pass the streamed A2UI JSON to the A2UIRenderer.tsx component. Verify that the hardcoded UI renders correctly from a live API call.
+
+Phase 4: Full Workflow Orchestration
+
+1. Implement the backend API endpoints (GET, POST) for /api/workflows to enable saving and retrieving workflow definitions.
+2. Develop the main agent orchestrator logic within the /api/chat service. This orchestrator is the 'brain' of the system and must be able to execute a multi-step workflow: receive a prompt, make a call to Hyperbrowser via the SDK, pass the results to an LLM, and generate a final, dynamic A2UI response.
+3. Connect the StudioPanel.tsx UI to the workflow API endpoints to enable creating, saving, and triggering real workflows from the user interface.
+
+This orchestrated system is driven by a well-defined API that connects the user interface to the backend agent.
+
+
+--------------------------------------------------------------------------------
+
+
+VII. API & Data Flow
+
+This section details the application's primary API contract and the flow of data through the system. These endpoints are the critical bridge between the frontend interface where the user acts and the backend agentic logic where tasks are executed.
+
+Primary Endpoint: Agent Interaction
+
+* Method: POST
+* Path: /api/chat
+* Description: This is the main orchestration endpoint for the entire application. It accepts a user prompt and optional workflow context, executes the required sequence of actions (e.g., web scraping, LLM calls), and streams back an A2UI JSON payload to render the UI response dynamically.
+* Request Body Shape:
+* Response Body Shape: A stream of server-sent events (SSE) where each event is a JSON object representing an A2UIComponent node. This enables progressive rendering of the UI on the client.
+
+Data Flow Diagram
+
+The end-to-end data flow for a typical user interaction follows a clear, six-step sequence:
+
+1. User Interaction: The user types a message or triggers a workflow in ChatPanel.tsx and submits the request.
+2. API Request: The frontend client sends a POST request to the /api/chat endpoint containing the prompt, sources, and any relevant workflow context.
+3. Agent Orchestration: The backend agent orchestrator receives the request. It parses the intent and, if required, calls external tools like the Hyperbrowser SDK to gather data from the web.
+4. LLM Generation: The agent passes the user context and any newly gathered data to a large language model (e.g., OpenAI, Gemini) to generate the A2UI JSON response that describes the desired user interface.
+5. Streaming Response: The server streams the A2UI JSON payload back to the client as a series of server-sent events.
+6. UI Rendering: The A2UIRenderer.tsx component on the client receives these events, interprets the declarative JSON, maps the abstract component descriptions (e.g., type: 'card') to the pre-approved, native React components in its catalog, and renders the final UI in real-time, providing an instant, dynamic user experience.
+
+These data flows enable a series of powerful and intuitive user journeys.
+
+
+--------------------------------------------------------------------------------
+
+
+VIII. User Flows
+
+This section maps out key user journeys from start to finish. These narrative sequences, derived from the project blueprint, provide concrete examples of how a user will interact with the fully integrated system to achieve a specific goal, demonstrating the platform's practical value.
+
+Flow 1: Automated Competitor Analysis
+
+1. User navigates to the "Studio" panel and opens the "Workflow Studio" tab.
+2. User defines a new workflow named "Weekly Competitor Scan," adding a 'scrape' step containing a list of competitor URLs and a 'summarize' step, then chaining the output to a 'generate_ui' step linked to a custom report template.
+3. User saves the workflow, which persists it for future use.
+4. User navigates to the "Chat" panel and types the prompt: "Run the 'Weekly Competitor Scan' workflow."
+5. System responds by triggering the Hyperbrowser agent to scrape the full content from each specified URL.
+6. System then passes the aggregated content to an LLM to perform a SWOT analysis.
+7. System finally uses A2UI to render an interactive mindmap visualizing the analysis and a detailed comparison table directly in the chat panel for the user to explore and interact with.
+
+Flow 2: Content Repurposing from a URL
+
+1. User navigates to the "Sources" panel and adds the URL of a new company blog post.
+2. User interacts with the chat panel, prompting: "Repurpose this article for marketing."
+3. System responds by using A2UI to generate an interactive card with several buttons: "Generate Slides," "Generate Audio," and "Draft LinkedIn Post."
+4. User clicks the "Generate Slides" button. The system uses Google's gemini-3-pro-image-preview model to create a slide deck from the article content and provides a download link.
+5. User clicks "Generate Audio." The system uses ElevenLabs' eleven_turbo_v2_5 model to generate a podcast-style audio overview of the article.
+6. User clicks the "Draft LinkedIn Post" button. The system uses A2UI to render a new form component, pre-filled with a suggested post text and an image extracted from the article. The user can edit the text directly in the form and click a button to send or save it.
+
+The successful implementation of these flows will be verified against a clear set of acceptance criteria.
+
+
+--------------------------------------------------------------------------------
+
+
+IX. Acceptance Criteria & Testing
+
+This section defines the explicit, testable criteria for major features. These criteria, written in the "Given/When/Then" format, ensure that functionality can be objectively verified and that the system behaves as expected.
+
+Feature: A2UI Dynamic Form Generation
+
+* Given a user asks a question that requires structured input (e.g., "Schedule an event").
+* When the backend agent determines a form is the appropriate UI for the task.
+* Then the agent should respond with an A2UI JSON payload describing a form with relevant inputs (e.g., text inputs, date pickers).
+* And the A2UIRenderer on the client must render a fully interactive HTML form from that payload.
+
+Feature: Hyperbrowser Web Scraping Workflow
+
+* Given a user has defined and saved a workflow in the Studio that includes a "scrape" step with a valid URL.
+* When the user triggers that workflow from the chat interface.
+* Then the backend orchestrator must successfully call the Hyperbrowser SDK with the correct parameters.
+* And the scraped content must be successfully returned from the SDK and made available to the next step in the workflow for processing.
+
+Testing Philosophy: Agentic Debug & Refine
+
+Our testing approach must abandon traditional software paradigms, which fail in an agentic context where every input is an edge case and "working" isn't binary. The core challenge is to harden a non-deterministic LLM system into a reliable production experience. To achieve this, we adopt the discipline of Agent Engineering.
+
+A core requirement after the initial build is the implementation of a workflow tracing view, inspired by the "Agentic Debug & Refine" Studio concept. This feature is the practical implementation of the discipline's central thesis: the iterative build, test, ship, observe, refine, repeat cycle. This view will allow developers to trace every agent interaction, inspect each tool call and its result, identify failure points, and refine prompts or tools directly. Shipping is not the end of the development process; it is the beginning of the learning process that makes the agent reliable.
+
+The visual presentation of these features will adhere to a consistent design system.
+
+
+--------------------------------------------------------------------------------
+
+
+X. Visual & UX Specifications
+
+This section provides high-level guidelines for the application's visual design and user experience. To ensure consistency and accelerate development, the project will leverage an existing, high-quality design system and a utility-first CSS framework.
+
+* Component Library: The UI will be built using shadcn/ui. All components must be sourced from this library wherever possible to maintain visual, functional, and accessibility consistency across the application.
+* CSS Framework: All styling will be implemented using Tailwind CSS. The AI agent must adhere to its utility-first principles to create a clean and maintainable stylesheet.
+* Layout: The application must maintain the three-panel layout (Sources, Chat, Studio) as established by the hyperbooklm foundation and visualized in the project's concept screenshot.
+* Typography: The default font pairings and sizing scale provided by the integration of shadcn/ui and Tailwind CSS will be used to ensure clear and readable text.
+* Color Palette: The default neutral color palette from shadcn/ui will be used for the application shell, chrome, and components to create a clean, professional, and focused user environment.
+* Animation: Use Framer Motion for subtle and purposeful transitions. This is especially important for enhancing the user experience of A2UI, such as fading in new UI elements as they are generated to create the feeling of a responsive, dynamic interface.
+
+These guidelines are balanced by a clear set of project boundaries and constraints.
+
+
+--------------------------------------------------------------------------------
+
+
+XI. Constraints & Guardrails
+
+Defining what not to build is as important as defining what to build. This section sets clear boundaries and non-functional requirements to keep the initial build focused, secure, and performant.
+
+* Out of Scope for Initial Build:
+  * Multi-user accounts and authentication. The initial build is designed for a single-user, local-first experience.
+  * The full, dynamic "Component Marketplace." The catalog of A2UI components will be static and pre-defined in the codebase under /components/a2ui/catalog/.
+  * Persistent database storage for workflows and templates. The initial implementation can use browser local storage for persistence.
+* Security First: The A2UI implementation must strictly adhere to its security-first philosophy. The agent can only request to render components from the pre-approved, trusted catalog located in /components/a2ui/catalog/. No arbitrary code execution is permitted under any circumstances. This approach ensures that agent-generated UIs are safe like data, but expressive like code.
+* Performance Requirements: All agent responses that generate UI must be streamed. The user must see the interface building in real-time via A2UI's progressive rendering capability to avoid the perception of a slow or frozen application and to provide immediate feedback.
+* Accessibility: All custom-built components and layouts must meet Web Content Accessibility Guidelines (WCAG) 2.1 Level AA standards, leveraging the accessibility features built into the shadcn/ui library as a foundation.
+
+The project concludes with a final set of direct instructions for the AI agent.
+
+
+--------------------------------------------------------------------------------
+
+
+XII. Agent Instructions
+
+AGENT INSTRUCTIONS:
+1. Read this entire document before writing any code to fully understand the project's architecture and goals.
+2. Follow the Build Order in Section VI exactly—do not deviate or skip steps.
+3. Use the exact file names and folder structure specified in Section III.
+4. Implement all data models and types from Section IV using TypeScript to ensure type safety.
+5. Adhere strictly to the A2UI security model: only render components from the pre-approved catalog.
+6. Prioritize streaming data and progressive rendering for a responsive user experience.
+7. Implement the core workflow orchestration first; UI polish is a secondary priority.
