@@ -231,6 +231,9 @@ export default function SourcesPanel({
     
     const formData = new FormData();
     formData.append('file', file);
+    if (notebookId) {
+      formData.append('notebookId', notebookId);
+    }
 
     try {
       const response = await fetch('/api/sources/upload', {
@@ -243,7 +246,13 @@ export default function SourcesPanel({
         throw new Error(errorData.error || 'Upload failed');
       }
 
-      await queryClient.invalidateQueries({ queryKey: ['/api/sources'] });
+      // Invalidate the correct query based on notebook context
+      await queryClient.invalidateQueries({ 
+        queryKey: notebookId ? [`/api/notebooks/${notebookId}/sources`] : ['/api/sources'] 
+      });
+      if (notebookId) {
+        await queryClient.invalidateQueries({ queryKey: ['/api/notebooks'] });
+      }
       toast({ title: "File uploaded successfully" });
     } catch (err) {
       toast({ 

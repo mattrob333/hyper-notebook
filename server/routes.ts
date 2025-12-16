@@ -6,6 +6,7 @@ import { insertSourceSchema, insertNoteSchema, insertWorkflowSchema, insertNoteb
 import { z } from "zod";
 import multer from "multer";
 import { extractText } from "unpdf";
+import { Hyperbrowser } from "@hyperbrowser/sdk";
 
 const upload = multer({ 
   storage: multer.memoryStorage(),
@@ -229,6 +230,164 @@ export async function registerRoutes(
     }
   });
 
+  // Audio Overview endpoint using ElevenLabs TTS
+  app.post("/api/audio/generate", async (req: Request, res: Response) => {
+    try {
+      const { text, sourceIds } = req.body;
+      
+      if (!text && !sourceIds) {
+        return res.status(400).json({ error: "Text or sourceIds required" });
+      }
+
+      const apiKey = process.env.ELEVENLABS_API_KEY;
+      
+      if (!apiKey) {
+        return res.status(400).json({ 
+          error: "ElevenLabs API key not configured",
+          message: "Add ELEVENLABS_API_KEY to your .env file"
+        });
+      }
+
+      // If sourceIds provided, generate a podcast script from sources
+      let scriptText = text;
+      if (sourceIds && sourceIds.length > 0) {
+        const sources = await Promise.all(
+          sourceIds.map((id: string) => storage.getSource(id))
+        );
+        const sourceContent = sources
+          .filter(Boolean)
+          .map((s: any) => s?.content || '')
+          .join('\n\n');
+
+        // Generate podcast script
+        const scriptPrompt = `Create a brief, engaging podcast-style summary (2-3 minutes when spoken) based on the following content. 
+        
+Write it as a natural monologue that:
+- Starts with an attention-grabbing hook
+- Covers the main points conversationally
+- Ends with a memorable takeaway
+
+Content:
+${sourceContent.slice(0, 8000)}
+
+Write ONLY the script text, no stage directions or speaker labels.`;
+
+        scriptText = await chat([{ role: 'user', content: scriptPrompt }], {
+          model: DEFAULT_MODEL,
+          systemPrompt: 'You are a podcast script writer. Write natural, conversational content.',
+          maxTokens: 1500,
+        });
+      }
+
+      // Call ElevenLabs API
+      const voiceId = 'EXAVITQu4vr4xnSDxMaL'; // Sarah - clear, professional voice
+      const elevenLabsResponse = await fetch(
+        `https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`,
+        {
+          method: 'POST',
+          headers: {
+            'Accept': 'audio/mpeg',
+            'Content-Type': 'application/json',
+            'xi-api-key': apiKey,
+          },
+          body: JSON.stringify({
+            text: scriptText,
+            model_id: 'eleven_turbo_v2_5',
+            voice_settings: {
+              stability: 0.5,
+              similarity_boost: 0.75,
+            },
+          }),
+        }
+      );
+
+      if (!elevenLabsResponse.ok) {
+        const errorText = await elevenLabsResponse.text();
+        console.error('[Audio] ElevenLabs error:', errorText);
+        return res.status(500).json({ error: "Failed to generate audio" });
+      }
+
+      // Return audio as base64 data URL
+      const audioBuffer = await elevenLabsResponse.arrayBuffer();
+      const base64Audio = Buffer.from(audioBuffer).toString('base64');
+      const audioUrl = `data:audio/mpeg;base64,${base64Audio}`;
+
+      res.json({
+        audioUrl,
+        script: scriptText,
+        duration: Math.ceil(scriptText.split(' ').length / 150 * 60), // Estimate duration
+      });
+    } catch (error) {
+      console.error("[Audio] Error:", error);
+      res.status(500).json({
+        error: error instanceof Error ? error.message : "Unknown error occurred",
+      });
+    }
+  });
+
+  // Hyperbrowser scrape endpoint for deep research
+  app.post("/api/scrape", async (req: Request, res: Response) => {
+    try {
+      const { url } = req.body;
+      
+      if (!url) {
+        return res.status(400).json({ error: "URL is required" });
+      }
+
+      const apiKey = process.env.HYPERBROWSER_API_KEY;
+      
+      if (!apiKey) {
+        // Fallback to basic fetch if no Hyperbrowser key
+        console.log('[Scrape] No Hyperbrowser API key, using basic fetch');
+        try {
+          const response = await fetch(url);
+          const html = await response.text();
+          // Extract title from HTML
+          const titleMatch = html.match(/<title[^>]*>([^<]+)<\/title>/i);
+          const title = titleMatch ? titleMatch[1].trim() : new URL(url).hostname;
+          // Extract text content (basic)
+          const textContent = html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 10000);
+          
+          return res.json({
+            title,
+            content: textContent,
+            text: textContent,
+            url,
+          });
+        } catch (fetchError) {
+          console.error('[Scrape] Fetch error:', fetchError);
+          return res.status(500).json({ error: "Failed to fetch URL" });
+        }
+      }
+
+      const client = new Hyperbrowser({ apiKey });
+
+      const scrapeResult = await client.scrape.startAndWait({
+        url,
+        scrapeOptions: {
+          formats: ['markdown', 'html'],
+        },
+      });
+
+      const data = scrapeResult.data as any;
+      const title = data?.metadata?.title || new URL(url).hostname;
+      const content = data?.markdown || data?.text || "";
+      const text = data?.text || data?.markdown || "";
+
+      res.json({
+        title,
+        content,
+        text,
+        url,
+      });
+    } catch (error) {
+      console.error("[Scrape] Error:", error);
+      res.status(500).json({
+        error: error instanceof Error ? error.message : "Unknown error occurred",
+      });
+    }
+  });
+
   // Web search endpoint for finding sources
   app.post("/api/search/web", async (req: Request, res: Response) => {
     try {
@@ -284,6 +443,7 @@ export async function registerRoutes(
       const file = req.file;
       const fileName = file.originalname;
       const mimeType = file.mimetype;
+      const notebookId = req.body.notebookId || null;
       
       const allowedMimeTypes = ['application/pdf', 'text/plain', 'text/markdown'];
       const allowedExtensions = ['.pdf', '.txt', '.md'];
@@ -316,16 +476,44 @@ export async function registerRoutes(
         return res.status(400).json({ error: "Could not extract content from file" });
       }
 
+      // Auto-generate a title from the content
+      let generatedTitle = fileName;
+      try {
+        const titleResponse = await chat(
+          [{ role: 'user', content: `Based on the following content, generate a short, descriptive title (max 60 characters). Just respond with the title, no quotes or explanation:\n\n${content.slice(0, 2000)}` }],
+          { maxTokens: 50, temperature: 0.3 }
+        );
+        if (titleResponse && titleResponse.trim().length > 0 && titleResponse.trim().length <= 80) {
+          generatedTitle = titleResponse.trim().replace(/^["']|["']$/g, '');
+        }
+      } catch (titleError) {
+        console.log('Could not generate title, using filename:', titleError);
+      }
+
+      // Create the source
       const source = await storage.createSource({
         type: sourceType,
-        name: fileName,
+        name: generatedTitle,
         content: content,
+        notebookId: notebookId,
         metadata: { 
           originalName: fileName,
           mimeType: mimeType,
           size: String(file.size)
         }
       });
+
+      // Auto-generate summary in background (don't wait for it)
+      (async () => {
+        try {
+          const summary = await summarizeSource(content);
+          if (summary) {
+            await storage.updateSource(source.id, { summary });
+          }
+        } catch (summaryError) {
+          console.log('Could not generate summary:', summaryError);
+        }
+      })();
 
       res.status(201).json(source);
     } catch (error) {

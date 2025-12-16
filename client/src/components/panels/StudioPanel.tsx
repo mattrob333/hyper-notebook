@@ -62,6 +62,9 @@ import A2UIRenderer from "../a2ui/A2UIRenderer";
 import ReportsModal from "../studio/ReportsModal";
 import CustomizeInfographicModal from "../studio/CustomizeInfographicModal";
 import CustomizeSlideDeckModal from "../studio/CustomizeSlideDeckModal";
+import SlideViewer from "../studio/SlideViewer";
+import InfographicViewer from "../studio/InfographicViewer";
+import ReportViewer from "../studio/ReportViewer";
 import type { Workflow as WorkflowType, Source } from "@/lib/types";
 import type { A2UIComponent, ContentType } from "@shared/schema";
 
@@ -179,6 +182,9 @@ export default function StudioPanel({
   const [reportsModalOpen, setReportsModalOpen] = useState(false);
   const [infographicModalOpen, setInfographicModalOpen] = useState(false);
   const [slideDeckModalOpen, setSlideDeckModalOpen] = useState(false);
+  const [infographicViewerOpen, setInfographicViewerOpen] = useState(false);
+  const [infographicImageUrl, setInfographicImageUrl] = useState<string | undefined>();
+  const [infographicLoading, setInfographicLoading] = useState(false);
   const [loadingType, setLoadingType] = useState<ContentType | null>(null);
   const [generatedContent, setGeneratedContent] = useState<GeneratedContent | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -461,6 +467,39 @@ export default function StudioPanel({
     const contentTypeInfo = CONTENT_TYPES.find(t => t.type === generatedContent.type);
     const Icon = contentTypeInfo?.icon || FileText;
     
+    // Render specialized viewers based on content type
+    if (generatedContent.type === 'slides') {
+      const slidesData = generatedContent.content?.slides || generatedContent.content || [];
+      return (
+        <SlideViewer
+          slides={Array.isArray(slidesData) ? slidesData : []}
+          title={generatedContent.title}
+          onClose={() => {
+            setActiveView('main');
+            setIsFullscreen(false);
+          }}
+        />
+      );
+    }
+
+    if (generatedContent.type === 'briefing_doc' || generatedContent.type === 'study_guide') {
+      const reportContent = typeof generatedContent.content === 'string' 
+        ? generatedContent.content 
+        : generatedContent.content?.raw || JSON.stringify(generatedContent.content, null, 2);
+      return (
+        <ReportViewer
+          content={reportContent}
+          title={generatedContent.title}
+          sourceCount={generatedContent.sourceIds?.length}
+          generatedAt={generatedContent.createdAt}
+          onClose={() => {
+            setActiveView('main');
+            setIsFullscreen(false);
+          }}
+        />
+      );
+    }
+    
     const canvasView = (
       <div 
         className={`flex flex-col h-full ${isFullscreen ? 'fixed inset-0 z-50 bg-background' : ''}`}
@@ -724,9 +763,23 @@ export default function StudioPanel({
         onOpenChange={setInfographicModalOpen}
         selectedSourceIds={selectedSourceIds}
         onGenerated={(content) => {
-          setGeneratedContent(content);
-          setActiveView('canvas');
+          // For infographics, open the viewer modal with the image
+          if (content?.content?.imageUrl) {
+            setInfographicImageUrl(content.content.imageUrl);
+            setInfographicViewerOpen(true);
+          } else {
+            setGeneratedContent(content);
+            setActiveView('canvas');
+          }
         }}
+      />
+
+      <InfographicViewer
+        open={infographicViewerOpen}
+        onOpenChange={setInfographicViewerOpen}
+        imageUrl={infographicImageUrl}
+        title="Generated Infographic"
+        isLoading={infographicLoading}
       />
 
       <CustomizeSlideDeckModal

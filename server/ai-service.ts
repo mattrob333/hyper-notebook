@@ -221,19 +221,41 @@ Format as JSON array with date, title, description, and significance fields.`,
 - Connections between concepts
 Format as JSON with nodes (id, label, type) and edges (source, target) for React Flow.`,
 
-  infographic: `Design an infographic layout based on the provided sources. Include:
-- Main title and subtitle
-- Key statistics (3-5 numbers with context)
-- Visual sections with icons
-- Bullet points for key takeaways
-Format as structured JSON with title, stats, sections, and takeaways.`,
+  infographic: `Create a visually stunning infographic image based on the provided sources.
 
-  slides: `Create a slide deck outline based on the provided sources. Include:
-- Title slide
-- 8-12 content slides
-- Each slide with title, bullet points, and speaker notes
-- Conclusion slide
-Format as JSON array with slideType, title, bullets, and notes fields.`,
+Design Requirements:
+- Professional, modern design aesthetic
+- Clear visual hierarchy with a compelling title at the top
+- 3-5 key statistics displayed prominently with large numbers
+- Use icons and visual elements to represent concepts
+- Include a cohesive color palette (blues, teals, or the user's preference)
+- Organized sections with clear headings
+- Data visualizations where appropriate (charts, graphs, icons)
+- Clean typography that's easy to read
+- Footer with source attribution
+
+Content Focus:
+- Highlight the most important insights from the sources
+- Use concise, impactful text
+- Make data memorable with visual representation
+
+Generate a complete, publication-ready infographic image.`,
+
+  slides: `Create a professional slide deck based on the provided sources.
+
+Instructions:
+- Create 6-10 slides total
+- Each slide MUST have a "title" (string) and "bullets" (array of 2-4 strings)
+- Be concise, professional, and impactful
+- Use clear, action-oriented language
+- Do not include filler text
+
+Return ONLY valid JSON matching this EXACT structure:
+{
+  "slides": [
+    { "title": "Slide Title Here", "bullets": ["Point 1", "Point 2", "Point 3"] }
+  ]
+}`,
 
   audio_overview: `Create a podcast script for two hosts discussing the provided sources. Include:
 - Introduction and hook
