@@ -514,15 +514,16 @@ export default function EmailBuilder({ onBack }: EmailBuilderProps) {
     if (!editor) return;
     const html = editor.getHTML();
     console.log("Email saved:", { subject, html });
+    toast({ title: 'Saved!', description: 'Email draft saved' });
   };
 
-  const handleExport = () => {
-    if (!editor) return;
-    const bodyHtml = editor.getHTML();
+  const generateFullHtml = useCallback(() => {
+    if (!editor) return '';
+    const bodyHtml = replaceVariables(editor.getHTML());
     const letterhead = replaceVariables(selectedTemplate.letterhead);
     const signature = replaceVariables(selectedTemplate.signature);
     
-    const fullHtml = `<!DOCTYPE html>
+    return `<!DOCTYPE html>
 <html>
 <head>
   <meta charset="utf-8">
@@ -543,6 +544,12 @@ export default function EmailBuilder({ onBack }: EmailBuilderProps) {
   </div>
 </body>
 </html>`;
+  }, [editor, selectedTemplate, subject, replaceVariables]);
+
+  const handleExport = () => {
+    const fullHtml = generateFullHtml();
+    if (!fullHtml) return;
+    
     const blob = new Blob([fullHtml], { type: "text/html" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -550,6 +557,7 @@ export default function EmailBuilder({ onBack }: EmailBuilderProps) {
     a.download = `${subject || "email"}.html`;
     a.click();
     URL.revokeObjectURL(url);
+    toast({ title: 'Exported!', description: 'HTML file downloaded' });
   };
 
   if (!editor) {
@@ -655,6 +663,7 @@ export default function EmailBuilder({ onBack }: EmailBuilderProps) {
           </TabsList>
 
           <TabsContent value="compose" className="flex-1 flex flex-col mt-0 overflow-hidden">
+            {/* Subject line - always visible */}
             <div className="p-3 border-b border-border/50">
               <Input
                 placeholder="Email subject..."
@@ -665,6 +674,9 @@ export default function EmailBuilder({ onBack }: EmailBuilderProps) {
               />
             </div>
 
+            {/* Edit mode - show toolbar and editor */}
+            {previewMode === 'edit' && (
+            <>
             <div className="p-2 border-b border-border/50 flex items-center gap-1 flex-wrap bg-muted/30">
               <Button variant="ghost" size="icon" onClick={() => editor.chain().focus().toggleBold().run()}
                 className={`toggle-elevate ${editor.isActive("bold") ? "toggle-elevated" : ""}`} data-testid="button-bold">
@@ -771,73 +783,155 @@ export default function EmailBuilder({ onBack }: EmailBuilderProps) {
                 </div>
               </div>
             </ScrollArea>
+            </>
+            )}
+
+            {/* Preview mode - show rendered email */}
+            {previewMode === 'preview' && (
+              <ScrollArea className="flex-1">
+                <div className="p-4">
+                  <div className="bg-white text-black rounded-lg border shadow-lg overflow-hidden max-w-[600px] mx-auto">
+                    <div 
+                      dangerouslySetInnerHTML={{ __html: replaceVariables(selectedTemplate.letterhead) }}
+                    />
+                    <div className="p-6">
+                      <div 
+                        className="prose prose-sm max-w-none"
+                        dangerouslySetInnerHTML={{ __html: replaceVariables(editor?.getHTML() || '') }}
+                      />
+                    </div>
+                    <div 
+                      dangerouslySetInnerHTML={{ __html: replaceVariables(selectedTemplate.signature) }}
+                    />
+                  </div>
+                </div>
+              </ScrollArea>
+            )}
+
+            {/* HTML mode - show raw HTML code */}
+            {previewMode === 'html' && (
+              <ScrollArea className="flex-1">
+                <div className="p-4">
+                  <div className="bg-zinc-900 rounded-lg border border-border/50 overflow-hidden">
+                    <div className="p-2 bg-zinc-800 border-b border-border/50 flex items-center justify-between">
+                      <span className="text-xs text-zinc-400 font-mono">HTML Source</span>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 text-xs"
+                        onClick={() => {
+                          const html = generateFullHtml();
+                          navigator.clipboard.writeText(html);
+                          toast({ title: 'Copied!', description: 'HTML copied to clipboard' });
+                        }}
+                      >
+                        Copy HTML
+                      </Button>
+                    </div>
+                    <pre className="p-4 text-xs font-mono text-emerald-400 overflow-x-auto whitespace-pre-wrap">
+                      {generateFullHtml()}
+                    </pre>
+                  </div>
+                </div>
+              </ScrollArea>
+            )}
           </TabsContent>
 
-          <TabsContent value="templates" className="flex-1 overflow-auto p-3">
-            <div className="space-y-4">
-              <p className="text-xs text-muted-foreground">Choose a template for your email</p>
-              
-              {/* Business Templates */}
-              <div>
-                <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
-                  💼 Business
-                </h4>
-                <div className="space-y-2">
-                  {EMAIL_TEMPLATES.filter(t => t.category === 'business').map((template) => {
-                    const Icon = template.icon;
-                    return (
-                      <Card
-                        key={template.id}
-                        className={`p-3 cursor-pointer hover-elevate transition-all ${selectedTemplate.id === template.id ? 'ring-2 ring-primary bg-primary/5' : ''}`}
-                        onClick={() => setSelectedTemplate(template)}
-                        data-testid={`template-${template.id}`}
-                      >
-                        <div className="flex items-center gap-3">
-                          <div className="p-2 rounded-lg bg-blue-500/10">
-                            <Icon className="w-4 h-4 text-blue-500" />
+          <TabsContent value="templates" className="flex-1 overflow-hidden">
+            <div className="flex h-full">
+              {/* Template List - Left Side */}
+              <div className="w-1/3 border-r border-border/50 overflow-auto p-3">
+                <p className="text-xs text-muted-foreground mb-3">Choose a template</p>
+                
+                {/* Business Templates */}
+                <div className="mb-4">
+                  <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
+                    💼 Business
+                  </h4>
+                  <div className="space-y-1">
+                    {EMAIL_TEMPLATES.filter(t => t.category === 'business').map((template) => {
+                      const Icon = template.icon;
+                      return (
+                        <div
+                          key={template.id}
+                          className={`p-2 rounded-lg cursor-pointer transition-all flex items-center gap-2 ${
+                            selectedTemplate.id === template.id 
+                              ? 'bg-primary/10 ring-1 ring-primary' 
+                              : 'hover:bg-muted/50'
+                          }`}
+                          onClick={() => setSelectedTemplate(template)}
+                          data-testid={`template-${template.id}`}
+                        >
+                          <div className={`p-1.5 rounded ${selectedTemplate.id === template.id ? 'bg-primary/20' : 'bg-blue-500/10'}`}>
+                            <Icon className={`w-3.5 h-3.5 ${selectedTemplate.id === template.id ? 'text-primary' : 'text-blue-500'}`} />
                           </div>
-                          <div>
-                            <span className="text-sm font-medium">{template.name}</span>
-                            {template.defaultContent && (
-                              <p className="text-xs text-muted-foreground">Pre-filled template</p>
-                            )}
-                          </div>
+                          <span className="text-sm">{template.name}</span>
                         </div>
-                      </Card>
-                    );
-                  })}
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Marketing Templates */}
+                <div>
+                  <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
+                    📣 Marketing
+                  </h4>
+                  <div className="space-y-1">
+                    {EMAIL_TEMPLATES.filter(t => t.category === 'marketing').map((template) => {
+                      const Icon = template.icon;
+                      return (
+                        <div
+                          key={template.id}
+                          className={`p-2 rounded-lg cursor-pointer transition-all flex items-center gap-2 ${
+                            selectedTemplate.id === template.id 
+                              ? 'bg-primary/10 ring-1 ring-primary' 
+                              : 'hover:bg-muted/50'
+                          }`}
+                          onClick={() => setSelectedTemplate(template)}
+                          data-testid={`template-${template.id}`}
+                        >
+                          <div className={`p-1.5 rounded ${selectedTemplate.id === template.id ? 'bg-primary/20' : 'bg-emerald-500/10'}`}>
+                            <Icon className={`w-3.5 h-3.5 ${selectedTemplate.id === template.id ? 'text-primary' : 'text-emerald-500'}`} />
+                          </div>
+                          <span className="text-sm">{template.name}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
               </div>
 
-              {/* Marketing Templates */}
-              <div>
-                <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
-                  📣 Marketing
-                </h4>
-                <div className="space-y-2">
-                  {EMAIL_TEMPLATES.filter(t => t.category === 'marketing').map((template) => {
-                    const Icon = template.icon;
-                    return (
-                      <Card
-                        key={template.id}
-                        className={`p-3 cursor-pointer hover-elevate transition-all ${selectedTemplate.id === template.id ? 'ring-2 ring-primary bg-primary/5' : ''}`}
-                        onClick={() => setSelectedTemplate(template)}
-                        data-testid={`template-${template.id}`}
-                      >
-                        <div className="flex items-center gap-3">
-                          <div className="p-2 rounded-lg bg-emerald-500/10">
-                            <Icon className="w-4 h-4 text-emerald-500" />
-                          </div>
-                          <div>
-                            <span className="text-sm font-medium">{template.name}</span>
-                            {template.defaultContent && (
-                              <p className="text-xs text-muted-foreground">Pre-filled template</p>
-                            )}
-                          </div>
-                        </div>
-                      </Card>
-                    );
-                  })}
+              {/* Template Preview - Right Side */}
+              <div className="flex-1 overflow-auto p-4 bg-muted/30">
+                <div className="mb-3 flex items-center justify-between">
+                  <h3 className="text-sm font-semibold">{selectedTemplate.name} Preview</h3>
+                  <Button 
+                    size="sm" 
+                    onClick={() => {
+                      if (editor && selectedTemplate.defaultContent) {
+                        editor.commands.setContent(selectedTemplate.defaultContent);
+                      }
+                      setPreviewMode('edit');
+                      toast({ title: 'Template applied!', description: 'Switch to Compose tab to edit' });
+                    }}
+                  >
+                    Use This Template
+                  </Button>
+                </div>
+                <div className="bg-white text-black rounded-lg border shadow-md overflow-hidden transform scale-[0.85] origin-top">
+                  <div 
+                    dangerouslySetInnerHTML={{ __html: replaceVariables(selectedTemplate.letterhead) }}
+                  />
+                  <div className="p-4">
+                    <div 
+                      className="prose prose-sm max-w-none"
+                      dangerouslySetInnerHTML={{ __html: replaceVariables(selectedTemplate.defaultContent || '<p>Start writing your email content here...</p>') }}
+                    />
+                  </div>
+                  <div 
+                    dangerouslySetInnerHTML={{ __html: replaceVariables(selectedTemplate.signature) }}
+                  />
                 </div>
               </div>
             </div>
