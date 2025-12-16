@@ -1,7 +1,7 @@
 import type { Express, Request, Response } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { streamChat, chat, generateContent, summarizeSource, generateImage, type ModelId } from "./ai-service";
+import { streamChat, chat, generateContent, summarizeSource, generateImage, availableModels, getModelsByProvider, DEFAULT_MODEL, type ModelId } from "./ai-service";
 import { insertSourceSchema, insertNoteSchema, insertWorkflowSchema, type ContentType } from "@shared/schema";
 import { z } from "zod";
 import multer from "multer";
@@ -16,6 +16,15 @@ export async function registerRoutes(
   httpServer: Server,
   app: Express
 ): Promise<Server> {
+
+  // Models endpoint
+  app.get("/api/models", (req: Request, res: Response) => {
+    res.json({
+      models: availableModels,
+      byProvider: getModelsByProvider(),
+      defaultModel: DEFAULT_MODEL,
+    });
+  });
 
   app.get("/api/sources", async (req: Request, res: Response) => {
     try {
@@ -167,7 +176,7 @@ export async function registerRoutes(
       [{"title": "Example Title", "url": "https://example.com/page", "description": "Description here"}]`;
 
       const response = await chat([{ role: 'user', content: searchPrompt }], {
-        model: 'gpt-4.1',
+        model: DEFAULT_MODEL,
         systemPrompt: 'You are a search results generator. Return only valid JSON arrays.',
       });
 

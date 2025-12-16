@@ -7,7 +7,9 @@ import { Card } from "@/components/ui/card";
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
+  SelectLabel,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
@@ -16,11 +18,28 @@ import { motion, AnimatePresence } from "framer-motion";
 import A2UIRenderer from "../a2ui/A2UIRenderer";
 import type { ChatMessage, Source, A2UIComponent } from "@/lib/types";
 import { apiRequest } from "@/lib/queryClient";
+import { useQuery } from "@tanstack/react-query";
 
 interface SourceSummary {
   id: string;
   name: string;
   summary: string;
+}
+
+interface ModelInfo {
+  id: string;
+  name: string;
+  provider: string;
+  contextLength: number;
+  description: string;
+  supportsImages?: boolean;
+  supportsStreaming?: boolean;
+}
+
+interface ModelsResponse {
+  models: ModelInfo[];
+  byProvider: Record<string, ModelInfo[]>;
+  defaultModel: string;
 }
 
 interface ChatPanelProps {
@@ -31,14 +50,12 @@ interface ChatPanelProps {
   sourceSummaries?: SourceSummary[];
 }
 
-type ModelId = 'gpt-4.1' | 'gpt-4.1-mini' | 'gemini-2.5-pro' | 'gemini-2.5-flash';
-
 function parseA2UIComponents(content: string): A2UIComponent[] {
   const components: A2UIComponent[] = [];
-  
+
   const jsonBlockRegex = /```(?:json)?\s*\n?([\s\S]*?)```/g;
   let match;
-  
+
   while ((match = jsonBlockRegex.exec(content)) !== null) {
     try {
       const parsed = JSON.parse(match[1].trim());
@@ -79,7 +96,7 @@ function parseA2UIComponents(content: string): A2UIComponent[] {
       // Not valid JSON, skip
     }
   }
-  
+
   return components;
 }
 
@@ -90,24 +107,24 @@ function generateSuggestedPrompts(sources: Source[], sourceSummaries?: SourceSum
     "Generate a study guide from this material",
     "Create a timeline of events mentioned"
   ];
-  
+
   if (!sources.length && !sourceSummaries?.length) {
     return defaultPrompts;
   }
-  
+
   const prompts: string[] = [];
-  
+
   if (sourceSummaries && sourceSummaries.length > 0) {
     const firstSummary = sourceSummaries[0];
     if (firstSummary.summary) {
       prompts.push(`Explain the main concepts from "${firstSummary.name}"`);
     }
-    
+
     if (sourceSummaries.length > 1) {
       prompts.push(`Compare "${sourceSummaries[0].name}" with "${sourceSummaries[1].name}"`);
     }
   }
-  
+
   if (sources.length > 0) {
     const sourceTypes = Array.from(new Set(sources.map(s => s.type)));
     if (sourceTypes.includes('pdf')) {
@@ -117,31 +134,48 @@ function generateSuggestedPrompts(sources: Source[], sourceSummaries?: SourceSum
       prompts.push("Summarize the web articles and highlight important links");
     }
   }
-  
+
   while (prompts.length < 4) {
     const remaining = defaultPrompts.filter(p => !prompts.includes(p));
     if (remaining.length === 0) break;
     prompts.push(remaining[0]);
   }
-  
+
   return prompts.slice(0, 4);
 }
 
-export default function ChatPanel({ 
-  sources, 
-  messages, 
-  onNewMessage, 
+export default function ChatPanel({
+  sources,
+  messages,
+  onNewMessage,
   isLoading: externalLoading,
-  sourceSummaries 
+  sourceSummaries
 }: ChatPanelProps) {
   const [inputValue, setInputValue] = useState('');
-  const [selectedModel, setSelectedModel] = useState<ModelId>('gpt-4.1');
+  const [selectedModel, setSelectedModel] = useState<string>('');
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [isStreaming, setIsStreaming] = useState(false);
   const [streamingContent, setStreamingContent] = useState('');
   const scrollRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
+
+  // Fetch available models
+  const { data: modelsData } = useQuery<ModelsResponse>({
+    queryKey: ['models'],
+    queryFn: async () => {
+      const response = await fetch('/api/models');
+      return response.json();
+    },
+    staleTime: Infinity,
+  });
+
+  // Set default model once loaded
+  useEffect(() => {
+    if (modelsData?.defaultModel && !selectedModel) {
+      setSelectedModel(modelsData.defaultModel);
+    }
+  }, [modelsData, selectedModel]);
 
   const isLoading = externalLoading || isStreaming;
 
@@ -169,7 +203,7 @@ export default function ChatPanel({
   const handleStreamChat = useCallback(async (userMessage: string) => {
     setIsStreaming(true);
     setStreamingContent('');
-    
+
     try {
       let currentConversationId = conversationId;
       if (!currentConversationId) {
@@ -274,6 +308,12 @@ export default function ChatPanel({
 
   const suggestedQuestions = generateSuggestedPrompts(sources, sourceSummaries);
 
+  // Get model display name
+  const getModelDisplayName = (modelId: string) => {
+    const model = modelsData?.models.find(m => m.id === modelId);
+    return model?.name || modelId.split('/').pop() || modelId;
+  };
+
   return (
     <div className="flex-1 flex flex-col h-full min-w-0" data-testid="chat-panel">
       <div className="h-14 border-b border-border/50 flex items-center justify-between gap-2 px-4 sticky top-0 bg-sidebar z-10">
@@ -294,12 +334,12 @@ export default function ChatPanel({
               </div>
               <h3 className="text-xl font-medium mb-2" data-testid="text-empty-title">Start a conversation</h3>
               <p className="text-sm text-muted-foreground max-w-md mx-auto mb-8" data-testid="text-empty-description">
-                Ask questions about your sources, run workflows, or request analysis. 
+                Ask questions about your sources, run workflows, or request analysis.
                 I can generate interactive UI components to help visualize results.
               </p>
               <div className="grid grid-cols-2 gap-3 max-w-lg mx-auto">
                 {suggestedQuestions.map((question, idx) => (
-                  <Card 
+                  <Card
                     key={idx}
                     className="p-3 rounded-xl cursor-pointer hover-elevate text-left"
                     onClick={() => handleSuggestionClick(question)}
@@ -434,68 +474,80 @@ export default function ChatPanel({
           </div>
           <div className="flex items-center justify-between px-3 pb-3 gap-2">
             <div className="flex items-center gap-1">
-              <Button 
-                variant="ghost" 
-                size="icon" 
-                className="h-8 w-8 rounded-lg text-muted-foreground" 
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 rounded-lg text-muted-foreground"
                 data-testid="button-sparkles"
               >
                 <Sparkles className="w-4 h-4" />
               </Button>
-              <Button 
-                variant="ghost" 
-                size="icon" 
-                className="h-8 w-8 rounded-lg text-muted-foreground" 
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 rounded-lg text-muted-foreground"
                 data-testid="button-attach"
               >
                 <Plus className="w-4 h-4" />
               </Button>
-              <Button 
-                variant="ghost" 
-                size="icon" 
-                className="h-8 w-8 rounded-lg text-muted-foreground" 
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 rounded-lg text-muted-foreground"
                 data-testid="button-settings"
               >
                 <SlidersHorizontal className="w-4 h-4" />
               </Button>
-              <Button 
-                variant="ghost" 
-                size="icon" 
-                className="h-8 w-8 rounded-lg text-muted-foreground" 
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 rounded-lg text-muted-foreground"
                 data-testid="button-history"
               >
                 <History className="w-4 h-4" />
               </Button>
             </div>
             <div className="flex items-center gap-2">
-              <Select 
-                value={selectedModel} 
-                onValueChange={(value) => setSelectedModel(value as ModelId)}
+              <Select
+                value={selectedModel}
+                onValueChange={setSelectedModel}
                 disabled={isLoading}
               >
-                <SelectTrigger 
-                  className="h-8 border-0 bg-transparent text-xs text-muted-foreground gap-1 px-2" 
+                <SelectTrigger
+                  className="h-8 border-0 bg-transparent text-xs text-muted-foreground gap-1 px-2 min-w-[120px]"
                   data-testid="select-model"
                 >
-                  <SelectValue />
+                  <SelectValue placeholder="Select model">
+                    {selectedModel && getModelDisplayName(selectedModel)}
+                  </SelectValue>
                   <ChevronDown className="w-3 h-3 opacity-50" />
                 </SelectTrigger>
-                <SelectContent className="rounded-xl">
-                  <SelectItem value="gpt-4.1" className="rounded-lg text-xs" data-testid="option-gpt-4.1">
-                    GPT-4.1
-                  </SelectItem>
-                  <SelectItem value="gpt-4.1-mini" className="rounded-lg text-xs" data-testid="option-gpt-4.1-mini">
-                    GPT-4.1 Mini
-                  </SelectItem>
-                  <SelectItem value="gemini-2.5-pro" className="rounded-lg text-xs" data-testid="option-gemini-pro">
-                    Gemini Pro
-                  </SelectItem>
-                  <SelectItem value="gemini-2.5-flash" className="rounded-lg text-xs" data-testid="option-gemini-flash">
-                    Gemini Flash
-                  </SelectItem>
+                <SelectContent className="rounded-xl max-h-[300px]">
+                  {modelsData?.byProvider && Object.entries(modelsData.byProvider).map(([provider, models]) => (
+                    <SelectGroup key={provider}>
+                      <SelectLabel className="text-xs font-semibold text-muted-foreground px-2 py-1.5">
+                        {provider}
+                      </SelectLabel>
+                      {models.map((model) => (
+                        <SelectItem
+                          key={model.id}
+                          value={model.id}
+                          className="rounded-lg text-xs"
+                          data-testid={`option-${model.id.replace('/', '-')}`}
+                        >
+                          <div className="flex flex-col">
+                            <span>{model.name}</span>
+                            <span className="text-[10px] text-muted-foreground">
+                              {(model.contextLength / 1000).toFixed(0)}k context
+                            </span>
+                          </div>
+                        </SelectItem>
+                      ))}
+                    </SelectGroup>
+                  ))}
                 </SelectContent>
               </Select>
-              <Button 
+              <Button
                 onClick={handleSubmit}
                 disabled={!inputValue.trim() || isLoading}
                 size="icon"
