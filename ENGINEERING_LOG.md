@@ -254,16 +254,83 @@ shared/                 # Shared types
 
 ---
 
-## Next Steps
+---
+
+### 2024-12-17 - Audio Overview & Slide Deck Enhancements
+
+**Status:** Major feature improvements complete
+
+**Completed Tasks:**
+
+1. **Audio Overview - Full Implementation**
+   - Created `A2AudioTranscript` component in `A2UIRenderer.tsx` for displaying podcast-style transcripts
+   - Added `audio_transcript` type to `A2UIComponent` interface in `shared/schema.ts`
+   - Integrated ElevenLabs TTS API for audio generation in `server/routes.ts`
+   - Audio generation triggered during `/api/generate` for `audio_overview` content type
+   - Added "Generate Audio" button for existing transcripts without audio
+   - Created dedicated Audio Overview modal with:
+     - Source selection checkboxes with Select All/Deselect All
+     - Topic Focus instructions field
+     - Purple-themed styling
+   - Fixed content parsing in `StudioPanel.tsx` to properly detect audio overview format
+
+2. **Slide Deck - Enhanced Modal & Viewer**
+   - Redesigned `CustomizeSlideDeckModal.tsx` with source selection (matching Audio Overview UX)
+   - Added source checkboxes with Select All/Deselect All functionality
+   - Updated styling with emerald theme for consistency
+   - Rewrote `SlideViewer.tsx` with:
+     - **16:9 aspect ratio** (proper PowerPoint/Google Slides format)
+     - **Vertical scrolling layout** - all slides stacked, first on top
+     - Slide number labels above each slide
+     - Professional dark gradient design
+     - Fullscreen support
+     - Download as Markdown option
+
+3. **Database Persistence Fix**
+   - Identified PostgreSQL Docker container was stopped after server restart
+   - Documented need for `--restart unless-stopped` flag for container persistence
+
+**Technical Details:**
+
+- **ElevenLabs Integration:**
+  - Uses `eleven_turbo_v2_5` model for fast TTS
+  - Voice ID: `EXAVITQu4vr4xnSDxMaL` (Sarah)
+  - Audio returned as base64 data URL embedded in content
+  - Graceful fallback if API key missing or fails
+
+- **A2UIComponent Schema Update:**
+  - Added `'audio_transcript'` to type union
+  - Updated Zod validation schema for message components
+
+**Files Changed:**
+- `client/src/components/a2ui/A2UIRenderer.tsx` - Added A2AudioTranscript component
+- `client/src/components/panels/StudioPanel.tsx` - Added audio modal, fixed parsing
+- `client/src/components/studio/CustomizeSlideDeckModal.tsx` - Added source selection
+- `client/src/components/studio/SlideViewer.tsx` - Complete rewrite for vertical 16:9 layout
+- `server/routes.ts` - ElevenLabs TTS integration
+- `shared/schema.ts` - Added audio_transcript type
+
+**Environment Requirements:**
+- `ELEVENLABS_API_KEY` - Required for audio generation (needs `text_to_speech` permission)
+
+---
+
+## Current Feature Status
+
+### Completed Features ✓
+- [x] Multi-notebook management system
+- [x] OpenRouter AI integration (15+ models)
+- [x] Reports generation with templates
+- [x] Mind map visualization (NotebookLM-style)
+- [x] Infographic generation modal
+- [x] Slide deck generation with 16:9 viewer
+- [x] **Audio Overview with ElevenLabs TTS**
+- [x] Source selection modals for content generation
 
 ### Pending Features
 - [ ] Custom report type persistence (save to database)
-- [ ] Audio Overview generation with TTS
 - [ ] Real web search integration (Serper/Tavily)
 - [ ] YouTube transcript extraction
-
-### Phase 3: Enhanced Features
-- [x] Multi-notebook support ✓
 - [ ] Source pinning for context control
 - [ ] Voice input/output
 - [ ] Export functionality (PDF, Markdown)
