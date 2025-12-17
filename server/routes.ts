@@ -1344,6 +1344,36 @@ You help users analyze and work with their sources. When the user asks about the
 - Create summaries, newsletters, reports, or other content based on the sources
 - Answer questions using the source material
 
+## Report Creation
+
+When the user asks you to create a report, article, blog post, or other formatted content, you have two options:
+
+1. **Write it directly** in the chat for quick previews
+2. **Suggest opening the Report Editor** for full editing capabilities
+
+When the user wants to create content like:
+- Blog posts, articles, or thought leadership pieces
+- LinkedIn posts or Twitter threads
+- Executive summaries or briefing documents
+- Case studies or whitepapers
+- Newsletters or email content
+
+You can suggest they use the Reports feature in Studio by including this A2UI component in your response:
+
+\`\`\`json
+{
+  "type": "report_suggestion",
+  "properties": {
+    "format": "LinkedIn Article",
+    "description": "from this research",
+    "showPreview": true,
+    "showEditor": true
+  }
+}
+\`\`\`
+
+Available report formats: Briefing Doc, Blog Post, LinkedIn Article, Twitter Thread, Executive Summary, Case Study, Newsletter, Whitepaper, Strategic Plan, Technical Spec
+
 ## Response Format
 
 - Use markdown formatting (headers, bold, lists, etc.)
@@ -1553,6 +1583,154 @@ You help users analyze and work with their sources. When the user asks about the
     }
   });
 
+  // AI Rewrite endpoint for report editing
+  app.post("/api/ai/rewrite", async (req: Request, res: Response) => {
+    try {
+      const { text, prompt } = req.body;
+      
+      if (!text || !prompt) {
+        return res.status(400).json({ error: "Text and prompt are required" });
+      }
+
+      const systemPrompt = `You are a professional editor. Rewrite the following text according to the user's instructions. 
+Only output the rewritten text, nothing else. Do not include explanations or commentary.`;
+
+      const userPrompt = `Instructions: ${prompt}
+
+Text to rewrite:
+${text}`;
+
+      const rewritten = await chat([{ role: 'user', content: userPrompt }], {
+        model: DEFAULT_MODEL,
+        systemPrompt,
+        temperature: 0.7,
+        maxTokens: 2000,
+      });
+
+      res.json({ rewritten: rewritten || text });
+    } catch (error: any) {
+      console.error("AI rewrite error:", error);
+      res.status(500).json({ error: error.message || "Failed to rewrite text" });
+    }
+  });
+
+  // Source analyzer for dynamic report suggestions
+  app.post("/api/reports/analyze-sources", async (req: Request, res: Response) => {
+    try {
+      const { sourceIds } = req.body;
+      
+      if (!sourceIds || sourceIds.length === 0) {
+        return res.json({ suggestions: [] });
+      }
+
+      // Get sources
+      const allSources = await storage.getSources();
+      const sourcesToAnalyze = allSources.filter((s: any) => sourceIds.includes(s.id));
+      
+      if (sourcesToAnalyze.length === 0) {
+        return res.json({ suggestions: [] });
+      }
+
+      // Combine source content for analysis (limit to first 3000 chars each)
+      const combinedContent = sourcesToAnalyze
+        .map((s: any) => `[${s.name}]: ${s.content?.substring(0, 3000) || ''}`)
+        .join('\n\n');
+
+      const systemPrompt = `Analyze the provided source content and suggest the most appropriate report formats.
+Return a JSON array of suggestions, each with:
+- id: unique identifier (kebab-case)
+- name: display name
+- description: brief description of why this format fits
+- reason: one sentence explaining the match
+
+Suggest 2-4 formats from this list based on content type:
+- linkedin-article: For thought leadership, professional insights
+- twitter-thread: For breaking down complex topics into digestible points
+- case-study: For success stories, implementations, results
+- trend-analysis: For news, market data, industry developments
+- investment-memo: For company/financial analysis
+- product-brief: For product/feature documentation
+- newsletter: For curated content, updates, digests
+- whitepaper: For in-depth technical or research content
+- competitive-analysis: For comparing companies/products
+- executive-summary: For condensing lengthy documents
+
+Only return valid JSON array, no other text.`;
+
+      const response = await chat(
+        [{ role: 'user', content: `Analyze these sources:\n\n${combinedContent.substring(0, 8000)}` }],
+        {
+          model: DEFAULT_MODEL,
+          systemPrompt,
+          temperature: 0.3,
+          maxTokens: 1000,
+        }
+      );
+
+      let suggestions = [];
+      try {
+        const content = response || '[]';
+        suggestions = JSON.parse(content.replace(/```json\n?|\n?```/g, ''));
+      } catch (e) {
+        console.error("Failed to parse suggestions:", e);
+        suggestions = [];
+      }
+
+      res.json({ suggestions });
+    } catch (error: any) {
+      console.error("Source analysis error:", error);
+      res.status(500).json({ error: error.message || "Failed to analyze sources" });
+    }
+  });
+
+  // Generate report as plain markdown (for TipTap editor)
+  app.post("/api/reports/generate", async (req: Request, res: Response) => {
+    try {
+      const { title, systemPrompt, sourceIds, model } = req.body;
+      
+      if (!systemPrompt) {
+        return res.status(400).json({ error: "System prompt is required" });
+      }
+
+      // Get source contents
+      const sources = await Promise.all(
+        (sourceIds || []).map((id: string) => storage.getSource(id))
+      );
+      const sourceContents = sources.filter(Boolean).map(s => `[${s!.name}]:\n${s!.content}`);
+      
+      if (sourceContents.length === 0) {
+        return res.status(400).json({ error: "No sources provided" });
+      }
+
+      const sourcesText = sourceContents.join('\n\n---\n\n');
+
+      const reportPrompt = `${systemPrompt}
+
+Based on these sources:
+
+${sourcesText}
+
+Write the report in clean markdown format. Use proper headings (##, ###), bullet points, bold text for emphasis, and blockquotes for key insights. Do NOT wrap in code blocks. Just output the markdown directly.`;
+
+      const content = await chat(
+        [{ role: 'user', content: reportPrompt }],
+        {
+          model: (model as ModelId) || DEFAULT_MODEL,
+          systemPrompt: 'You are an expert report writer. Generate well-formatted markdown reports. Output markdown directly without code block wrappers.',
+          maxTokens: 4000,
+        }
+      );
+
+      res.json({ 
+        title: title || 'Report',
+        content: content || '',
+      });
+    } catch (error: any) {
+      console.error("Report generation error:", error);
+      res.status(500).json({ error: error.message || "Failed to generate report" });
+    }
+  });
+
   app.get("/api/workflows", async (req: Request, res: Response) => {
     try {
       const workflows = await storage.getWorkflows();
@@ -1594,6 +1772,108 @@ You help users analyze and work with their sources. When the user asks about the
     } catch (error) {
       res.status(500).json({ error: "Failed to delete workflow" });
     }
+  });
+
+  // ========== HyperBrowser API Routes ==========
+  
+  const hyperbrowserService = await import('./hyperbrowser-service');
+
+  // Get all workflow templates
+  app.get("/api/hyperbrowser/workflows", async (_req: Request, res: Response) => {
+    try {
+      const workflows = hyperbrowserService.getAllWorkflows();
+      const configured = hyperbrowserService.isConfigured();
+      res.json({ workflows, configured });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Get single workflow template
+  app.get("/api/hyperbrowser/workflows/:id", async (req: Request, res: Response) => {
+    try {
+      const workflow = hyperbrowserService.getWorkflow(req.params.id);
+      if (!workflow) {
+        return res.status(404).json({ error: "Workflow not found" });
+      }
+      res.json(workflow);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Execute a workflow
+  app.post("/api/hyperbrowser/execute", async (req: Request, res: Response) => {
+    try {
+      const { workflowId, variables } = req.body;
+      
+      if (!hyperbrowserService.isConfigured()) {
+        return res.status(400).json({ error: "HyperBrowser API key not configured" });
+      }
+
+      console.log(`[HyperBrowser] Executing workflow: ${workflowId}`);
+      
+      const execution = await hyperbrowserService.executeWorkflow(
+        workflowId,
+        variables,
+        (log) => console.log(`[HyperBrowser] ${log}`)
+      );
+
+      res.json(execution);
+    } catch (error: any) {
+      console.error('[HyperBrowser] Execution error:', error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Get execution status
+  app.get("/api/hyperbrowser/executions/:id", async (req: Request, res: Response) => {
+    try {
+      const execution = hyperbrowserService.getExecution(req.params.id);
+      if (!execution) {
+        return res.status(404).json({ error: "Execution not found" });
+      }
+      res.json(execution);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Generate workflow code preview
+  app.post("/api/hyperbrowser/preview-code", async (req: Request, res: Response) => {
+    try {
+      const { workflowId, variables } = req.body;
+      const code = hyperbrowserService.generateWorkflowCode(workflowId, variables);
+      res.json({ code });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Simple URL scrape
+  app.post("/api/hyperbrowser/scrape", async (req: Request, res: Response) => {
+    try {
+      const { url } = req.body;
+      
+      if (!hyperbrowserService.isConfigured()) {
+        return res.status(400).json({ error: "HyperBrowser API key not configured" });
+      }
+
+      console.log(`[HyperBrowser] Scraping URL: ${url}`);
+      const result = await hyperbrowserService.scrapeUrl(url);
+      res.json(result);
+    } catch (error: any) {
+      console.error('[HyperBrowser] Scrape error:', error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Check if HyperBrowser is configured
+  app.get("/api/hyperbrowser/status", async (_req: Request, res: Response) => {
+    res.json({ 
+      configured: hyperbrowserService.isConfigured(),
+      workflowCount: hyperbrowserService.getAllWorkflows().length
+    });
   });
 
   return httpServer;

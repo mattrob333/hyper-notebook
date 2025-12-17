@@ -61,7 +61,7 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import WorkflowStudio from "../studio/WorkflowStudio";
 import EmailBuilder from "../studio/EmailBuilder";
-import HyperBrowserBuilder from "../studio/HyperBrowserBuilder";
+// HyperBrowserBuilder removed - keeping simple scrape functionality
 import AIContextFileGenerator from "../studio/AIContextFileGenerator";
 import A2UIRenderer from "../a2ui/A2UIRenderer";
 import ReportsModal from "../studio/ReportsModal";
@@ -91,7 +91,7 @@ interface GeneratedContent {
 
 interface StudioPanelProps {
   selectedSourceIds?: string[];
-  onViewCsvSource?: (sourceId: string) => void;
+  onViewCsvSource?: (sourceId: string | null) => void;
   viewingCsvSourceId?: string | null;
 }
 
@@ -168,19 +168,18 @@ const CONTENT_TYPES: Array<{
 ];
 
 const AI_MODELS = [
-  { value: 'gpt-4.1', label: 'GPT-4.1' },
-  { value: 'gpt-4o', label: 'GPT-4o' },
-  { value: 'gpt-4o-mini', label: 'GPT-4o Mini' },
-  { value: 'gemini-2.5-pro', label: 'Gemini 2.5 Pro' },
-  { value: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash' },
+  { value: 'google/gemini-3-flash-preview', label: 'Gemini 3 Flash' },
+  { value: 'google/gemini-3-pro-preview', label: 'Gemini 3 Pro' },
+  { value: 'anthropic/claude-sonnet-4.5', label: 'Claude Sonnet 4.5' },
+  { value: 'anthropic/claude-haiku-4.5', label: 'Claude Haiku 4.5' },
 ];
 
 const CONTENT_TYPE_DEFAULT_MODELS: Partial<Record<ContentType, string>> = {
-  'slides': 'gemini-2.5-pro',
-  'infographic': 'gemini-2.5-pro',
+  'slides': 'google/gemini-3-pro-preview',
+  'infographic': 'google/gemini-3-pro-preview',
 };
 
-type ActiveView = 'main' | 'email' | 'hyperbrowser' | 'context-file' | 'canvas';
+type ActiveView = 'main' | 'email' | 'context-file' | 'canvas';
 
 export default function StudioPanel({
   selectedSourceIds = [],
@@ -209,14 +208,14 @@ export default function StudioPanel({
   const [customDialogOpen, setCustomDialogOpen] = useState(false);
   const [customType, setCustomType] = useState<ContentType>('study_guide');
   const [customPrompt, setCustomPrompt] = useState('');
-  const [customModel, setCustomModel] = useState('gpt-4.1');
+  const [customModel, setCustomModel] = useState('google/gemini-3-flash-preview');
   const [customSourceIds, setCustomSourceIds] = useState<string[]>([]);
   const { toast } = useToast();
   
   // Config dialog for slides/infographics
   const [configDialogOpen, setConfigDialogOpen] = useState(false);
   const [configType, setConfigType] = useState<ContentType | null>(null);
-  const [configModel, setConfigModel] = useState('gemini-2.5-pro');
+  const [configModel, setConfigModel] = useState('google/gemini-3-pro-preview');
   const [configPrompt, setConfigPrompt] = useState('');
 
   // Audio Overview modal state
@@ -327,7 +326,7 @@ export default function StudioPanel({
     generateMutation.mutate({
       type,
       sourceIds: idsToUse,
-      model: 'gpt-4.1'
+      model: 'google/gemini-3-flash-preview'
     });
   };
 
@@ -493,22 +492,6 @@ export default function StudioPanel({
     return <EmailBuilder onBack={() => setActiveView('main')} />;
   }
 
-  if (activeView === 'hyperbrowser') {
-    return (
-      <HyperBrowserBuilder 
-        onBack={() => setActiveView('main')} 
-        onRun={(script) => {
-          toast({
-            title: 'Browser Script Started',
-            description: 'Executing browser automation...'
-          });
-        }}
-        onMinimize={() => {
-          setActiveView('main');
-        }}
-      />
-    );
-  }
 
   if (activeView === 'context-file') {
     return (
@@ -748,16 +731,6 @@ export default function StudioPanel({
               variant="ghost" 
               size="sm" 
               className="gap-1 text-xs"
-              onClick={() => setActiveView('hyperbrowser')}
-              data-testid="button-hyperbrowser"
-            >
-              <Globe className="w-4 h-4" />
-              Browser
-            </Button>
-            <Button 
-              variant="ghost" 
-              size="sm" 
-              className="gap-1 text-xs"
               onClick={() => setActiveView('context-file')}
               data-testid="button-context-file"
             >
@@ -938,10 +911,6 @@ export default function StudioPanel({
         open={reportsModalOpen}
         onOpenChange={setReportsModalOpen}
         selectedSourceIds={selectedSourceIds}
-        onReportGenerated={(content) => {
-          setGeneratedContent(content);
-          setActiveView('canvas');
-        }}
       />
 
       <CustomizeInfographicModal
@@ -1070,7 +1039,7 @@ export default function StudioPanel({
                 generateMutation.mutate({
                   type: 'audio_overview',
                   sourceIds: audioSelectedSources,
-                  model: 'gpt-4.1',
+                  model: 'google/gemini-3-flash-preview',
                   customPrompt: audioInstructions || undefined
                 });
               }}

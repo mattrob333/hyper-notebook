@@ -1,7 +1,11 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
 import {
   Select,
   SelectContent,
@@ -23,210 +27,161 @@ import {
   Pause,
   Square,
   RefreshCw,
-  ExternalLink
+  ExternalLink,
+  Loader2,
+  CheckCircle2,
+  XCircle,
+  Eye,
+  Download
 } from "lucide-react";
+import { apiRequest } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
 
 interface HyperBrowserBuilderProps {
   onBack: () => void;
-  onRun: (script: string) => void;
+  onRun?: (script: string) => void;
   onMinimize: () => void;
+  onOutput?: (output: WorkflowOutput) => void;
 }
 
-interface SavedWorkflow {
+interface WorkflowVariable {
+  name: string;
+  type: 'string' | 'number' | 'array' | 'boolean' | 'enum' | 'csv-column';
+  required?: boolean;
+  default?: any;
+  values?: string[];
+  description?: string;
+  placeholder?: string;
+}
+
+interface WorkflowTemplate {
   id: string;
   name: string;
-  script: string;
+  icon: string;
+  description: string;
+  category: string;
+  variables: WorkflowVariable[];
+  outputs: string[];
+  code: string;
 }
 
-const savedWorkflows: SavedWorkflow[] = [
-  {
-    id: 'hacker-news',
-    name: 'Hacker News Top Stories',
-    script: `/**
- * Hacker News Top Stories
- * 
- * This script navigates to Hacker News and extracts the top 10 stories
- * with their titles and links.
- */
+interface WorkflowOutput {
+  type: 'table' | 'markdown' | 'json' | 'csv';
+  title: string;
+  data: any;
+  columns?: string[];
+}
 
-const sleep = async (ms: number) => {
-  await new Promise(resolve => setTimeout(resolve, ms));
-};
+interface WorkflowExecution {
+  id: string;
+  workflowId: string;
+  status: 'pending' | 'running' | 'completed' | 'failed';
+  variables: Record<string, any>;
+  output?: WorkflowOutput;
+  logs: string[];
+  error?: string;
+}
 
-await page.goto("https://news.ycombinator.com", { timeout: 30000 });
-console.log("Loaded Hacker News homepage");
-
-const stories = await page.evaluate(() => {
-  const rows = document.querySelectorAll('.athing');
-  return Array.from(rows).slice(0, 10).map(row => ({
-    title: row.querySelector('.titleline > a')?.textContent || '',
-    link: (row.querySelector('.titleline > a') as HTMLAnchorElement)?.href || ''
-  }));
-});
-
-console.log("Extracted stories:", stories);
-`
-  },
-  {
-    id: 'product-hunt',
-    name: 'Product Hunt Trending',
-    script: `/**
- * Product Hunt Trending Products
- * 
- * Scrapes the trending products from Product Hunt homepage
- */
-
-await page.goto("https://www.producthunt.com", { timeout: 30000 });
-console.log("Loaded Product Hunt");
-
-await page.waitForSelector('[data-test="post-item"]');
-const products = await page.evaluate(() => {
-  return Array.from(document.querySelectorAll('[data-test="post-item"]')).slice(0, 5).map(el => ({
-    name: el.querySelector('h3')?.textContent || '',
-    tagline: el.querySelector('p')?.textContent || ''
-  }));
-});
-
-console.log("Found products:", products);
-`
-  },
-  {
-    id: 'github-trending',
-    name: 'GitHub Trending Repos',
-    script: `/**
- * GitHub Trending Repositories
- * 
- * Extracts today's trending repositories from GitHub
- */
-
-await page.goto("https://github.com/trending", { timeout: 30000 });
-console.log("Loaded GitHub Trending");
-
-const repos = await page.evaluate(() => {
-  return Array.from(document.querySelectorAll('article.Box-row')).slice(0, 10).map(el => ({
-    name: el.querySelector('h2 a')?.textContent?.trim() || '',
-    description: el.querySelector('p')?.textContent?.trim() || '',
-    stars: el.querySelector('[href$="/stargazers"]')?.textContent?.trim() || '0'
-  }));
-});
-
-console.log("Trending repos:", repos);
-`
-  },
-  {
-    id: 'new-workflow',
-    name: '+ New Workflow',
-    script: `/**
- * New Browser Workflow
- * 
- * Start building your automation here
- */
-
-// Navigate to a URL
-await page.goto("https://example.com", { timeout: 30000 });
-
-// Your automation code here...
-`
-  }
-];
-
-const defaultScript = `/**
- * Hacker News Top Stories
- * 
- * This script navigates to Hacker News and extracts the top 10 stories
- * with their titles and links.
- */
-
-// Full puppeteer API is available
-
-const sleep = async (ms: number) => {
-  await new Promise(resolve => setTimeout(resolve, ms));
-};
-
-// Navigate to Hacker News
-await page.goto("https://news.ycombinator.com", {
-  timeout: 30000
-});
-
-console.log("Loaded Hacker News homepage");
-
-// Extract the top 10 stories
-const storyRows = await page.evaluate(() => {
-  const stories: Array<{ title: string; link: string; rank: number }> = [];
-  
-  const storyRows = document.querySelectorAll('.athing');
-  
-  for (let i = 0; i < Math.min(10, storyRows.length); i++) {
-    const row = storyRows[i];
-    const rankEl = row.querySelector('.rank');
-    const titleEl = row.querySelector('.titleline > a');
-    
-    if (!rankEl || !titleEl) continue;
-    
-    stories.push({
-      rank: parseInt(rankEl.textContent?.replace('.', '') || '0'),
-      title: titleEl.textContent || '',
-      link: (titleEl as HTMLAnchorElement).href
-    });
-  }
-  
-  return stories;
-});
-
-console.log("Extracted stories:", storyRows);
-`;
-
-export default function HyperBrowserBuilder({ onBack, onRun, onMinimize }: HyperBrowserBuilderProps) {
-  const [selectedWorkflowId, setSelectedWorkflowId] = useState('hacker-news');
-  const [script, setScript] = useState(defaultScript);
-  const [activeTab, setActiveTab] = useState<'editor' | 'output'>('editor');
+export default function HyperBrowserBuilder({ onBack, onRun, onMinimize, onOutput }: HyperBrowserBuilderProps) {
+  const { toast } = useToast();
+  const [selectedWorkflowId, setSelectedWorkflowId] = useState('');
+  const [variables, setVariables] = useState<Record<string, any>>({});
+  const [activeTab, setActiveTab] = useState<'config' | 'editor' | 'output'>('config');
   const [output, setOutput] = useState<string[]>([]);
-  const [isRunning, setIsRunning] = useState(false);
+  const [execution, setExecution] = useState<WorkflowExecution | null>(null);
+  const [previewCode, setPreviewCode] = useState('');
   const [browserUrl, setBrowserUrl] = useState('about:blank');
   const [showBrowser, setShowBrowser] = useState(false);
 
+  // Fetch workflow templates from API
+  const { data: workflowsData } = useQuery<{ workflows: WorkflowTemplate[]; configured: boolean }>({
+    queryKey: ['/api/hyperbrowser/workflows'],
+  });
+
+  const workflows = workflowsData?.workflows || [];
+  const isConfigured = workflowsData?.configured ?? false;
+  const selectedWorkflow = workflows.find(w => w.id === selectedWorkflowId);
+
+  // Initialize variables when workflow changes
+  useEffect(() => {
+    if (selectedWorkflow) {
+      const defaults: Record<string, any> = {};
+      selectedWorkflow.variables.forEach(v => {
+        defaults[v.name] = v.default ?? '';
+      });
+      setVariables(defaults);
+      setPreviewCode('');
+      setExecution(null);
+    }
+  }, [selectedWorkflowId]);
+
+  // Execute workflow mutation
+  const executeMutation = useMutation({
+    mutationFn: async () => {
+      const response = await apiRequest('POST', '/api/hyperbrowser/execute', {
+        workflowId: selectedWorkflowId,
+        variables
+      });
+      return response.json();
+    },
+    onSuccess: (data: WorkflowExecution) => {
+      setExecution(data);
+      setOutput(data.logs);
+      setActiveTab('output');
+      setShowBrowser(false);
+      if (data.output) {
+        onOutput?.(data.output);
+        toast({ title: 'Workflow completed', description: data.output.title });
+      }
+    },
+    onError: (error: Error) => {
+      toast({ title: 'Workflow failed', description: error.message, variant: 'destructive' });
+      setOutput(prev => [...prev, `Error: ${error.message}`]);
+    }
+  });
+
+  // Preview code mutation
+  const previewMutation = useMutation({
+    mutationFn: async () => {
+      const response = await apiRequest('POST', '/api/hyperbrowser/preview-code', {
+        workflowId: selectedWorkflowId,
+        variables
+      });
+      return response.json();
+    },
+    onSuccess: (data: { code: string }) => {
+      setPreviewCode(data.code);
+      setActiveTab('editor');
+    }
+  });
+
   const handleWorkflowChange = (workflowId: string) => {
     setSelectedWorkflowId(workflowId);
-    const workflow = savedWorkflows.find(w => w.id === workflowId);
-    if (workflow) {
-      setScript(workflow.script);
-    }
   };
 
-  const currentWorkflow = savedWorkflows.find(w => w.id === selectedWorkflowId);
+  const handleVariableChange = (name: string, value: any) => {
+    setVariables(prev => ({ ...prev, [name]: value }));
+  };
 
   const handleRun = () => {
-    setIsRunning(true);
+    if (!selectedWorkflowId) {
+      toast({ title: 'Select a workflow', variant: 'destructive' });
+      return;
+    }
     setShowBrowser(true);
-    setActiveTab('output');
-    setBrowserUrl('https://news.ycombinator.com');
-    setOutput([
-      '> Initializing Hyperbrowser...',
-      '> Connecting to browser instance...',
-      '> Running script...',
-    ]);
-    
-    onRun(script);
-    
-    setTimeout(() => {
-      setOutput(prev => [...prev, 
-        '> Navigating to https://news.ycombinator.com',
-        '> Loaded Hacker News homepage',
-        '> Extracting stories...',
-        '> Found 10 stories',
-        '> Script completed successfully'
-      ]);
-      setIsRunning(false);
-    }, 2000);
+    setBrowserUrl('Running workflow...');
+    setOutput(['> Initializing HyperBrowser...', '> Connecting to browser instance...']);
+    executeMutation.mutate();
+    onRun?.(previewCode);
   };
 
+  const isRunning = executeMutation.isPending;
+
   const handlePause = () => {
-    setIsRunning(false);
     setOutput(prev => [...prev, '> Script paused']);
   };
 
   const handleStop = () => {
-    setIsRunning(false);
     setShowBrowser(false);
     setOutput(prev => [...prev, '> Script stopped']);
   };
@@ -264,9 +219,12 @@ export default function HyperBrowserBuilder({ onBack, onRun, onMinimize }: Hyper
               </div>
             </SelectTrigger>
             <SelectContent className="rounded-xl">
-              {savedWorkflows.map((workflow) => (
+              {workflows.map((workflow) => (
                 <SelectItem key={workflow.id} value={workflow.id} className="rounded-lg">
-                  {workflow.name}
+                  <span className="flex items-center gap-2">
+                    <span>{workflow.icon}</span>
+                    <span>{workflow.name}</span>
+                  </span>
                 </SelectItem>
               ))}
             </SelectContent>
@@ -301,61 +259,103 @@ export default function HyperBrowserBuilder({ onBack, onRun, onMinimize }: Hyper
         </div>
       </div>
 
-      {/* Navigation Tabs */}
-      <div className="flex items-center gap-2 px-4 py-2 border-b border-border/50 text-xs">
-        <Button variant="ghost" size="sm" className="h-7 gap-1 text-xs">
-          Overview
-        </Button>
-        <Button variant="ghost" size="sm" className="h-7 gap-1 text-xs bg-muted">
-          Playground
-        </Button>
-        <Button variant="ghost" size="sm" className="h-7 gap-1 text-xs">
-          Browser
-        </Button>
-        <Button variant="ghost" size="sm" className="h-7 gap-1 text-xs">
-          Scrape
-        </Button>
-        <Button variant="ghost" size="sm" className="h-7 gap-1 text-xs">
-          Crawl
-        </Button>
-        <Button variant="ghost" size="sm" className="h-7 gap-1 text-xs">
-          Extract
-        </Button>
-      </div>
-
-      {/* Main Content - Vertical Stack */}
+      {/* Main Content - Horizontal Split */}
       <div className="flex flex-1 min-h-0">
-        {/* Left Sidebar - API Docs */}
-        <div className="w-44 border-r border-border/50 p-2 shrink-0">
-          <ScrollArea className="h-full">
-            <div className="space-y-1">
-              <div className="text-xs text-muted-foreground px-2 py-1">Hyperbrowser APIs</div>
-              <Button variant="ghost" size="sm" className="w-full justify-start h-7 text-xs">
-                <ChevronDown className="w-3 h-3 mr-1" />
-                Quickstart
-              </Button>
-              <Button variant="ghost" size="sm" className="w-full justify-start h-7 text-xs">
-                <ChevronDown className="w-3 h-3 mr-1" />
-                Sessions
-              </Button>
-              <Button variant="ghost" size="sm" className="w-full justify-start h-7 text-xs">
-                <ChevronDown className="w-3 h-3 mr-1" />
-                Agents
-              </Button>
-              <Button variant="ghost" size="sm" className="w-full justify-start h-7 text-xs">
-                <ChevronDown className="w-3 h-3 mr-1" />
-                Data Extraction
-              </Button>
-              <div className="text-xs text-muted-foreground px-2 py-1 mt-4">Account</div>
-              <Button variant="ghost" size="sm" className="w-full justify-start h-7 text-xs">
-                <ChevronDown className="w-3 h-3 mr-1" />
-                Profiles
-              </Button>
-              <Button variant="ghost" size="sm" className="w-full justify-start h-7 text-xs">
-                <ChevronDown className="w-3 h-3 mr-1" />
-                Extensions
-              </Button>
-            </div>
+        {/* Left Sidebar - Workflow Configuration */}
+        <div className="w-72 border-r border-border/50 flex flex-col shrink-0">
+          <div className="p-3 border-b border-border/50">
+            <h3 className="text-sm font-medium mb-1">Workflow Configuration</h3>
+            {selectedWorkflow && (
+              <p className="text-xs text-muted-foreground">{selectedWorkflow.description}</p>
+            )}
+          </div>
+          <ScrollArea className="flex-1 p-3">
+            {selectedWorkflow ? (
+              <div className="space-y-4">
+                {selectedWorkflow.variables.map((variable) => (
+                  <div key={variable.name} className="space-y-1.5">
+                    <Label className="text-xs flex items-center gap-1">
+                      {variable.name}
+                      {variable.required && <span className="text-destructive">*</span>}
+                    </Label>
+                    {variable.description && (
+                      <p className="text-xs text-muted-foreground">{variable.description}</p>
+                    )}
+                    {variable.type === 'enum' ? (
+                      <Select
+                        value={String(variables[variable.name] || '')}
+                        onValueChange={(v) => handleVariableChange(variable.name, v)}
+                      >
+                        <SelectTrigger className="h-8 text-xs">
+                          <SelectValue placeholder={`Select ${variable.name}`} />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {variable.values?.map(opt => (
+                            <SelectItem key={opt} value={opt}>{opt}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    ) : variable.type === 'number' ? (
+                      <Input
+                        type="number"
+                        className="h-8 text-xs"
+                        value={variables[variable.name] || ''}
+                        onChange={(e) => handleVariableChange(variable.name, parseInt(e.target.value) || 0)}
+                        placeholder={variable.placeholder}
+                      />
+                    ) : variable.type === 'array' ? (
+                      <Input
+                        className="h-8 text-xs"
+                        value={Array.isArray(variables[variable.name]) ? variables[variable.name].join(', ') : variables[variable.name] || ''}
+                        onChange={(e) => handleVariableChange(variable.name, e.target.value.split(',').map(s => s.trim()))}
+                        placeholder={variable.placeholder || 'Values separated by commas'}
+                      />
+                    ) : (
+                      <Input
+                        className="h-8 text-xs"
+                        value={variables[variable.name] || ''}
+                        onChange={(e) => handleVariableChange(variable.name, e.target.value)}
+                        placeholder={variable.placeholder}
+                      />
+                    )}
+                  </div>
+                ))}
+                
+                <div className="pt-4 space-y-2">
+                  <Button
+                    className="w-full gap-2"
+                    onClick={handleRun}
+                    disabled={isRunning}
+                  >
+                    {isRunning ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <Play className="w-4 h-4" />
+                    )}
+                    Run Workflow
+                  </Button>
+                  <Button
+                    variant="outline"
+                    className="w-full gap-2"
+                    onClick={() => previewMutation.mutate()}
+                    disabled={previewMutation.isPending}
+                  >
+                    {previewMutation.isPending ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <Eye className="w-4 h-4" />
+                    )}
+                    Preview Code
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <div className="text-center py-8 text-muted-foreground">
+                <Zap className="w-8 h-8 mx-auto mb-2 text-amber-500" />
+                <p className="text-sm">Select a workflow above</p>
+                <p className="text-xs mt-1">Choose from {workflows.length} available workflows</p>
+              </div>
+            )}
           </ScrollArea>
         </div>
 
@@ -507,10 +507,11 @@ export default function HyperBrowserBuilder({ onBack, onRun, onMinimize }: Hyper
               <TabsContent value="editor" className="flex-1 m-0 overflow-hidden">
                 <div className="h-full bg-[#1e1e1e] p-3 font-mono text-sm overflow-auto dark-scrollbar">
                   <textarea
-                    value={script}
-                    onChange={(e) => setScript(e.target.value)}
+                    value={previewCode}
+                    onChange={(e) => setPreviewCode(e.target.value)}
                     className="w-full h-full bg-transparent text-[#d4d4d4] resize-none outline-none font-mono text-xs leading-relaxed dark-scrollbar"
                     spellCheck={false}
+                    placeholder="Select a workflow and click Preview to see the generated code"
                     data-testid="textarea-script"
                   />
                 </div>
@@ -518,11 +519,23 @@ export default function HyperBrowserBuilder({ onBack, onRun, onMinimize }: Hyper
 
               <TabsContent value="output" className="flex-1 m-0 overflow-hidden">
                 <div className="h-full bg-[#1e1e1e] p-3 font-mono text-xs dark-scrollbar overflow-auto">
+                  {/* Logs */}
                   {output.map((line, i) => (
                     <div key={i} className="text-[#6a9955]">{line}</div>
                   ))}
                   {isRunning && (
                     <div className="text-amber-400 animate-pulse">Running...</div>
+                  )}
+                  {/* Scraped Content Output */}
+                  {execution?.output?.data && (
+                    <div className="mt-4 pt-4 border-t border-gray-700">
+                      <div className="text-cyan-400 mb-2 font-semibold">📄 Scraped Content:</div>
+                      <div className="text-[#d4d4d4] whitespace-pre-wrap text-xs leading-relaxed max-h-[400px] overflow-auto">
+                        {typeof execution.output.data === 'string' 
+                          ? execution.output.data.slice(0, 5000) + (execution.output.data.length > 5000 ? '\n\n... (truncated)' : '')
+                          : JSON.stringify(execution.output.data, null, 2)}
+                      </div>
+                    </div>
                   )}
                 </div>
               </TabsContent>

@@ -17,6 +17,15 @@ export const insertUserSchema = createInsertSchema(users).pick({
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
 
+// Letterhead settings type
+export interface LetterheadSettings {
+  enabled: boolean;
+  position: 'left' | 'center' | 'right';
+  logoUrl?: string;
+  companyName?: string;
+  tagline?: string;
+}
+
 // Notebooks table - each notebook contains its own sources, conversations, and generated content
 export const notebooks = pgTable("notebooks", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -25,6 +34,7 @@ export const notebooks = pgTable("notebooks", {
   emoji: text("emoji").default("📓"),
   color: text("color").default("#6366f1"),
   sourceCount: integer("source_count").default(0),
+  letterhead: jsonb("letterhead").$type<LetterheadSettings>(),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -195,7 +205,7 @@ export interface WorkflowStep {
 
 export interface A2UIComponent {
   id: string;
-  type: 'card' | 'chart' | 'table' | 'list' | 'code' | 'quote' | 'image' | 'accordion' | 'tabs' | 'progress' | 'badge' | 'button' | 'link' | 'mindmap' | 'timeline' | 'slides' | 'audio_transcript';
+  type: 'card' | 'chart' | 'table' | 'list' | 'code' | 'quote' | 'image' | 'accordion' | 'tabs' | 'progress' | 'badge' | 'button' | 'link' | 'mindmap' | 'timeline' | 'slides' | 'audio_transcript' | 'report_suggestion';
   parentId?: string;
   properties: Record<string, any>;
   data?: any;

@@ -27,7 +27,13 @@ import {
   MarkerType,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
-import { ExternalLink, Circle, CheckCircle, Clock, AlertCircle } from "lucide-react";
+import { ExternalLink, Circle, CheckCircle, Clock, AlertCircle, Sparkles, FileText, Eye, ChevronDown } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 
 interface A2UIRendererProps {
   components: A2UIComponent[];
@@ -929,6 +935,90 @@ function A2Slides({
   );
 }
 
+const REPORT_FORMATS = [
+  { id: 'briefing-doc', name: 'Briefing Doc' },
+  { id: 'blog-post', name: 'Blog Post' },
+  { id: 'linkedin-article', name: 'LinkedIn Article' },
+  { id: 'twitter-thread', name: 'Twitter Thread' },
+  { id: 'executive-summary', name: 'Executive Summary' },
+  { id: 'case-study', name: 'Case Study' },
+  { id: 'newsletter', name: 'Newsletter' },
+  { id: 'whitepaper', name: 'Whitepaper' },
+];
+
+function A2ReportSuggestion({
+  format = 'Briefing Doc',
+  description = 'from this research',
+  showPreview = true,
+  showEditor = true,
+  onAction,
+}: {
+  format?: string;
+  description?: string;
+  showPreview?: boolean;
+  showEditor?: boolean;
+  onAction?: (action: string, data?: any) => void;
+}) {
+  return (
+    <Card className="p-4 rounded-xl border-primary/20 bg-primary/5" data-testid="a2ui-report-suggestion">
+      <div className="flex items-start gap-3">
+        <div className="p-2 rounded-lg bg-primary/10 shrink-0">
+          <Sparkles className="w-5 h-5 text-primary" />
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="text-sm mb-3">
+            I can create a <strong>{format}</strong> {description}
+          </p>
+
+          <div className="flex flex-wrap items-center gap-2">
+            {showPreview && (
+              <Button
+                size="sm"
+                variant="outline"
+                className="gap-2"
+                onClick={() => onAction?.('report_preview', { format })}
+              >
+                <Eye className="w-4 h-4" />
+                Preview Here
+              </Button>
+            )}
+
+            {showEditor && (
+              <Button
+                size="sm"
+                className="gap-2"
+                onClick={() => onAction?.('report_open_editor', { format })}
+              >
+                <FileText className="w-4 h-4" />
+                Open in Editor
+              </Button>
+            )}
+
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="sm" className="gap-1">
+                  Change Format
+                  <ChevronDown className="w-3 h-3" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start">
+                {REPORT_FORMATS.map((f) => (
+                  <DropdownMenuItem
+                    key={f.id}
+                    onClick={() => onAction?.('report_change_format', { format: f.name })}
+                  >
+                    {f.name}
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+        </div>
+      </div>
+    </Card>
+  );
+}
+
 function renderA2UIComponent(
   component: A2UIComponent,
   allComponents: A2UIComponent[],
@@ -994,6 +1084,14 @@ function renderA2UIComponent(
 
       case 'audio_transcript':
         return <A2AudioTranscript {...properties} segments={data?.segments || properties.segments} />;
+
+      case 'report_suggestion':
+        return (
+          <A2ReportSuggestion 
+            {...properties} 
+            onAction={onAction}
+          />
+        );
 
       default:
         console.warn(`Unknown A2UI component type: ${type}`);

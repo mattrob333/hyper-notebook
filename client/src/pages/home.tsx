@@ -12,6 +12,7 @@ import ChatPanel from "@/components/panels/ChatPanel";
 import StudioPanel from "@/components/panels/StudioPanel";
 import SourceDetailView from "@/components/panels/SourceDetailView";
 import BrowserAgentMonitor from "@/components/browser/BrowserAgentMonitor";
+import ReportEditor from "@/components/studio/ReportEditor";
 import type { Source, ChatMessage, A2UIComponent, Notebook } from "@/lib/types";
 
 export default function Home() {
@@ -31,11 +32,21 @@ export default function Home() {
   const [browserTotalSteps, setBrowserTotalSteps] = useState(0);
   const [browserUrl, setBrowserUrl] = useState('about:blank');
   const [messages, setMessages] = useState<ChatMessage[]>([]);
+  
+  // Report Editor state
+  const [showReportEditor, setShowReportEditor] = useState(false);
+  const [reportEditorContent, setReportEditorContent] = useState('');
+  const [reportEditorTitle, setReportEditorTitle] = useState('');
 
   // Fetch notebook details
   const { data: notebook } = useQuery<Notebook>({
     queryKey: [`/api/notebooks/${notebookId}`],
     enabled: !!notebookId,
+  });
+
+  // Fetch all notebooks for the dropdown
+  const { data: notebooks = [] } = useQuery<Notebook[]>({
+    queryKey: ['/api/notebooks'],
   });
 
   // Fetch sources for this notebook
@@ -58,6 +69,21 @@ export default function Home() {
 
   useEffect(() => {
     document.documentElement.classList.add('dark');
+  }, []);
+
+  // Listen for openReportEditor events from ChatPanel
+  useEffect(() => {
+    const handleOpenReportEditor = (event: CustomEvent) => {
+      const { content, title } = event.detail;
+      setReportEditorContent(content || '');
+      setReportEditorTitle(title || 'Report');
+      setShowReportEditor(true);
+    };
+
+    window.addEventListener('openReportEditor', handleOpenReportEditor as EventListener);
+    return () => {
+      window.removeEventListener('openReportEditor', handleOpenReportEditor as EventListener);
+    };
   }, []);
 
   const handleNewMessage = async (content: string, response?: string, a2uiComponents?: A2UIComponent[]) => {
@@ -104,13 +130,33 @@ export default function Home() {
     setMessages([]);
   };
 
+  // Show full-screen report editor if triggered
+  if (showReportEditor) {
+    return (
+      <ReportEditor
+        initialContent={reportEditorContent}
+        title={reportEditorTitle}
+        onClose={() => {
+          setShowReportEditor(false);
+          setReportEditorContent('');
+          setReportEditorTitle('');
+        }}
+        notebookId={notebookId}
+      />
+    );
+  }
+
   return (
     <div className="h-screen flex flex-col bg-background" data-testid="home-page">
       <Navbar 
         isDarkMode={isDarkMode} 
         onToggleDarkMode={() => setIsDarkMode(!isDarkMode)}
         notebookName={notebook?.name}
+        notebookId={notebookId}
+        notebooks={notebooks}
         onBackToDashboard={() => navigate('/')}
+        onSelectNotebook={(id) => navigate(`/notebook/${id}`)}
+        onCreateNotebook={() => navigate('/')}
       />
       
       <div className="flex-1 p-4 overflow-hidden">

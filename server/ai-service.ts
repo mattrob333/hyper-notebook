@@ -82,6 +82,15 @@ export const availableModels: ModelInfo[] = [
   },
   // Google Models
   {
+    id: "google/gemini-3-flash-preview",
+    name: "Gemini 3 Flash",
+    provider: "Google",
+    contextLength: 1000000,
+    description: "Google's fastest frontier model with excellent reasoning and 1M context window",
+    supportsImages: true,
+    supportsStreaming: true,
+  },
+  {
     id: "google/gemini-3-pro-preview",
     name: "Gemini 3 Pro",
     provider: "Google",
@@ -100,23 +109,13 @@ export const availableModels: ModelInfo[] = [
     supportsStreaming: true,
     supportsImageGeneration: true,
   },
-  {
-    id: "google/gemini-2.5-flash-image",
-    name: "Nano Banana (Gemini 2.5 Flash Image)",
-    provider: "Google",
-    contextLength: 33000,
-    description: "State-of-the-art image generation with contextual understanding, text-to-image and image edits",
-    supportsImages: true,
-    supportsStreaming: true,
-    supportsImageGeneration: true,
-  },
 ];
 
 // Type for model IDs
 export type ModelId = typeof availableModels[number]["id"];
 
-// Default model
-export const DEFAULT_MODEL: ModelId = process.env.DEFAULT_MODEL as ModelId || "anthropic/claude-sonnet-4.5";
+// Default model - Gemini 3 Flash for speed and quality
+export const DEFAULT_MODEL: ModelId = process.env.DEFAULT_MODEL as ModelId || "google/gemini-3-flash-preview";
 
 export interface ChatOptions {
   model?: ModelId;

@@ -99,7 +99,7 @@ export default function SettingsPage() {
   const [autoSave, setAutoSave] = useState(true);
   
   // AI settings
-  const [defaultModel, setDefaultModel] = useState("gpt-4o-mini");
+  const [defaultModel, setDefaultModel] = useState("google/gemini-3-flash-preview");
   const [streamResponses, setStreamResponses] = useState(true);
   const [maxTokens, setMaxTokens] = useState("4096");
   
@@ -391,11 +391,10 @@ export default function SettingsPage() {
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="gpt-4o-mini">GPT-4o Mini (Fast & Affordable)</SelectItem>
-                      <SelectItem value="gpt-4o">GPT-4o (Powerful)</SelectItem>
-                      <SelectItem value="claude-3-5-sonnet">Claude 3.5 Sonnet</SelectItem>
-                      <SelectItem value="gemini-pro">Gemini Pro</SelectItem>
-                      <SelectItem value="llama-3.1-70b">Llama 3.1 70B</SelectItem>
+                      <SelectItem value="google/gemini-3-flash-preview">Gemini 3 Flash (Fast)</SelectItem>
+                      <SelectItem value="google/gemini-3-pro-preview">Gemini 3 Pro (Powerful)</SelectItem>
+                      <SelectItem value="anthropic/claude-sonnet-4.5">Claude Sonnet 4.5</SelectItem>
+                      <SelectItem value="anthropic/claude-haiku-4.5">Claude Haiku 4.5 (Fast)</SelectItem>
                     </SelectContent>
                   </Select>
                   <p className="text-xs text-muted-foreground">

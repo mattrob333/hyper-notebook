@@ -664,6 +664,27 @@ You MUST respond with ONLY this JSON (no other text):
         navigator.clipboard.writeText(lastAssistantMessage.content);
         toast({ title: 'Copied', description: 'Content copied to clipboard.' });
       }
+    } else if (action === 'report_preview') {
+      // Preview report inline - already shown in chat, just scroll to it
+      toast({ title: 'Preview', description: 'Report preview is shown above.' });
+    } else if (action === 'report_open_editor') {
+      // Open report in full-screen editor
+      const lastAssistantMessage = messages.filter(m => m.role === 'assistant').pop();
+      if (lastAssistantMessage) {
+        // Dispatch custom event to open report editor
+        const event = new CustomEvent('openReportEditor', { 
+          detail: { 
+            content: lastAssistantMessage.content,
+            title: `Report - ${new Date().toLocaleDateString()}`,
+            format: data?.format || 'Report'
+          }
+        });
+        window.dispatchEvent(event);
+      }
+    } else if (action === 'report_change_format') {
+      // Regenerate with different format
+      const format = data?.format || 'Briefing Doc';
+      handleStreamChat(`Rewrite the above content as a ${format}. Use the same information but restructure it for the ${format} format with appropriate sections and style.`, true);
     } else {
       // Unknown action - treat as workflow step selection (sent silently)
       handleStreamChat(`Selected: ${action}`, false);

@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
+import ReportEditor from './ReportEditor';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -54,6 +55,14 @@ interface ReportsModalProps {
   onOpenChange: (open: boolean) => void;
   selectedSourceIds?: string[];
   onReportGenerated?: (content: any) => void;
+  notebookId?: string;
+}
+
+interface DynamicSuggestion {
+  id: string;
+  name: string;
+  description: string;
+  reason: string;
 }
 
 const defaultReportTypes: ReportType[] = [
@@ -186,12 +195,12 @@ Format as a comprehensive yet accessible technical overview.`,
 ];
 
 const AI_MODELS = [
-  { value: 'anthropic/claude-sonnet-4.5', label: 'Claude Sonnet 4.5' },
+  { value: 'google/gemini-3-flash-preview', label: 'Gemini 3 Flash' },
   { value: 'google/gemini-3-pro-preview', label: 'Gemini 3 Pro' },
-  { value: 'openai/gpt-5.2', label: 'GPT-5.2' },
+  { value: 'anthropic/claude-sonnet-4.5', label: 'Claude Sonnet 4.5' },
 ];
 
-export default function ReportsModal({ open, onOpenChange, selectedSourceIds = [], onReportGenerated }: ReportsModalProps) {
+export default function ReportsModal({ open, onOpenChange, selectedSourceIds = [], onReportGenerated, notebookId }: ReportsModalProps) {
   const [customReports, setCustomReports] = useState<ReportType[]>([]);
   const [isAddingCustom, setIsAddingCustom] = useState(false);
   const [customName, setCustomName] = useState('');
@@ -202,13 +211,40 @@ export default function ReportsModal({ open, onOpenChange, selectedSourceIds = [
   const [selectedReport, setSelectedReport] = useState<ReportType | null>(null);
   const [reportTitle, setReportTitle] = useState('');
   const [reportInstructions, setReportInstructions] = useState('');
-  const [reportModel, setReportModel] = useState('anthropic/claude-sonnet-4.5');
+  const [reportModel, setReportModel] = useState('google/gemini-3-flash-preview');
+  
+  // Editor state - opens full-screen editor after generation
+  const [showEditor, setShowEditor] = useState(false);
+  const [generatedContent, setGeneratedContent] = useState<string>('');
+  
+  // Dynamic suggestions state
+  const [dynamicSuggestions, setDynamicSuggestions] = useState<DynamicSuggestion[]>([]);
   
   const { toast } = useToast();
   
   const { data: sources = [] } = useQuery<Source[]>({
     queryKey: ['/api/sources'],
   });
+
+  // Fetch dynamic suggestions when sources change
+  const analyzeMutation = useMutation({
+    mutationFn: async (sourceIds: string[]) => {
+      const res = await apiRequest('POST', '/api/reports/analyze-sources', { sourceIds });
+      return res.json();
+    },
+    onSuccess: (data) => {
+      setDynamicSuggestions(data.suggestions || []);
+    },
+  });
+
+  // Analyze sources when modal opens
+  useEffect(() => {
+    if (open && selectedSourceIds.length > 0) {
+      analyzeMutation.mutate(selectedSourceIds);
+    } else if (open && sources.length > 0) {
+      analyzeMutation.mutate(sources.map(s => s.id));
+    }
+  }, [open, selectedSourceIds, sources]);
   
   const generateMutation = useMutation({
     mutationFn: async ({ title, systemPrompt, sourceIds, model }: {
@@ -217,22 +253,19 @@ export default function ReportsModal({ open, onOpenChange, selectedSourceIds = [
       sourceIds: string[];
       model: string;
     }) => {
-      const res = await apiRequest('POST', '/api/generate', {
-        type: 'briefing_doc', // Using briefing_doc as base type for reports
+      const res = await apiRequest('POST', '/api/reports/generate', {
+        title,
+        systemPrompt,
         sourceIds,
         model,
-        customPrompt: systemPrompt,
       });
       return res.json();
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['/api/generated'] });
-      toast({
-        title: 'Report Generated',
-        description: `Your ${selectedReport?.name || 'report'} has been created successfully.`
-      });
-      onReportGenerated?.(data);
-      handleClose();
+      // Store generated markdown content and open editor
+      setGeneratedContent(data.content || '');
+      setShowEditor(true);
     },
     onError: (error: Error) => {
       toast({
@@ -303,7 +336,15 @@ export default function ReportsModal({ open, onOpenChange, selectedSourceIds = [
     setSelectedReport(null);
     setReportTitle('');
     setReportInstructions('');
+    setShowEditor(false);
+    setGeneratedContent('');
     onOpenChange(false);
+  };
+
+  const handleEditorClose = () => {
+    setShowEditor(false);
+    setGeneratedContent('');
+    handleClose();
   };
   
   const handleBack = () => {
@@ -321,6 +362,18 @@ export default function ReportsModal({ open, onOpenChange, selectedSourceIds = [
   const suggestedReports = allReportTypes.slice(4);
   
   const sourceCount = selectedSourceIds.length > 0 ? selectedSourceIds.length : sources.length;
+
+  // Show full-screen editor when report is generated
+  if (showEditor) {
+    return (
+      <ReportEditor
+        initialContent={generatedContent}
+        title={reportTitle}
+        onClose={handleEditorClose}
+        notebookId={notebookId}
+      />
+    );
+  }
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
@@ -442,10 +495,51 @@ export default function ReportsModal({ open, onOpenChange, selectedSourceIds = [
                   </div>
                 </div>
 
+                {/* AI-Powered Dynamic Suggestions */}
+                {(dynamicSuggestions.length > 0 || analyzeMutation.isPending) && (
+                  <div>
+                    <div className="flex items-center gap-2 mb-3">
+                      <Sparkles className="w-4 h-4 text-primary" />
+                      <h3 className="text-sm font-medium">Suggested For Your Sources</h3>
+                      {analyzeMutation.isPending && (
+                        <Loader2 className="w-3 h-3 animate-spin text-muted-foreground" />
+                      )}
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      {dynamicSuggestions.map((suggestion) => (
+                        <Card 
+                          key={suggestion.id}
+                          className="p-4 rounded-xl cursor-pointer hover-elevate transition-all group"
+                          onClick={() => handleSelectReport({
+                            id: suggestion.id,
+                            name: suggestion.name,
+                            description: suggestion.description,
+                            icon: Sparkles,
+                            systemPrompt: `Create a ${suggestion.name} based on the provided sources. ${suggestion.description}. Focus on: ${suggestion.reason}`,
+                          })}
+                        >
+                          <div className="flex items-start gap-3">
+                            <div className="p-2 rounded-lg bg-primary/10 shrink-0">
+                              <Sparkles className="w-4 h-4 text-primary" />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <h4 className="text-sm font-medium truncate">{suggestion.name}</h4>
+                              <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">
+                                {suggestion.description}
+                              </p>
+                            </div>
+                          </div>
+                        </Card>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Static Suggested Formats */}
                 <div>
                   <div className="flex items-center gap-2 mb-3">
-                    <Sparkles className="w-4 h-4 text-primary" />
-                    <h3 className="text-sm font-medium">Suggested Format</h3>
+                    <Sparkles className="w-4 h-4 text-muted-foreground" />
+                    <h3 className="text-sm font-medium">More Formats</h3>
                   </div>
                   <div className="grid grid-cols-2 gap-3">
                     {suggestedReports.map((report) => (

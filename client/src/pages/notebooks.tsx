@@ -108,11 +108,9 @@ export default function NotebooksDashboard() {
     <div className="min-h-screen bg-background">
       {/* Header */}
       <header className="h-14 border-b flex items-center justify-between px-6 bg-background">
-        <div className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-lg bg-primary/20 flex items-center justify-center">
-            <BookOpen className="w-5 h-5 text-primary" />
-          </div>
-          <span className="font-semibold text-lg">NotebookLM</span>
+        <div className="flex items-center gap-3">
+          <img src="/favicon.png" alt="Tier 4 Logo" className="w-8 h-8 object-contain" />
+          <span className="font-semibold text-lg">Tier 4 Notebook</span>
         </div>
         <div className="flex items-center gap-2">
           <Button 
