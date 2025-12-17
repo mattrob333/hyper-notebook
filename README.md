@@ -1,26 +1,96 @@
 # Hyper-Notebook
 
-An AI-powered research assistant inspired by Google NotebookLM. Upload sources, chat with AI about your research, and generate study guides, mind maps, timelines, and more.
+An AI-powered research assistant that goes beyond Google NotebookLM. Upload sources, chat with AI about your research, generate professional reports with a full-featured editor, create images, and much more.
 
-## Features
+## 🚀 Why Hyper-Notebook?
 
-- **Multi-Source Research**: Upload PDFs, add URLs, paste text, or upload CSV files as research sources
-- **CSV & Lead Management**: Upload CSV contact lists, view as interactive spreadsheets, select leads for AI context
-- **AI Chat**: Conversational interface to ask questions about your sources with lead context injection
-- **Multi-Model Support**: Choose from 15+ AI models via OpenRouter (Claude, GPT-4, Gemini, Llama, Mistral, etc.)
-- **Content Generation**:
-  - Study guides
-  - Executive briefing documents
-  - FAQs
-  - Timelines
-  - Mind maps (interactive visualization)
-  - Infographics
-  - Slide decks
-  - Audio overviews (with ElevenLabs TTS)
-  - Professional emails (with lead pre-fill)
-- **A2UI System**: AI can generate interactive UI components directly in chat
-- **Workflow Automation**: Create and save multi-step workflows
-- **Dark Mode**: Beautiful dark theme inspired by NotebookLM
+Hyper-Notebook takes the core concept of NotebookLM and supercharges it with professional features for content creators, researchers, and business users.
+
+### Feature Comparison: Hyper-Notebook vs NotebookLM
+
+| Feature | Hyper-Notebook | Google NotebookLM |
+|---------|:-------------:|:-----------------:|
+| **Source Management** | | |
+| PDF Upload | ✅ | ✅ |
+| URL Scraping | ✅ | ✅ |
+| Text/Markdown Sources | ✅ | ✅ |
+| CSV/Spreadsheet Sources | ✅ | ❌ |
+| RSS Feed Integration | ✅ | ❌ |
+| **AI Models** | | |
+| Multiple AI Providers | ✅ (15+ models) | ❌ (Gemini only) |
+| Claude, GPT-4, Gemini, Llama | ✅ | ❌ |
+| Model Selection Per Chat | ✅ | ❌ |
+| **Report Generation** | | |
+| Briefing Documents | ✅ | ✅ |
+| Full-Screen Rich Text Editor | ✅ | ❌ |
+| AI-Powered Text Rewrite | ✅ | ❌ |
+| AI Image Generation in Reports | ✅ | ❌ |
+| Export to PDF/Markdown | ✅ | ❌ |
+| Custom Letterhead/Branding | ✅ | ❌ |
+| LinkedIn Article Format | ✅ | ❌ |
+| Twitter Thread Format | ✅ | ❌ |
+| Newsletter Format | ✅ | ❌ |
+| **Content Types** | | |
+| Study Guides | ✅ | ✅ |
+| FAQs | ✅ | ✅ |
+| Mind Maps (Interactive) | ✅ | ❌ |
+| Timelines | ✅ | ❌ |
+| Infographics | ✅ | ❌ |
+| Slide Decks | ✅ | ❌ |
+| Audio Overviews | ✅ | ✅ |
+| **Business Features** | | |
+| Lead/Contact Management | ✅ | ❌ |
+| Email Builder with Lead Pre-fill | ✅ | ❌ |
+| CRM Integration Ready | ✅ | ❌ |
+| **Developer Features** | | |
+| A2UI (AI-Generated UI) | ✅ | ❌ |
+| Workflow Automation | ✅ | ❌ |
+| API Access | ✅ | ❌ |
+| Self-Hosted Option | ✅ | ❌ |
+| Open Source | ✅ | ❌ |
+
+## ✨ Key Features
+
+### 📝 Professional Report Editor
+- **Full-screen TipTap editor** with rich text formatting
+- **AI rewrite** - Select text and have AI improve, expand, or change tone
+- **AI image generation** - Generate images from prompts directly in your reports
+- **Multiple export formats** - PDF, Markdown, HTML
+- **Custom letterhead** - Add branding with logo, company name, tagline
+
+### 🤖 Multi-Model AI
+- **15+ AI models** from OpenRouter (Claude, GPT-4, Gemini, Llama, Mistral)
+- **Gemini 3 Flash** - Fast, affordable default model
+- **Gemini 3 Pro** - For complex reasoning
+- **Switch models per conversation**
+
+### 📊 Advanced Source Management
+- **Multi-source research** - PDFs, URLs, text, CSV files
+- **CSV & Lead Management** - Upload contact lists, view as spreadsheets
+- **RSS Feed Integration** - Auto-import from news feeds
+- **Lead context injection** - AI knows about your contacts
+
+### 🎨 Content Generation Studio
+- Study guides & FAQs
+- Executive briefing documents
+- Interactive mind maps (React Flow)
+- Timelines & infographics
+- Slide decks with AI
+- Audio overviews (ElevenLabs TTS)
+- Professional emails
+
+### 🔧 A2UI System
+AI can generate interactive UI components directly in chat:
+- Cards, buttons, accordions
+- Progress indicators
+- Data tables
+- Report suggestions with one-click generation
+
+### 📧 Business Tools
+- Email builder with template library
+- Lead pre-fill from CSV sources
+- Professional report formats (LinkedIn, Newsletter, Case Study)
+- Workflow automation
 
 ## Tech Stack
 
@@ -148,15 +218,18 @@ hyper-notebook/
 
 The app supports models from multiple providers via OpenRouter:
 
-| Provider | Models |
-|----------|--------|
-| Anthropic | Claude Sonnet 4, Claude 3.5 Sonnet, Claude 3.5 Haiku |
-| OpenAI | GPT-4o, GPT-4o Mini, o1, o1-mini |
-| Google | Gemini 2.0 Flash, Gemini Pro 1.5, Gemini Flash 1.5 |
-| Meta | Llama 3.3 70B |
-| Mistral | Mistral Large, Mistral Small |
-| DeepSeek | DeepSeek V3 |
-| Qwen | Qwen 2.5 72B |
+| Provider | Models | Best For |
+|----------|--------|----------|
+| Google | **Gemini 3 Flash** (default), Gemini 3 Pro | Fast responses, image generation |
+| Anthropic | Claude Sonnet 4.5, Claude Haiku 4.5, Claude Opus 4.5 | Complex reasoning, writing |
+| OpenAI | GPT-5.2, GPT-5.2 Pro, GPT-5.2 Chat | General purpose |
+| Meta | Llama 3.3 70B | Open source, cost-effective |
+| Mistral | Mistral Large, Mistral Small | European data compliance |
+| DeepSeek | DeepSeek V3 | Code generation |
+| Qwen | Qwen 2.5 72B | Multilingual |
+
+### Image Generation
+- **Gemini 3 Pro Image Preview** - AI image generation directly in reports
 
 ## Environment Variables
 

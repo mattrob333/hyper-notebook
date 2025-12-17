@@ -388,30 +388,136 @@ Implemented a comprehensive CSV upload and lead management system that allows us
 
 ---
 
+### 2024-12-17 - Professional Report Editor & Gemini 3 Model Updates
+
+**Status:** Major feature implementation complete
+
+**Summary:**
+Implemented a full-featured professional report editor with AI rewrite capabilities, image generation, and updated all AI models to use the new Gemini 3 Flash and Pro models.
+
+**Features Implemented:**
+
+1. **Full-Screen Report Editor (`ReportEditor.tsx`)**
+   - **TipTap rich text editor** with full formatting toolbar
+   - Bold, italic, underline, strikethrough
+   - Headings (H1, H2, H3)
+   - Text alignment (left, center, right)
+   - Bullet lists, numbered lists, blockquotes
+   - Code blocks and inline code
+   - Link insertion
+   - **AI-powered text rewrite** - Select text and choose from:
+     - Make it shorter / Make it longer
+     - Professional tone / Casual tone
+     - Improve clarity / Add more detail
+     - Custom rewrite prompt
+   - **AI image generation** - Generate images from prompts directly in editor
+   - **Drag & drop images** - Reposition images within document
+   - **Export options** - PDF (via print), Markdown download
+   - **Save to Studio** - Persists reports to database
+
+2. **Markdown to HTML Converter**
+   - Line-by-line processing for accurate conversion
+   - Handles headers, lists, blockquotes, code blocks
+   - Proper inline formatting (bold, italic, links)
+   - Displays as rich text instead of raw markdown
+
+3. **Gemini 3 Model Updates**
+   - Updated default model to `google/gemini-3-flash-preview`
+   - Updated image generation to `google/gemini-3-pro-image-preview`
+   - Updated all client-side model dropdowns (StudioPanel, ReportsModal, Settings)
+   - Removed old GPT-4o references
+
+4. **Report Generation API**
+   - New `/api/reports/generate` endpoint returns plain markdown
+   - `/api/reports/analyze-sources` for dynamic format suggestions
+   - `/api/ai/rewrite` for AI text rewriting
+
+5. **A2UI Report Suggestion Component**
+   - New `report_suggestion` A2UI component type
+   - Displays in chat with "Preview Here", "Open in Editor", "Change Format" buttons
+   - Click "Open in Editor" → Opens full-screen editor with content
+   - Change Format dropdown for quick format switching
+
+6. **Letterhead Settings (`LetterheadSettings.tsx`)**
+   - Per-notebook branding configuration
+   - Logo URL, company name, tagline
+   - Position options (left, center, right)
+   - Enable/disable toggle
+   - Real-time preview
+   - Saved to notebook.letterhead field
+
+7. **Chat Integration**
+   - `handleA2UIAction` handlers for report actions
+   - `openReportEditor` custom event for opening editor from chat
+   - Report editor renders as full-screen overlay in home.tsx
+
+**Technical Details:**
+
+- **AI Rewrite Flow:**
+  1. User selects text in editor
+  2. Clicks rewrite option (tone, length, etc.)
+  3. POST to `/api/ai/rewrite` with text and prompt
+  4. AI returns rewritten text
+  5. Editor replaces selection with result
+
+- **Image Generation Flow:**
+  1. User enters prompt in image dialog
+  2. POST to `/api/images/generate` with prompt
+  3. Gemini 3 Pro Image returns base64 image
+  4. Editor inserts image at cursor
+
+**New Files Created:**
+- `client/src/components/studio/ReportEditor.tsx` - Full-screen TipTap editor
+- `client/src/components/studio/LetterheadSettings.tsx` - Notebook branding
+- `client/src/components/a2ui/ReportSuggestionCard.tsx` - A2UI component
+
+**Files Modified:**
+- `server/ai-service.ts` - Updated models to Gemini 3
+- `server/routes.ts` - Added report generation and rewrite endpoints
+- `client/src/components/panels/StudioPanel.tsx` - Updated models, removed callback
+- `client/src/components/panels/ChatPanel.tsx` - Added report action handlers
+- `client/src/components/studio/ReportsModal.tsx` - Updated to use new API
+- `client/src/components/a2ui/A2UIRenderer.tsx` - Added report_suggestion support
+- `client/src/pages/home.tsx` - Added ReportEditor rendering
+- `client/src/pages/settings.tsx` - Updated model options
+- `shared/schema.ts` - Added letterhead type, report_suggestion component
+
+**Database Changes:**
+- Added `letterhead` JSONB column to notebooks table
+- Ran `drizzle-kit push` to sync schema
+
+---
+
 ## Current Feature Status
 
 ### Completed Features ✓
 - [x] Multi-notebook management system
 - [x] OpenRouter AI integration (15+ models)
 - [x] Reports generation with templates
+- [x] **Professional Report Editor with TipTap**
+- [x] **AI-powered text rewrite**
+- [x] **AI image generation in reports**
+- [x] **Custom letterhead/branding per notebook**
 - [x] Mind map visualization (NotebookLM-style)
 - [x] Infographic generation modal
 - [x] Slide deck generation with 16:9 viewer
-- [x] **Audio Overview with ElevenLabs TTS**
+- [x] Audio Overview with ElevenLabs TTS
 - [x] Source selection modals for content generation
-- [x] **CSV Upload & Lead Management System**
+- [x] CSV Upload & Lead Management System
 - [x] Spreadsheet viewer with editable cells
 - [x] Lead context injection for AI chat
 - [x] Source renaming
+- [x] **A2UI Report Suggestion component**
+- [x] **Gemini 3 Flash/Pro model integration**
+- [x] **Export to PDF/Markdown**
 
 ### Pending Features
-- [ ] Custom report type persistence (save to database)
 - [ ] Real web search integration (Serper/Tavily)
 - [ ] YouTube transcript extraction
 - [ ] Source pinning for context control
 - [ ] Voice input/output
-- [ ] Export functionality (PDF, Markdown)
 - [ ] CRM integration for lead management
+- [ ] HyperBrowser automation (scaffolded)
 
 ---
 
