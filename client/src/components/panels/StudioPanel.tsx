@@ -26,8 +26,12 @@ import {
   X,
   ArrowLeft,
   Maximize2,
-  Minimize2
+  Minimize2,
+  Table2
 } from "lucide-react";
+import A2Spreadsheet from "../a2ui/A2Spreadsheet";
+import { useLeadContext } from "@/contexts/LeadContext";
+import type { SpreadsheetContent, Lead } from "@shared/schema";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -87,6 +91,8 @@ interface GeneratedContent {
 
 interface StudioPanelProps {
   selectedSourceIds?: string[];
+  onViewCsvSource?: (sourceId: string) => void;
+  viewingCsvSourceId?: string | null;
 }
 
 interface ContentCardProps {
@@ -178,8 +184,19 @@ type ActiveView = 'main' | 'email' | 'hyperbrowser' | 'context-file' | 'canvas';
 
 export default function StudioPanel({
   selectedSourceIds = [],
+  onViewCsvSource,
+  viewingCsvSourceId,
 }: StudioPanelProps) {
   const [activeView, setActiveView] = useState<ActiveView>('main');
+  const [csvSourceId, setCsvSourceId] = useState<string | null>(viewingCsvSourceId || null);
+  const leadContext = useLeadContext();
+
+  // Sync viewingCsvSourceId prop with local state
+  useEffect(() => {
+    if (viewingCsvSourceId !== undefined) {
+      setCsvSourceId(viewingCsvSourceId);
+    }
+  }, [viewingCsvSourceId]);
   const [reportsModalOpen, setReportsModalOpen] = useState(false);
   const [infographicModalOpen, setInfographicModalOpen] = useState(false);
   const [slideDeckModalOpen, setSlideDeckModalOpen] = useState(false);
@@ -500,6 +517,71 @@ export default function StudioPanel({
         sources={sources}
       />
     );
+  }
+
+  // CSV Spreadsheet view
+  if (csvSourceId) {
+    const csvSource = sources.find(s => s.id === csvSourceId);
+    if (csvSource) {
+      // Try to parse as spreadsheet content (check type === 'csv' OR content has spreadsheet structure)
+      let spreadsheetData: SpreadsheetContent | null = null;
+      try {
+        const parsed = JSON.parse(csvSource.content);
+        if (parsed.type === 'spreadsheet' && parsed.headers && parsed.rows) {
+          spreadsheetData = parsed as SpreadsheetContent;
+        }
+      } catch {
+        spreadsheetData = null;
+      }
+
+      if (spreadsheetData) {
+        return (
+          <div className="flex flex-col h-full">
+            {/* Close button header */}
+            <div className="flex items-center justify-between p-2 border-b shrink-0">
+              <span className="text-sm font-medium text-muted-foreground">Spreadsheet View</span>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  setCsvSourceId(null);
+                  if (onViewCsvSource) onViewCsvSource(null);
+                }}
+                className="gap-1"
+              >
+                <X className="w-4 h-4" />
+                Close
+              </Button>
+            </div>
+            <A2Spreadsheet
+              data={spreadsheetData}
+              title={csvSource.name}
+              selectedLeadIndex={leadContext.selectedLead?.rowIndex ?? null}
+              onSelectLead={(lead) => {
+                leadContext.setSelectedLead(lead);
+                leadContext.setSourceId(csvSourceId);
+              }}
+              onDataUpdate={async (updatedData) => {
+                try {
+                  await apiRequest('PUT', `/api/sources/${csvSourceId}`, {
+                    content: JSON.stringify(updatedData)
+                  });
+                  queryClient.invalidateQueries({ queryKey: ['/api/sources'] });
+                } catch (error) {
+                  toast({
+                    title: 'Save Failed',
+                    description: 'Could not save spreadsheet changes',
+                    variant: 'destructive'
+                  });
+                }
+              }}
+            />
+          </div>
+        );
+      }
+    }
+    // If CSV source not found or invalid, clear the state
+    setCsvSourceId(null);
   }
 
   // Canvas view for displaying generated content

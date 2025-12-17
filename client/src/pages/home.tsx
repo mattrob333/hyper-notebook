@@ -24,6 +24,7 @@ export default function Home() {
   const [selectedSourceIds, setSelectedSourceIds] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [showBrowserMonitor, setShowBrowserMonitor] = useState(false);
+  const [viewingCsvSourceId, setViewingCsvSourceId] = useState<string | null>(null);
   const [browserStatus, setBrowserStatus] = useState<'idle' | 'running' | 'paused' | 'completed' | 'error'>('idle');
   const [browserStep, setBrowserStep] = useState<string>('');
   const [browserStepNum, setBrowserStepNum] = useState(0);
@@ -119,7 +120,27 @@ export default function Home() {
               <SourcesPanel
                 selectedSourceId={selectedSourceId}
                 onSourcesChange={setSelectedSourceIds}
-                onSelectSource={(source) => setSelectedSourceId(source.id)}
+                onSelectSource={(source) => {
+                  // Check if source is CSV by type OR by content structure
+                  let isCsv = source.type === 'csv';
+                  if (!isCsv && source.content) {
+                    try {
+                      const parsed = JSON.parse(source.content);
+                      isCsv = parsed.type === 'spreadsheet' && parsed.headers && parsed.rows;
+                    } catch {
+                      // Not JSON, not a CSV
+                    }
+                  }
+                  
+                  // For CSV sources, open in Studio spreadsheet view
+                  if (isCsv) {
+                    setViewingCsvSourceId(source.id);
+                    setSelectedSourceId(undefined);
+                  } else {
+                    setSelectedSourceId(source.id);
+                    setViewingCsvSourceId(null);
+                  }
+                }}
                 notebookId={notebookId}
               />
             </div>
@@ -152,6 +173,8 @@ export default function Home() {
             <div className="h-full bg-sidebar rounded-2xl border border-sidebar-border overflow-hidden">
               <StudioPanel
                 selectedSourceIds={selectedSourceIds}
+                viewingCsvSourceId={viewingCsvSourceId}
+                onViewCsvSource={setViewingCsvSourceId}
               />
             </div>
           </ResizablePanel>

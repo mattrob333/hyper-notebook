@@ -73,6 +73,7 @@ import {
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useEmailBuilder } from "@/contexts/EmailBuilderContext";
+import { useOptionalLeadContext } from "@/contexts/LeadContext";
 
 interface EmailBuilderProps {
   onBack?: () => void;
@@ -348,6 +349,14 @@ export default function EmailBuilder({ onBack }: EmailBuilderProps) {
   
   // Email builder context for AI integration
   const emailContext = useEmailBuilder();
+  const leadContext = useOptionalLeadContext();
+  
+  // Pre-fill recipient email from selected lead
+  useEffect(() => {
+    if (leadContext?.selectedLead?.email && !recipientEmail) {
+      setRecipientEmail(leadContext.selectedLead.email);
+    }
+  }, [leadContext?.selectedLead?.email]);
   
   // Load custom templates from localStorage
   useEffect(() => {

@@ -340,6 +340,39 @@ export async function summarizeSource(content: string, options: { model?: ModelI
     m.id.includes('haiku') || m.id.includes('chat') || m.id.includes('flash')
   )?.id || DEFAULT_MODEL;
 
+  // Check if this is spreadsheet/CSV data (JSON with type: 'spreadsheet')
+  let isSpreadsheet = false;
+  let spreadsheetInfo = '';
+  try {
+    const parsed = JSON.parse(content);
+    if (parsed.type === 'spreadsheet' && parsed.headers && parsed.rows) {
+      isSpreadsheet = true;
+      const headers = parsed.headers.join(', ');
+      const rowCount = parsed.rowCount || parsed.rows.length;
+      const sampleRows = parsed.rows.slice(0, 3).map((row: Record<string, string>) => 
+        Object.values(row).join(' | ')
+      ).join('\n');
+      spreadsheetInfo = `This is a spreadsheet/CSV with ${rowCount} rows and the following columns: ${headers}\n\nSample data:\n${sampleRows}`;
+    }
+  } catch {
+    // Not JSON, treat as regular content
+  }
+
+  if (isSpreadsheet) {
+    return chat(
+      [{ role: 'user', content: `Based on this spreadsheet data, write a brief 2-3 sentence description that explains:
+1. What kind of data this spreadsheet contains
+2. What it could be used for (e.g., contact list, sales data, research results)
+
+${spreadsheetInfo}` }],
+      {
+        model: options.model || fastModel,
+        systemPrompt: 'You are a helpful assistant that describes data sources. Focus on the type of data and its potential uses. Be concise and practical.',
+        maxTokens: 200,
+      }
+    );
+  }
+
   // Filter out code/CSS content - focus on text
   const cleanContent = content
     .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')

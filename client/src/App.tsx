@@ -4,6 +4,7 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { EmailBuilderProvider } from "@/contexts/EmailBuilderContext";
+import { LeadProvider } from "@/contexts/LeadContext";
 import NotFound from "@/pages/not-found";
 import Home from "@/pages/home";
 import NotebooksDashboard from "@/pages/notebooks";
@@ -25,8 +26,10 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
         <EmailBuilderProvider>
-          <Toaster />
-          <Router />
+          <LeadProvider>
+            <Toaster />
+            <Router />
+          </LeadProvider>
         </EmailBuilderProvider>
       </TooltipProvider>
     </QueryClientProvider>

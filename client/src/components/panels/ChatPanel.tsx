@@ -24,6 +24,7 @@ import type { ChatMessage, Source, A2UIComponent } from "@/lib/types";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useQuery } from "@tanstack/react-query";
 import { useEmailBuilder } from "@/contexts/EmailBuilderContext";
+import { useOptionalLeadContext } from "@/contexts/LeadContext";
 import { useToast } from "@/hooks/use-toast";
 
 interface SourceSummary {
@@ -194,6 +195,7 @@ export default function ChatPanel({
   
   // Email builder context for AI integration
   const emailContext = useEmailBuilder();
+  const leadContext = useOptionalLeadContext();
   const { toast } = useToast();
   
   // Convert markdown to HTML for email builder
@@ -372,6 +374,14 @@ ${emailContext.contacts.length > 0 ? `- Recipients loaded: ${emailContext.contac
         summary: s.summary,
       })) : [];
 
+      // Build lead context if a lead is selected
+      const selectedLeadContext = leadContext?.selectedLead ? {
+        name: leadContext.selectedLead.name,
+        email: leadContext.selectedLead.email,
+        company: leadContext.selectedLead.company,
+        data: leadContext.selectedLead.data,
+      } : null;
+
       const response = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -381,6 +391,7 @@ ${emailContext.contacts.length > 0 ? `- Recipients loaded: ${emailContext.contac
           conversationId: currentConversationId,
           sources: sourceContext,
           sourceSummaries: sourceSummaries,
+          selectedLead: selectedLeadContext,
         }),
         signal: abortControllerRef.current.signal,
       });
@@ -908,6 +919,31 @@ You MUST respond with ONLY this JSON (no other text):
       </ScrollArea>
 
       <div className="px-4 pb-4 pt-2">
+        {/* Selected Lead Indicator */}
+        {leadContext?.selectedLead && (
+          <div className="mb-2 px-3 py-2 bg-blue-500/10 border border-blue-500/20 rounded-xl flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <div className="w-6 h-6 rounded-full bg-blue-500/20 flex items-center justify-center">
+                <User className="w-3 h-3 text-blue-500" />
+              </div>
+              <div className="text-sm">
+                <span className="text-blue-500 font-medium">Lead selected: </span>
+                <span className="text-foreground">{leadContext.selectedLead.name || 'Unknown'}</span>
+                {leadContext.selectedLead.email && (
+                  <span className="text-muted-foreground ml-1">({leadContext.selectedLead.email})</span>
+                )}
+              </div>
+            </div>
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              className="h-6 px-2 text-xs text-muted-foreground hover:text-foreground"
+              onClick={() => leadContext.clearSelectedLead()}
+            >
+              Clear
+            </Button>
+          </div>
+        )}
         <div className="bg-muted/60 dark:bg-muted rounded-2xl overflow-hidden transition-colors focus-within:bg-muted/80 dark:focus-within:bg-muted/90">
           <div className="px-4 pt-3 pb-2">
             <Textarea

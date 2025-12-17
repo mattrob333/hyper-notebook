@@ -36,7 +36,7 @@ export type Notebook = typeof notebooks.$inferSelect;
 export const sources = pgTable("sources", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   notebookId: varchar("notebook_id").references(() => notebooks.id, { onDelete: 'cascade' }),
-  type: text("type").notNull().$type<'url' | 'pdf' | 'text' | 'audio' | 'video'>(),
+  type: text("type").notNull().$type<'url' | 'pdf' | 'text' | 'audio' | 'video' | 'csv'>(),
   category: text("category").$type<'context' | 'feed' | 'reference'>().default('context'),
   name: text("name").notNull(),
   content: text("content").notNull(),
@@ -46,10 +46,37 @@ export const sources = pgTable("sources", {
 });
 
 export const insertSourceSchema = createInsertSchema(sources).omit({ id: true, createdAt: true }).extend({
-  type: z.enum(['url', 'pdf', 'text', 'audio', 'video']),
+  type: z.enum(['url', 'pdf', 'text', 'audio', 'video', 'csv']),
   category: z.enum(['context', 'feed', 'reference']).optional().default('context'),
   metadata: z.record(z.any()).optional().nullable(),
 });
+
+// CSV/Spreadsheet content structure
+export interface SpreadsheetContent {
+  type: 'spreadsheet';
+  headers: string[];
+  rows: Record<string, string>[];
+  rowCount: number;
+  fileName: string;
+  detectedColumns: {
+    email?: string;
+    name?: string;
+    firstName?: string;
+    lastName?: string;
+    company?: string;
+    title?: string;
+    phone?: string;
+  };
+}
+
+// Lead type for selected lead context
+export interface Lead {
+  rowIndex: number;
+  data: Record<string, string>;
+  email?: string;
+  name?: string;
+  company?: string;
+}
 export type InsertSource = z.infer<typeof insertSourceSchema>;
 export type Source = typeof sources.$inferSelect;
 

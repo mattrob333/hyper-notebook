@@ -315,6 +315,79 @@ shared/                 # Shared types
 
 ---
 
+### 2024-12-17 - CSV Upload & Lead Management System
+
+**Status:** Feature Complete
+
+**Summary:**
+Implemented a comprehensive CSV upload and lead management system that allows users to upload CSV files as sources, view them as interactive spreadsheets, select leads for AI context, and integrate with the email builder.
+
+**Features Implemented:**
+
+1. **CSV Upload & Parsing**
+   - Added `papaparse` for robust CSV parsing on server
+   - Auto-detects column types (email, name, company, phone, title)
+   - Enforces 5,000 row limit for performance
+   - Stores parsed data as JSON in source content field
+   - Skips AI summarization on upload (handled separately)
+
+2. **Spreadsheet Display Component (`A2Spreadsheet.tsx`)**
+   - Interactive table with horizontal/vertical scrolling
+   - Editable cells (double-click to edit)
+   - Row selection for lead context
+   - Column type indicators (email, name, company icons)
+   - Export to CSV functionality
+   - Close button to return to Studio tools
+
+3. **Lead Context System**
+   - New `LeadContext` provider for global lead state
+   - Selected lead indicator above chat input
+   - Lead data injected into AI system prompt
+   - AI can reference lead's name, email, company, and all row data
+
+4. **Source Management Improvements**
+   - Rename sources via dialog
+   - Spreadsheet-aware summarization prompt
+   - CSV icon in sources list
+   - Click CSV source → opens in Studio panel
+
+5. **Email Builder Integration**
+   - Recipient email pre-filled from selected lead
+
+**Technical Details:**
+
+- **Column Detection Patterns:**
+  - Email: `/email/, /e-mail/, /mail/`
+  - Name: `/^name$/, /respondent/, /contact/`
+  - Company: `/company/, /organization/, /org/`
+  - Flexible matching with fallback detection in client
+
+- **Lead Context in Chat:**
+  - Server builds `leadContextSection` with lead details
+  - Injected into both default and workflow system prompts
+  - Includes all row data as "Additional Info"
+
+**Files Created:**
+- `client/src/components/a2ui/A2Spreadsheet.tsx` - Spreadsheet component
+- `client/src/contexts/LeadContext.tsx` - Lead state management
+
+**Files Modified:**
+- `shared/schema.ts` - Added `csv` type, `SpreadsheetContent`, `Lead` interfaces
+- `server/routes.ts` - CSV parsing, column detection, lead context in chat, name in PATCH
+- `server/ai-service.ts` - Spreadsheet-aware summarization
+- `client/src/components/panels/StudioPanel.tsx` - CSV view rendering, close button
+- `client/src/components/panels/SourcesPanel.tsx` - CSV icon, rename dialog
+- `client/src/components/panels/ChatPanel.tsx` - Lead indicator, context passing
+- `client/src/components/studio/EmailBuilder.tsx` - Pre-fill recipient
+- `client/src/pages/home.tsx` - CSV source click handling
+- `client/src/App.tsx` - Added LeadProvider
+
+**Dependencies Added:**
+- `papaparse` - CSV parsing
+- `@types/papaparse` - TypeScript types
+
+---
+
 ## Current Feature Status
 
 ### Completed Features ✓
@@ -326,6 +399,10 @@ shared/                 # Shared types
 - [x] Slide deck generation with 16:9 viewer
 - [x] **Audio Overview with ElevenLabs TTS**
 - [x] Source selection modals for content generation
+- [x] **CSV Upload & Lead Management System**
+- [x] Spreadsheet viewer with editable cells
+- [x] Lead context injection for AI chat
+- [x] Source renaming
 
 ### Pending Features
 - [ ] Custom report type persistence (save to database)
@@ -334,6 +411,7 @@ shared/                 # Shared types
 - [ ] Source pinning for context control
 - [ ] Voice input/output
 - [ ] Export functionality (PDF, Markdown)
+- [ ] CRM integration for lead management
 
 ---
 

@@ -33,9 +33,11 @@ import {
   ArrowRight,
   Hourglass,
   X,
+  Table2,
   Rss,
   RefreshCw,
-  Tag
+  Tag,
+  Pencil
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -58,6 +60,7 @@ const sourceTypeIcons: Record<string, typeof Globe> = {
   url: Globe,
   pdf: FileText,
   text: Type,
+  csv: Table2,
 };
 
 export default function SourcesPanel({ 
@@ -95,6 +98,9 @@ export default function SourcesPanel({
   const [showSearchResults, setShowSearchResults] = useState(false);
   const [feedsExpanded, setFeedsExpanded] = useState(false);
   const [discoveringRss, setDiscoveringRss] = useState<string | null>(null);
+  const [renameDialogOpen, setRenameDialogOpen] = useState(false);
+  const [renameSourceId, setRenameSourceId] = useState<string | null>(null);
+  const [renameValue, setRenameValue] = useState('');
 
   const { data: sources = [], isLoading, isError, error } = useQuery<Source[]>({
     queryKey: notebookId ? [`/api/notebooks/${notebookId}/sources`] : ['/api/sources'],
@@ -145,6 +151,22 @@ export default function SourcesPanel({
     },
     onError: (err: Error) => {
       toast({ title: "Failed to delete source", description: err.message, variant: "destructive" });
+    },
+  });
+
+  const renameSourceMutation = useMutation({
+    mutationFn: async ({ id, name }: { id: string; name: string }) => {
+      await apiRequest('PATCH', `/api/sources/${id}`, { name });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: notebookId ? [`/api/notebooks/${notebookId}/sources`] : ['/api/sources'] });
+      toast({ title: "Source renamed" });
+      setRenameDialogOpen(false);
+      setRenameSourceId(null);
+      setRenameValue('');
+    },
+    onError: (err: Error) => {
+      toast({ title: "Failed to rename", description: err.message, variant: "destructive" });
     },
   });
 
@@ -791,6 +813,20 @@ export default function SourcesPanel({
                           <Button
                             size="sm"
                             variant="ghost"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setRenameSourceId(source.id);
+                              setRenameValue(source.name);
+                              setRenameDialogOpen(true);
+                            }}
+                            data-testid={`button-rename-${source.id}`}
+                          >
+                            <Pencil className="w-3 h-3 mr-1" />
+                            Rename
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
                             className="text-destructive"
                             onClick={(e) => {
                               e.stopPropagation();
@@ -1088,18 +1124,58 @@ export default function SourcesPanel({
               </div>
               <div>
                 <p className="text-sm font-medium">Upload file</p>
-                <p className="text-xs text-muted-foreground">PDF, TXT, or Markdown files</p>
+                <p className="text-xs text-muted-foreground">PDF, TXT, Markdown, or CSV files</p>
               </div>
             </button>
             <input
               ref={fileInputRef}
               type="file"
-              accept=".pdf,.txt,.md,text/plain,application/pdf"
+              accept=".pdf,.txt,.md,.csv,text/plain,application/pdf,text/csv"
               onChange={handleFileUpload}
               className="hidden"
               data-testid="input-file-upload"
             />
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Rename Dialog */}
+      <Dialog open={renameDialogOpen} onOpenChange={setRenameDialogOpen}>
+        <DialogContent className="rounded-2xl max-w-md">
+          <DialogHeader>
+            <DialogTitle>Rename Source</DialogTitle>
+            <DialogDescription>Enter a new name for this source</DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <Input
+              value={renameValue}
+              onChange={(e) => setRenameValue(e.target.value)}
+              placeholder="Source name"
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && renameSourceId && renameValue.trim()) {
+                  renameSourceMutation.mutate({ id: renameSourceId, name: renameValue.trim() });
+                }
+              }}
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setRenameDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button 
+              onClick={() => {
+                if (renameSourceId && renameValue.trim()) {
+                  renameSourceMutation.mutate({ id: renameSourceId, name: renameValue.trim() });
+                }
+              }}
+              disabled={renameSourceMutation.isPending || !renameValue.trim()}
+            >
+              {renameSourceMutation.isPending ? (
+                <Loader2 className="w-4 h-4 animate-spin mr-2" />
+              ) : null}
+              Save
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

@@ -2,7 +2,7 @@ import type { Express, Request, Response } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { streamChat, chat, generateContent, summarizeSource, generateImage, availableModels, getModelsByProvider, DEFAULT_MODEL, type ModelId } from "./ai-service";
-import { insertSourceSchema, insertNoteSchema, insertWorkflowSchema, insertNotebookSchema, sources, type ContentType } from "@shared/schema";
+import { insertSourceSchema, insertNoteSchema, insertWorkflowSchema, insertNotebookSchema, sources, type ContentType, type SpreadsheetContent } from "@shared/schema";
 import { z } from "zod";
 import multer from "multer";
 import { extractText } from "unpdf";
@@ -10,6 +10,31 @@ import { Hyperbrowser } from "@hyperbrowser/sdk";
 import { db } from "./db";
 import { eq, and } from "drizzle-orm";
 import { getWorkflowByTrigger } from "./workflows";
+import Papa from "papaparse";
+
+// Auto-detect column types from headers
+function detectColumns(headers: string[]): SpreadsheetContent['detectedColumns'] {
+  const lowerHeaders = headers.map(h => h.toLowerCase().trim());
+  
+  // More flexible matching - find columns that contain these keywords
+  const findColumn = (patterns: RegExp[]) => {
+    for (const pattern of patterns) {
+      const idx = lowerHeaders.findIndex(h => pattern.test(h));
+      if (idx !== -1) return headers[idx];
+    }
+    return undefined;
+  };
+  
+  return {
+    email: findColumn([/email/, /e-mail/, /mail/]),
+    name: findColumn([/^name$/, /^name\s/, /\sname$/, /full.?name/, /contact.?name/, /respondent/]),
+    firstName: findColumn([/first.?name/, /fname/, /given.?name/]),
+    lastName: findColumn([/last.?name/, /lname/, /surname/, /family.?name/]),
+    company: findColumn([/company/, /organization/, /org/, /business/, /employer/]),
+    title: findColumn([/title/, /role/, /position/, /job.?title/]),
+    phone: findColumn([/phone/, /tel/, /mobile/, /cell/]),
+  };
+}
 
 const upload = multer({ 
   storage: multer.memoryStorage(),
@@ -254,12 +279,13 @@ export async function registerRoutes(
 
   app.patch("/api/sources/:id", async (req: Request, res: Response) => {
     try {
-      const { category, summary, content } = req.body;
+      const { category, summary, content, name } = req.body;
       const updates: Record<string, any> = {};
       
       if (category) updates.category = category;
       if (summary !== undefined) updates.summary = summary;
       if (content !== undefined) updates.content = content;
+      if (name !== undefined) updates.name = name;
       
       await storage.updateSource(req.params.id, updates);
       const updated = await storage.getSource(req.params.id);
@@ -1060,18 +1086,58 @@ Write ONLY the script text, no stage directions or speaker labels.`;
       const mimeType = file.mimetype;
       const notebookId = req.body.notebookId || null;
       
-      const allowedMimeTypes = ['application/pdf', 'text/plain', 'text/markdown'];
-      const allowedExtensions = ['.pdf', '.txt', '.md'];
+      const allowedMimeTypes = ['application/pdf', 'text/plain', 'text/markdown', 'text/csv', 'application/vnd.ms-excel'];
+      const allowedExtensions = ['.pdf', '.txt', '.md', '.csv'];
       const fileExtension = fileName.toLowerCase().slice(fileName.lastIndexOf('.'));
       
       if (!allowedMimeTypes.includes(mimeType) && !allowedExtensions.includes(fileExtension)) {
-        return res.status(400).json({ error: "Unsupported file type. Please upload PDF, TXT, or Markdown files." });
+        return res.status(400).json({ error: "Unsupported file type. Please upload PDF, TXT, Markdown, or CSV files." });
       }
       
       let content = '';
-      let sourceType: 'pdf' | 'text' = 'text';
+      let sourceType: 'pdf' | 'text' | 'csv' = 'text';
 
-      if (mimeType === 'application/pdf') {
+      // Handle CSV files
+      if (fileExtension === '.csv' || mimeType === 'text/csv' || mimeType === 'application/vnd.ms-excel') {
+        sourceType = 'csv';
+        try {
+          const csvText = file.buffer.toString('utf-8');
+          const parseResult = Papa.parse(csvText, {
+            header: true,
+            skipEmptyLines: true,
+            transformHeader: (header) => header.trim(),
+          });
+          
+          if (parseResult.errors.length > 0) {
+            console.warn('CSV parse warnings:', parseResult.errors);
+          }
+          
+          const headers = parseResult.meta.fields || [];
+          const rows = parseResult.data as Record<string, string>[];
+          
+          // Limit to 5000 rows
+          const MAX_ROWS = 5000;
+          if (rows.length > MAX_ROWS) {
+            return res.status(400).json({ 
+              error: `CSV file too large. Maximum ${MAX_ROWS} rows allowed. Your file has ${rows.length} rows.` 
+            });
+          }
+          
+          const spreadsheetContent: SpreadsheetContent = {
+            type: 'spreadsheet',
+            headers,
+            rows: rows.slice(0, MAX_ROWS),
+            rowCount: Math.min(rows.length, MAX_ROWS),
+            fileName,
+            detectedColumns: detectColumns(headers),
+          };
+          
+          content = JSON.stringify(spreadsheetContent);
+        } catch (csvError) {
+          console.error('CSV parsing error:', csvError);
+          return res.status(400).json({ error: "Failed to parse CSV file" });
+        }
+      } else if (mimeType === 'application/pdf') {
         sourceType = 'pdf';
         try {
           const pdfData = await extractText(file.buffer);
@@ -1091,18 +1157,28 @@ Write ONLY the script text, no stage directions or speaker labels.`;
         return res.status(400).json({ error: "Could not extract content from file" });
       }
 
-      // Auto-generate a title from the content
+      // Auto-generate a title from the content (skip for CSV - use filename)
       let generatedTitle = fileName;
-      try {
-        const titleResponse = await chat(
-          [{ role: 'user', content: `Based on the following content, generate a short, descriptive title (max 60 characters). Just respond with the title, no quotes or explanation:\n\n${content.slice(0, 2000)}` }],
-          { maxTokens: 50, temperature: 0.3 }
-        );
-        if (titleResponse && titleResponse.trim().length > 0 && titleResponse.trim().length <= 80) {
-          generatedTitle = titleResponse.trim().replace(/^["']|["']$/g, '');
+      if (sourceType !== 'csv') {
+        try {
+          const titleResponse = await chat(
+            [{ role: 'user', content: `Based on the following content, generate a short, descriptive title (max 60 characters). Just respond with the title, no quotes or explanation:\n\n${content.slice(0, 2000)}` }],
+            { maxTokens: 50, temperature: 0.3 }
+          );
+          if (titleResponse && titleResponse.trim().length > 0 && titleResponse.trim().length <= 80) {
+            generatedTitle = titleResponse.trim().replace(/^["']|["']$/g, '');
+          }
+        } catch (titleError) {
+          console.log('Could not generate title, using filename:', titleError);
         }
-      } catch (titleError) {
-        console.log('Could not generate title, using filename:', titleError);
+      } else {
+        // For CSV, create a descriptive title
+        try {
+          const parsed = JSON.parse(content) as SpreadsheetContent;
+          generatedTitle = `${fileName.replace('.csv', '')} (${parsed.rowCount} rows)`;
+        } catch {
+          generatedTitle = fileName;
+        }
       }
 
       // Create the source
@@ -1119,17 +1195,19 @@ Write ONLY the script text, no stage directions or speaker labels.`;
         }
       });
 
-      // Auto-generate summary in background (don't wait for it)
-      (async () => {
-        try {
-          const summary = await summarizeSource(content);
-          if (summary) {
-            await storage.updateSource(source.id, { summary });
+      // Auto-generate summary in background (skip for CSV files)
+      if (sourceType !== 'csv') {
+        (async () => {
+          try {
+            const summary = await summarizeSource(content);
+            if (summary) {
+              await storage.updateSource(source.id, { summary });
+            }
+          } catch (summaryError) {
+            console.log('Could not generate summary:', summaryError);
           }
-        } catch (summaryError) {
-          console.log('Could not generate summary:', summaryError);
-        }
-      })();
+        })();
+      }
 
       res.status(201).json(source);
     } catch (error) {
@@ -1198,7 +1276,7 @@ Write ONLY the script text, no stage directions or speaker labels.`;
 
   app.post("/api/chat", async (req: Request, res: Response) => {
     try {
-      const { messages, model, conversationId, systemPrompt, sources, sourceSummaries } = req.body;
+      const { messages, model, conversationId, systemPrompt, sources, sourceSummaries, selectedLead } = req.body;
       
       res.setHeader("Content-Type", "text/event-stream");
       res.setHeader("Cache-Control", "no-cache");
@@ -1209,6 +1287,26 @@ Write ONLY the script text, no stage directions or speaker labels.`;
       // Check if this is a workflow trigger
       const lastMessage = messages[messages.length - 1]?.content || '';
       const workflow = getWorkflowByTrigger(lastMessage);
+      
+      // Build selected lead context if provided
+      let leadContextSection = '';
+      if (selectedLead) {
+        leadContextSection = `\n\n## Selected Lead\n\nThe user has selected a lead from their contacts. Use this information when they ask about "this lead", "this person", "them", or request emails/research:\n\n`;
+        leadContextSection += `- **Name:** ${selectedLead.name || 'Unknown'}\n`;
+        leadContextSection += `- **Email:** ${selectedLead.email || 'Not provided'}\n`;
+        if (selectedLead.company) {
+          leadContextSection += `- **Company:** ${selectedLead.company}\n`;
+        }
+        if (selectedLead.data && Object.keys(selectedLead.data).length > 0) {
+          leadContextSection += `- **Additional Info:**\n`;
+          Object.entries(selectedLead.data).forEach(([key, value]) => {
+            if (value && key !== 'name' && key !== 'email' && key !== 'company') {
+              leadContextSection += `  - ${key}: ${value}\n`;
+            }
+          });
+        }
+        leadContextSection += `\nWhen writing emails to this lead, address them by name and use their email address: ${selectedLead.email}\n`;
+      }
       
       // Build source context section if sources are provided
       let sourceContextSection = '';
@@ -1231,8 +1329,8 @@ Write ONLY the script text, no stage directions or speaker labels.`;
       let finalSystemPrompt: string;
       
       if (workflow) {
-        // Workflow-specific prompt with source context appended
-        finalSystemPrompt = workflow.systemPrompt + sourceContextSection;
+        // Workflow-specific prompt with lead and source context appended
+        finalSystemPrompt = workflow.systemPrompt + leadContextSection + sourceContextSection;
       } else if (systemPrompt) {
         finalSystemPrompt = systemPrompt;
       } else {
@@ -1251,7 +1349,7 @@ You help users analyze and work with their sources. When the user asks about the
 - Use markdown formatting (headers, bold, lists, etc.)
 - Structure long responses with clear sections
 - When creating newsletters or content, use professional formatting
-- Cite which sources you're drawing from when relevant${sourceContextSection}`;
+- Cite which sources you're drawing from when relevant${leadContextSection}${sourceContextSection}`;
       }
 
       for await (const token of streamChat(messages, { 

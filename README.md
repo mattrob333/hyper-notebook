@@ -4,8 +4,9 @@ An AI-powered research assistant inspired by Google NotebookLM. Upload sources, 
 
 ## Features
 
-- **Multi-Source Research**: Upload PDFs, add URLs, or paste text as research sources
-- **AI Chat**: Conversational interface to ask questions about your sources
+- **Multi-Source Research**: Upload PDFs, add URLs, paste text, or upload CSV files as research sources
+- **CSV & Lead Management**: Upload CSV contact lists, view as interactive spreadsheets, select leads for AI context
+- **AI Chat**: Conversational interface to ask questions about your sources with lead context injection
 - **Multi-Model Support**: Choose from 15+ AI models via OpenRouter (Claude, GPT-4, Gemini, Llama, Mistral, etc.)
 - **Content Generation**:
   - Study guides
@@ -15,8 +16,8 @@ An AI-powered research assistant inspired by Google NotebookLM. Upload sources, 
   - Mind maps (interactive visualization)
   - Infographics
   - Slide decks
-  - Podcast scripts
-  - Professional emails
+  - Audio overviews (with ElevenLabs TTS)
+  - Professional emails (with lead pre-fill)
 - **A2UI System**: AI can generate interactive UI components directly in chat
 - **Workflow Automation**: Create and save multi-step workflows
 - **Dark Mode**: Beautiful dark theme inspired by NotebookLM
