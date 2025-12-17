@@ -86,6 +86,10 @@ export default function Home() {
     }
   };
 
+  const handleClearMessages = () => {
+    setMessages([]);
+  };
+
   return (
     <div className="h-screen flex flex-col bg-background" data-testid="home-page">
       <Navbar 
@@ -122,6 +126,7 @@ export default function Home() {
                   sources={sources.filter(s => selectedSourceIds.includes(s.id))}
                   messages={messages}
                   onNewMessage={handleNewMessage}
+                  onClearMessages={handleClearMessages}
                   isLoading={isLoading}
                 />
               )}

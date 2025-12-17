@@ -72,6 +72,7 @@ import {
   Image as ImageIconLucide,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { useEmailBuilder } from "@/contexts/EmailBuilderContext";
 
 interface EmailBuilderProps {
   onBack?: () => void;
@@ -286,17 +287,51 @@ const highlightColors = [
 ];
 
 export default function EmailBuilder({ onBack }: EmailBuilderProps) {
+  const [recipientEmail, setRecipientEmail] = useState("");
   const [subject, setSubject] = useState("");
   const [selectedTemplate, setSelectedTemplate] = useState<EmailTemplateWithContent>(EMAIL_TEMPLATES[0]);
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [currentContactIndex, setCurrentContactIndex] = useState(0);
-  const [logoUrl, setLogoUrl] = useState("");
-  const [logoFile, setLogoFile] = useState<string | null>(null);
-  const [senderName, setSenderName] = useState("Your Name");
-  const [senderTitle, setSenderTitle] = useState("Your Title");
-  const [senderCompany, setSenderCompany] = useState("Your Company");
-  const [senderEmail, setSenderEmail] = useState("you@company.com");
-  const [senderPhone, setSenderPhone] = useState("");
+  const [logoUrl, setLogoUrl] = useState(() => {
+    const saved = localStorage.getItem('email-branding');
+    return saved ? JSON.parse(saved).logoUrl || "" : "";
+  });
+  const [customLetterhead, setCustomLetterhead] = useState<string | null>(() => {
+    const saved = localStorage.getItem('email-branding');
+    return saved ? JSON.parse(saved).customLetterhead || null : null;
+  });
+  const [businessUrl, setBusinessUrl] = useState(() => {
+    const saved = localStorage.getItem('email-branding');
+    return saved ? JSON.parse(saved).businessUrl || "" : "";
+  });
+  const [qrCodeImage, setQrCodeImage] = useState<string | null>(() => {
+    const saved = localStorage.getItem('email-branding');
+    return saved ? JSON.parse(saved).qrCodeImage || null : null;
+  });
+  const [logoFile, setLogoFile] = useState<string | null>(() => {
+    const saved = localStorage.getItem('email-branding');
+    return saved ? JSON.parse(saved).logoFile || null : null;
+  });
+  const [senderName, setSenderName] = useState(() => {
+    const saved = localStorage.getItem('email-branding');
+    return saved ? JSON.parse(saved).senderName || "Your Name" : "Your Name";
+  });
+  const [senderTitle, setSenderTitle] = useState(() => {
+    const saved = localStorage.getItem('email-branding');
+    return saved ? JSON.parse(saved).senderTitle || "Your Title" : "Your Title";
+  });
+  const [senderCompany, setSenderCompany] = useState(() => {
+    const saved = localStorage.getItem('email-branding');
+    return saved ? JSON.parse(saved).senderCompany || "Your Company" : "Your Company";
+  });
+  const [senderEmail, setSenderEmail] = useState(() => {
+    const saved = localStorage.getItem('email-branding');
+    return saved ? JSON.parse(saved).senderEmail || "you@company.com" : "you@company.com";
+  });
+  const [senderPhone, setSenderPhone] = useState(() => {
+    const saved = localStorage.getItem('email-branding');
+    return saved ? JSON.parse(saved).senderPhone || "" : "";
+  });
   const [previewMode, setPreviewMode] = useState<'edit' | 'preview' | 'html'>('edit');
   const [isSending, setIsSending] = useState(false);
   const [newsletterTitle, setNewsletterTitle] = useState("Monthly Newsletter");
@@ -304,9 +339,85 @@ export default function EmailBuilder({ onBack }: EmailBuilderProps) {
   const [eventName, setEventName] = useState("Annual Conference 2025");
   const [eventDate, setEventDate] = useState("January 15, 2025");
   const [eventLocation, setEventLocation] = useState("Virtual Event");
+  const [customTemplates, setCustomTemplates] = useState<EmailTemplateWithContent[]>([]);
+  const [editingHtml, setEditingHtml] = useState(false);
+  const [templateHtml, setTemplateHtml] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
   const logoInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
+  
+  // Email builder context for AI integration
+  const emailContext = useEmailBuilder();
+  
+  // Load custom templates from localStorage
+  useEffect(() => {
+    const saved = localStorage.getItem('email-custom-templates');
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        // Restore icon references (they can't be serialized)
+        const restored = parsed.map((t: any) => ({ ...t, icon: FileText }));
+        setCustomTemplates(restored);
+      } catch (e) {
+        console.error('Failed to load custom templates', e);
+      }
+    }
+  }, []);
+  
+  // Save custom templates to localStorage
+  const saveCustomTemplates = (templates: EmailTemplateWithContent[]) => {
+    setCustomTemplates(templates);
+    // Remove icon before saving (can't serialize React components)
+    const toSave = templates.map(({ icon, ...rest }) => rest);
+    localStorage.setItem('email-custom-templates', JSON.stringify(toSave));
+  };
+  
+  // Save branding/signature settings to localStorage
+  const saveBrandingSettings = () => {
+    const branding = {
+      logoUrl,
+      logoFile,
+      customLetterhead,
+      businessUrl,
+      qrCodeImage,
+      senderName,
+      senderTitle,
+      senderCompany,
+      senderEmail,
+      senderPhone,
+    };
+    localStorage.setItem('email-branding', JSON.stringify(branding));
+    toast({ title: 'Settings saved!', description: 'Your branding and signature settings have been saved' });
+  };
+  
+  const handleSaveAsTemplate = () => {
+    const name = prompt('Enter a name for your custom template:');
+    if (!name) return;
+    
+    const newTemplate: EmailTemplateWithContent = {
+      id: `custom-${Date.now()}`,
+      name,
+      icon: FileText,
+      category: 'business',
+      letterhead: customLetterhead 
+        ? `<div style="text-align: center;"><img src="${customLetterhead}" alt="Letterhead" style="max-width: 100%; height: auto;" /></div>`
+        : selectedTemplate.letterhead,
+      signature: selectedTemplate.signature,
+      defaultContent: editor?.getHTML() || '',
+    };
+    
+    saveCustomTemplates([...customTemplates, newTemplate]);
+    toast({ title: 'Template saved!', description: `"${name}" has been saved to your custom templates` });
+  };
+  
+  const handleDeleteCustomTemplate = (templateId: string) => {
+    const updated = customTemplates.filter(t => t.id !== templateId);
+    saveCustomTemplates(updated);
+    toast({ title: 'Template deleted' });
+  };
+  
+  // Combined templates list
+  const allTemplates = [...EMAIL_TEMPLATES, ...customTemplates];
 
   const editor = useEditor({
     extensions: [
@@ -349,11 +460,60 @@ export default function EmailBuilder({ onBack }: EmailBuilderProps) {
 
   const currentContact = contacts[currentContactIndex] || null;
 
+  // Set email mode on mount/unmount
+  useEffect(() => {
+    emailContext.setIsEmailMode(true);
+    return () => {
+      emailContext.setIsEmailMode(false);
+      emailContext.setInjectContent(null);
+    };
+  }, []);
+  
+  // Update context with current state (no toast here)
+  useEffect(() => {
+    emailContext.setCurrentTemplate(selectedTemplate.name);
+    emailContext.setCompanyName(senderCompany);
+    emailContext.setContacts(contacts);
+  }, [selectedTemplate.name, senderCompany, contacts]);
+  
+  // Register content injection function (only when editor is ready)
+  useEffect(() => {
+    if (!editor) return;
+    
+    const injectFn = (content: string, subjectLine?: string) => {
+      editor.commands.setContent(content);
+      setPreviewMode('edit');
+      toast({ title: 'Content received', description: 'AI-generated content added to editor' });
+      if (subjectLine) {
+        setSubject(subjectLine);
+      }
+    };
+    emailContext.setInjectContent(injectFn);
+  }, [editor]);
+  
+  // Handle pending content from chat (runs once when there's pending content)
+  useEffect(() => {
+    if (emailContext.pendingContent && editor) {
+      editor.commands.setContent(emailContext.pendingContent.content);
+      setPreviewMode('edit');
+      toast({ title: 'Content received', description: 'AI-generated content added to editor' });
+      if (emailContext.pendingContent.subject) {
+        setSubject(emailContext.pendingContent.subject);
+      }
+      emailContext.clearPendingContent();
+    }
+  }, [emailContext.pendingContent, editor]);
+
   // Get the effective logo (file upload takes priority over URL)
   const effectiveLogo = logoFile || logoUrl;
   const logoHtml = effectiveLogo 
-    ? `<img src="${effectiveLogo}" alt="Logo" style="max-height: 60px; max-width: 200px; margin-bottom: 10px;" />`
+    ? `<img src="${effectiveLogo}" alt="Logo" style="max-height: 80px; max-width: 250px; margin-bottom: 10px;" />`
     : '';
+  
+  // Get the effective letterhead (custom letterhead replaces template header)
+  const effectiveLetterhead = customLetterhead 
+    ? `<div style="width: 100%;"><img src="${customLetterhead}" alt="Letterhead" style="width: 100%; display: block;" /></div>`
+    : selectedTemplate.letterhead;
 
   const replaceVariables = (text: string): string => {
     let result = text;
@@ -520,8 +680,22 @@ export default function EmailBuilder({ onBack }: EmailBuilderProps) {
   const generateFullHtml = useCallback(() => {
     if (!editor) return '';
     const bodyHtml = replaceVariables(editor.getHTML());
-    const letterhead = replaceVariables(selectedTemplate.letterhead);
-    const signature = replaceVariables(selectedTemplate.signature);
+    
+    // Use custom letterhead if uploaded, otherwise use template default
+    const letterhead = customLetterhead 
+      ? `<div style="text-align: center;"><img src="${customLetterhead}" alt="Letterhead" style="max-width: 100%; height: auto;" /></div>`
+      : replaceVariables(selectedTemplate.letterhead);
+    
+    // Build enhanced footer with QR code and business URL
+    let footerHtml = replaceVariables(selectedTemplate.signature);
+    if (businessUrl || qrCodeImage) {
+      footerHtml += `
+        <div style="border-top: 1px solid #e5e7eb; margin-top: 20px; padding-top: 20px; text-align: center;">
+          ${qrCodeImage ? `<img src="${qrCodeImage}" alt="QR Code" style="width: 80px; height: 80px; margin-bottom: 10px;" />` : ''}
+          ${businessUrl ? `<p style="margin: 0; font-size: 12px;"><a href="${businessUrl}" style="color: #3b82f6;">${businessUrl}</a></p>` : ''}
+        </div>
+      `;
+    }
     
     return `<!DOCTYPE html>
 <html>
@@ -540,11 +714,11 @@ export default function EmailBuilder({ onBack }: EmailBuilderProps) {
     <div class="email-body">
       ${bodyHtml}
     </div>
-    ${signature}
+    ${footerHtml}
   </div>
 </body>
 </html>`;
-  }, [editor, selectedTemplate, subject, replaceVariables]);
+  }, [editor, selectedTemplate, subject, replaceVariables, customLetterhead, businessUrl, qrCodeImage]);
 
   const handleExport = () => {
     const fullHtml = generateFullHtml();
@@ -646,8 +820,8 @@ export default function EmailBuilder({ onBack }: EmailBuilderProps) {
       </div>
 
       <div className="flex-1 flex flex-col overflow-hidden">
-        <Tabs defaultValue="compose" className="flex-1 flex flex-col">
-          <TabsList className="mx-3 mt-2 rounded-lg bg-muted/50">
+        <Tabs defaultValue="compose" className="flex-1 flex flex-col min-h-0">
+          <TabsList className="mx-3 mt-2 rounded-lg bg-muted/50 shrink-0">
             <TabsTrigger value="compose" className="flex-1 text-xs rounded-md" data-testid="tab-compose">
               Compose
             </TabsTrigger>
@@ -662,16 +836,29 @@ export default function EmailBuilder({ onBack }: EmailBuilderProps) {
             </TabsTrigger>
           </TabsList>
 
-          <TabsContent value="compose" className="flex-1 flex flex-col mt-0 overflow-hidden">
-            {/* Subject line - always visible */}
-            <div className="p-3 border-b border-border/50">
-              <Input
-                placeholder="Email subject..."
-                value={subject}
-                onChange={(e) => setSubject(e.target.value)}
-                className="rounded-md"
-                data-testid="input-email-subject"
-              />
+          <TabsContent value="compose" className="flex-1 flex flex-col mt-0 overflow-hidden data-[state=inactive]:hidden">
+            {/* To and Subject fields - always visible */}
+            <div className="p-3 border-b border-border/50 space-y-2">
+              <div className="flex items-center gap-2">
+                <Label className="text-xs text-muted-foreground w-12">To:</Label>
+                <Input
+                  placeholder="recipient@email.com"
+                  value={recipientEmail}
+                  onChange={(e) => setRecipientEmail(e.target.value)}
+                  className="rounded-md flex-1"
+                  data-testid="input-recipient-email"
+                />
+              </div>
+              <div className="flex items-center gap-2">
+                <Label className="text-xs text-muted-foreground w-12">Subject:</Label>
+                <Input
+                  placeholder="Email subject..."
+                  value={subject}
+                  onChange={(e) => setSubject(e.target.value)}
+                  className="rounded-md flex-1"
+                  data-testid="input-email-subject"
+                />
+              </div>
             </div>
 
             {/* Edit mode - show toolbar and editor */}
@@ -773,7 +960,7 @@ export default function EmailBuilder({ onBack }: EmailBuilderProps) {
                 <div className="bg-background rounded-lg border border-border/50 overflow-hidden">
                   <div 
                     className="border-b border-border/30"
-                    dangerouslySetInnerHTML={{ __html: replaceVariables(selectedTemplate.letterhead) }}
+                    dangerouslySetInnerHTML={{ __html: replaceVariables(effectiveLetterhead) }}
                   />
                   <EditorContent editor={editor} data-testid="editor-email-body" />
                   <div 
@@ -792,7 +979,7 @@ export default function EmailBuilder({ onBack }: EmailBuilderProps) {
                 <div className="p-4">
                   <div className="bg-white text-black rounded-lg border shadow-lg overflow-hidden max-w-[600px] mx-auto">
                     <div 
-                      dangerouslySetInnerHTML={{ __html: replaceVariables(selectedTemplate.letterhead) }}
+                      dangerouslySetInnerHTML={{ __html: replaceVariables(effectiveLetterhead) }}
                     />
                     <div className="p-6">
                       <div 
@@ -837,7 +1024,7 @@ export default function EmailBuilder({ onBack }: EmailBuilderProps) {
             )}
           </TabsContent>
 
-          <TabsContent value="templates" className="flex-1 overflow-hidden mt-0">
+          <TabsContent value="templates" className="flex-1 overflow-hidden mt-0 data-[state=inactive]:hidden">
             <div className="flex h-full">
               {/* Template List - Left Side */}
               <div className="w-1/3 min-w-[200px] border-r border-border/50 overflow-auto p-3">
@@ -873,7 +1060,7 @@ export default function EmailBuilder({ onBack }: EmailBuilderProps) {
                 </div>
 
                 {/* Marketing Templates */}
-                <div>
+                <div className="mb-4">
                   <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
                     📣 Marketing
                   </h4>
@@ -900,6 +1087,60 @@ export default function EmailBuilder({ onBack }: EmailBuilderProps) {
                     })}
                   </div>
                 </div>
+
+                {/* Custom Templates */}
+                {customTemplates.length > 0 && (
+                  <div className="mb-4">
+                    <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
+                      ⭐ My Templates
+                    </h4>
+                    <div className="space-y-1">
+                      {customTemplates.map((template) => {
+                        const Icon = template.icon;
+                        return (
+                          <div
+                            key={template.id}
+                            className={`p-2 rounded-lg cursor-pointer transition-all flex items-center gap-2 group ${
+                              selectedTemplate.id === template.id 
+                                ? 'bg-primary/10 ring-1 ring-primary' 
+                                : 'hover:bg-muted/50'
+                            }`}
+                            onClick={() => setSelectedTemplate(template)}
+                            data-testid={`template-${template.id}`}
+                          >
+                            <div className={`p-1.5 rounded ${selectedTemplate.id === template.id ? 'bg-primary/20' : 'bg-amber-500/10'}`}>
+                              <Icon className={`w-3.5 h-3.5 ${selectedTemplate.id === template.id ? 'text-primary' : 'text-amber-500'}`} />
+                            </div>
+                            <span className="text-sm flex-1">{template.name}</span>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDeleteCustomTemplate(template.id);
+                              }}
+                            >
+                              <Trash2 className="w-3 h-3 text-destructive" />
+                            </Button>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {/* Save Current as Template */}
+                <Separator className="my-3" />
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="w-full gap-2"
+                  onClick={handleSaveAsTemplate}
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  Save Current as Template
+                </Button>
               </div>
 
               {/* Template Preview - Right Side */}
@@ -928,7 +1169,7 @@ export default function EmailBuilder({ onBack }: EmailBuilderProps) {
                 </div>
                 <div className="bg-white text-black rounded-lg border shadow-md overflow-hidden max-w-[500px]">
                   <div 
-                    dangerouslySetInnerHTML={{ __html: replaceVariables(selectedTemplate.letterhead) }}
+                    dangerouslySetInnerHTML={{ __html: replaceVariables(effectiveLetterhead) }}
                   />
                   <div className="p-4">
                     <div 
@@ -944,7 +1185,7 @@ export default function EmailBuilder({ onBack }: EmailBuilderProps) {
             </div>
           </TabsContent>
 
-          <TabsContent value="contacts" className="flex-1 overflow-auto p-3 mt-0">
+          <TabsContent value="contacts" className="flex-1 overflow-auto p-3 mt-0 data-[state=inactive]:hidden">
             <div className="space-y-4">
               <div>
                 <Label className="text-xs text-muted-foreground">Upload Contacts CSV</Label>
@@ -1017,7 +1258,7 @@ export default function EmailBuilder({ onBack }: EmailBuilderProps) {
             </div>
           </TabsContent>
 
-          <TabsContent value="signature" className="flex-1 overflow-auto p-3 mt-0">
+          <TabsContent value="signature" className="flex-1 overflow-auto p-3 mt-0 data-[state=inactive]:hidden">
             <ScrollArea className="h-full">
               <div className="space-y-4">
                 <p className="text-xs text-muted-foreground">Configure your branding and signature</p>
@@ -1210,6 +1451,157 @@ export default function EmailBuilder({ onBack }: EmailBuilderProps) {
                     </div>
                   </>
                 )}
+
+                <Separator />
+
+                {/* Custom Letterhead Banner */}
+                <div className="space-y-2">
+                  <Label className="text-xs font-semibold">Custom Letterhead Banner</Label>
+                  <p className="text-xs text-muted-foreground">
+                    Upload a custom header image (e.g., from Canva) to replace the default template header
+                  </p>
+                  <div className="border-2 border-dashed border-border rounded-lg p-4 text-center">
+                    {customLetterhead ? (
+                      <div className="space-y-3">
+                        <img 
+                          src={customLetterhead} 
+                          alt="Letterhead preview" 
+                          className="max-h-24 max-w-full mx-auto object-contain rounded"
+                        />
+                        <div className="flex items-center justify-center gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              const input = document.createElement('input');
+                              input.type = 'file';
+                              input.accept = 'image/*';
+                              input.onchange = (e) => {
+                                const file = (e.target as HTMLInputElement).files?.[0];
+                                if (file) {
+                                  const reader = new FileReader();
+                                  reader.onload = (e) => setCustomLetterhead(e.target?.result as string);
+                                  reader.readAsDataURL(file);
+                                }
+                              };
+                              input.click();
+                            }}
+                          >
+                            Change
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setCustomLetterhead(null)}
+                          >
+                            <Trash2 className="w-4 h-4 mr-1" />
+                            Remove
+                          </Button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div 
+                        className="cursor-pointer py-4"
+                        onClick={() => {
+                          const input = document.createElement('input');
+                          input.type = 'file';
+                          input.accept = 'image/*';
+                          input.onchange = (e) => {
+                            const file = (e.target as HTMLInputElement).files?.[0];
+                            if (file) {
+                              if (file.size > 5 * 1024 * 1024) {
+                                toast({ title: 'File too large', description: 'Please use an image under 5MB', variant: 'destructive' });
+                                return;
+                              }
+                              const reader = new FileReader();
+                              reader.onload = (e) => setCustomLetterhead(e.target?.result as string);
+                              reader.readAsDataURL(file);
+                            }
+                          };
+                          input.click();
+                        }}
+                      >
+                        <ImageIconLucide className="w-10 h-10 mx-auto text-muted-foreground mb-2" />
+                        <p className="text-sm font-medium">Upload letterhead banner</p>
+                        <p className="text-xs text-muted-foreground">Recommended: 600px wide, PNG or JPG</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <Separator />
+
+                {/* Footer Section */}
+                <div className="space-y-3">
+                  <Label className="text-xs font-semibold">Footer & Links</Label>
+                  
+                  <div className="space-y-1">
+                    <Label className="text-xs text-muted-foreground">Business Website URL</Label>
+                    <Input
+                      placeholder="https://yourcompany.com"
+                      value={businessUrl}
+                      onChange={(e) => setBusinessUrl(e.target.value)}
+                      className="text-sm"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label className="text-xs text-muted-foreground">QR Code (optional)</Label>
+                    <div className="border-2 border-dashed border-border rounded-lg p-3 text-center">
+                      {qrCodeImage ? (
+                        <div className="space-y-2">
+                          <img 
+                            src={qrCodeImage} 
+                            alt="QR Code" 
+                            className="w-20 h-20 mx-auto object-contain"
+                          />
+                          <div className="flex items-center justify-center gap-2">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => setQrCodeImage(null)}
+                            >
+                              <Trash2 className="w-4 h-4 mr-1" />
+                              Remove
+                            </Button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div 
+                          className="cursor-pointer py-2"
+                          onClick={() => {
+                            const input = document.createElement('input');
+                            input.type = 'file';
+                            input.accept = 'image/*';
+                            input.onchange = (e) => {
+                              const file = (e.target as HTMLInputElement).files?.[0];
+                              if (file) {
+                                const reader = new FileReader();
+                                reader.onload = (e) => setQrCodeImage(e.target?.result as string);
+                                reader.readAsDataURL(file);
+                              }
+                            };
+                            input.click();
+                          }}
+                        >
+                          <Plus className="w-6 h-6 mx-auto text-muted-foreground mb-1" />
+                          <p className="text-xs">Upload QR code</p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Save Button */}
+                <div className="pt-4">
+                  <Button 
+                    onClick={saveBrandingSettings}
+                    className="w-full"
+                  >
+                    <Save className="w-4 h-4 mr-2" />
+                    Save Branding Settings
+                  </Button>
+                </div>
               </div>
             </ScrollArea>
           </TabsContent>

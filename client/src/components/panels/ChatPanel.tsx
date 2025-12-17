@@ -4,6 +4,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Card } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import {
   Select,
   SelectContent,
@@ -13,12 +14,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Send, Paperclip, Loader2, Bot, User, Sparkles, ThumbsUp, ThumbsDown, Copy, Pin, Plus, SlidersHorizontal, History, ChevronDown, ArrowUp } from "lucide-react";
+import { Send, Paperclip, Loader2, Bot, User, Sparkles, ThumbsUp, ThumbsDown, Copy, Pin, Plus, SlidersHorizontal, History, ChevronDown, ArrowUp, Mail, Users, Trash2 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import A2UIRenderer from "../a2ui/A2UIRenderer";
 import type { ChatMessage, Source, A2UIComponent } from "@/lib/types";
 import { apiRequest } from "@/lib/queryClient";
 import { useQuery } from "@tanstack/react-query";
+import { useEmailBuilder } from "@/contexts/EmailBuilderContext";
+import { useToast } from "@/hooks/use-toast";
 
 interface SourceSummary {
   id: string;
@@ -46,6 +49,7 @@ interface ChatPanelProps {
   sources: Source[];
   messages: ChatMessage[];
   onNewMessage: (message: string, response?: string, a2uiComponents?: A2UIComponent[]) => void;
+  onClearMessages?: () => void;
   isLoading?: boolean;
   sourceSummaries?: SourceSummary[];
 }
@@ -148,6 +152,7 @@ export default function ChatPanel({
   sources,
   messages,
   onNewMessage,
+  onClearMessages,
   isLoading: externalLoading,
   sourceSummaries
 }: ChatPanelProps) {
@@ -159,6 +164,81 @@ export default function ChatPanel({
   const scrollRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
+  
+  // Email builder context for AI integration
+  const emailContext = useEmailBuilder();
+  const { toast } = useToast();
+  
+  // Convert markdown to HTML for email builder
+  const markdownToHtml = (markdown: string): string => {
+    // Split into lines for processing
+    const lines = markdown.split('\n');
+    const htmlParts: string[] = [];
+    let inList = false;
+    
+    for (let i = 0; i < lines.length; i++) {
+      let line = lines[i].trim();
+      if (!line) continue; // Skip empty lines
+      
+      // Headers
+      if (line.startsWith('### ')) {
+        if (inList) { htmlParts.push('</ul>'); inList = false; }
+        htmlParts.push(`<h3>${line.slice(4)}</h3>`);
+      } else if (line.startsWith('## ')) {
+        if (inList) { htmlParts.push('</ul>'); inList = false; }
+        htmlParts.push(`<h2>${line.slice(3)}</h2>`);
+      } else if (line.startsWith('# ')) {
+        if (inList) { htmlParts.push('</ul>'); inList = false; }
+        htmlParts.push(`<h1>${line.slice(2)}</h1>`);
+      }
+      // List items
+      else if (line.startsWith('- ') || line.startsWith('• ') || line.startsWith('* ')) {
+        if (!inList) { htmlParts.push('<ul>'); inList = true; }
+        const content = line.slice(2);
+        htmlParts.push(`<li>${content}</li>`);
+      }
+      // Horizontal rule
+      else if (line === '---' || line === '***') {
+        if (inList) { htmlParts.push('</ul>'); inList = false; }
+        htmlParts.push('<hr>');
+      }
+      // Regular paragraph
+      else {
+        if (inList) { htmlParts.push('</ul>'); inList = false; }
+        htmlParts.push(`<p>${line}</p>`);
+      }
+    }
+    
+    if (inList) htmlParts.push('</ul>');
+    
+    // Apply inline formatting
+    let html = htmlParts.join('')
+      .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+      .replace(/\*(.+?)\*/g, '<em>$1</em>')
+      .replace(/`(.+?)`/g, '<code>$1</code>');
+    
+    return html;
+  };
+  
+  const handleSendToEmailBuilder = (content: string) => {
+    // Parse subject line if present (format: "**Subject:** ..." or "Subject: ...")
+    let subject: string | undefined;
+    let body = content;
+    
+    const subjectMatch = content.match(/^\*?\*?Subject:\*?\*?\s*(.+?)(?:\n|$)/im);
+    if (subjectMatch) {
+      subject = subjectMatch[1].trim();
+      // Remove subject line from body
+      body = content.replace(/^\*?\*?Subject:\*?\*?\s*.+?(?:\n|$)/im, '').trim();
+    }
+    
+    const htmlContent = markdownToHtml(body);
+    emailContext.sendToEmailBuilder(htmlContent, subject);
+    toast({
+      title: 'Sent to Email Builder',
+      description: subject ? 'Subject and body added to email' : 'Content has been sent to the email editor',
+    });
+  };
 
   // Fetch available models
   const { data: modelsData } = useQuery<ModelsResponse>({
@@ -210,10 +290,46 @@ export default function ChatPanel({
         currentConversationId = await createConversation();
       }
 
-      const chatMessages = [
-        ...messages.map(m => ({ role: m.role, content: m.content })),
-        { role: 'user' as const, content: userMessage }
-      ];
+      // Build chat messages with email mode context if active
+      const chatMessages: Array<{ role: 'system' | 'user' | 'assistant', content: string }> = [];
+      
+      // Add email mode system context
+      if (emailContext.isEmailMode) {
+        chatMessages.push({
+          role: 'system',
+          content: `You are helping write email content. The user is in the Email Builder creating emails with pre-designed templates that already have a letterhead/header and signature/footer.
+
+FORMAT YOUR RESPONSE EXACTLY LIKE THIS:
+**Subject:** [Write a compelling subject line here]
+
+[Then write the email body content here]
+
+IMPORTANT RULES:
+- Always start with "**Subject:** " followed by your subject line
+- Then add a blank line and write the body content
+- Do NOT include To/From/Date lines (the UI handles this)
+- Do NOT include signature or closing (the template has this)
+- Do NOT use markdown tables (use simple lists instead)
+
+Write clean, professional body content that flows naturally. Use:
+- Short paragraphs for readability
+- Bullet points for lists (use - or •)
+- Bold (**text**) for emphasis
+- Simple section headers (## Header) only if needed for long content
+
+Start the body with a greeting (e.g., "Dear [Name],") or dive into content.
+End before the signature - the user's signature is already in the template.
+
+Current context:
+- Template type: ${emailContext.currentTemplate}
+- Company: ${emailContext.companyName}
+${emailContext.contacts.length > 0 ? `- Recipients loaded: ${emailContext.contacts.length} contacts` : ''}`
+        });
+      }
+      
+      // Add conversation history
+      chatMessages.push(...messages.map(m => ({ role: m.role as 'user' | 'assistant', content: m.content })));
+      chatMessages.push({ role: 'user' as const, content: userMessage });
 
       abortControllerRef.current = new AbortController();
 
@@ -239,6 +355,7 @@ export default function ChatPanel({
 
       const decoder = new TextDecoder();
       let fullContent = '';
+      let messageHandled = false;
 
       while (true) {
         const { done, value } = await reader.read();
@@ -254,10 +371,11 @@ export default function ChatPanel({
               if (data.type === 'token' && data.token) {
                 fullContent += data.token;
                 setStreamingContent(fullContent);
-              } else if (data.type === 'done') {
+              } else if (data.type === 'done' && !messageHandled) {
                 const a2uiComponents = parseA2UIComponents(fullContent);
                 onNewMessage(userMessage, fullContent, a2uiComponents);
                 setStreamingContent('');
+                messageHandled = true;
               }
             } catch {
               // Skip invalid JSON
@@ -266,7 +384,8 @@ export default function ChatPanel({
         }
       }
 
-      if (fullContent && !streamingContent) {
+      // Fallback: only add message if not already handled
+      if (fullContent && !messageHandled) {
         const a2uiComponents = parseA2UIComponents(fullContent);
         onNewMessage(userMessage, fullContent, a2uiComponents);
       }
@@ -323,6 +442,22 @@ export default function ChatPanel({
             {sources.length} source{sources.length !== 1 ? 's' : ''}
           </span>
         </div>
+        {messages.length > 0 && onClearMessages && (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="text-xs text-muted-foreground hover:text-foreground"
+            onClick={() => {
+              onClearMessages();
+              setConversationId(null);
+              setStreamingContent('');
+            }}
+            data-testid="button-clear-chat"
+          >
+            <Trash2 className="w-3.5 h-3.5 mr-1" />
+            Clear
+          </Button>
+        )}
       </div>
 
       <ScrollArea className="flex-1 px-4" ref={scrollRef} data-testid="scroll-messages">
@@ -408,12 +543,33 @@ export default function ChatPanel({
                           <Button variant="ghost" size="icon" className="h-7 w-7" data-testid={`button-thumbsdown-${message.id}`}>
                             <ThumbsDown className="w-3.5 h-3.5" />
                           </Button>
-                          <Button variant="ghost" size="icon" className="h-7 w-7" data-testid={`button-copy-${message.id}`}>
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            className="h-7 w-7" 
+                            data-testid={`button-copy-${message.id}`}
+                            onClick={() => {
+                              navigator.clipboard.writeText(message.content);
+                              toast({ title: 'Copied', description: 'Message copied to clipboard' });
+                            }}
+                          >
                             <Copy className="w-3.5 h-3.5" />
                           </Button>
                           <Button variant="ghost" size="icon" className="h-7 w-7" data-testid={`button-pin-${message.id}`}>
                             <Pin className="w-3.5 h-3.5" />
                           </Button>
+                          {emailContext.isEmailMode && (
+                            <Button 
+                              variant="ghost" 
+                              size="sm" 
+                              className="h-7 px-2 gap-1 text-xs text-blue-500 hover:text-blue-600 hover:bg-blue-500/10" 
+                              data-testid={`button-send-to-email-${message.id}`}
+                              onClick={() => handleSendToEmailBuilder(message.content)}
+                            >
+                              <Mail className="w-3.5 h-3.5" />
+                              Send to Email
+                            </Button>
+                          )}
                         </div>
                         <p className="text-xs text-muted-foreground mt-1" data-testid={`text-timestamp-${message.id}`}>
                           {message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
