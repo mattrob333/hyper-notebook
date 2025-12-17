@@ -1,13 +1,15 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
 import {
@@ -69,12 +71,22 @@ export default function CustomizeSlideDeckModal({
   const [language, setLanguage] = useState('en');
   const [length, setLength] = useState('default');
   const [description, setDescription] = useState('');
+  const [slideSelectedSources, setSlideSelectedSources] = useState<string[]>([]);
   
   const { toast } = useToast();
   
   const { data: sources = [] } = useQuery<Source[]>({
     queryKey: ['/api/sources'],
   });
+
+  // Initialize selected sources when modal opens
+  useEffect(() => {
+    if (open && sources.length > 0) {
+      setSlideSelectedSources(
+        selectedSourceIds.length > 0 ? selectedSourceIds : sources.map(s => s.id)
+      );
+    }
+  }, [open, sources, selectedSourceIds]);
   
   const generateMutation = useMutation({
     mutationFn: async (params: {
@@ -151,21 +163,17 @@ Generate a polished, professional presentation.`;
   };
   
   const handleGenerate = () => {
-    const idsToUse = selectedSourceIds.length > 0 
-      ? selectedSourceIds 
-      : sources.map(s => s.id);
-    
-    if (idsToUse.length === 0) {
+    if (slideSelectedSources.length === 0) {
       toast({
-        title: 'No Sources',
-        description: 'Please add sources before generating a slide deck.',
+        title: 'No Sources Selected',
+        description: 'Please select at least one source.',
         variant: 'destructive'
       });
       return;
     }
     
     generateMutation.mutate({
-      sourceIds: idsToUse,
+      sourceIds: slideSelectedSources,
       format,
       language,
       length,
@@ -177,38 +185,84 @@ Generate a polished, professional presentation.`;
     setDescription('');
     onOpenChange(false);
   };
-  
-  const sourceCount = selectedSourceIds.length > 0 ? selectedSourceIds.length : sources.length;
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="max-w-xl rounded-2xl">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2 text-lg">
-            <Presentation className="w-5 h-5 text-emerald-500" />
-            Customize Slide Deck
+      <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
+        <DialogHeader className="pb-4 border-b">
+          <DialogTitle className="flex items-center gap-3 text-lg">
+            <div className="p-2 rounded-lg bg-emerald-500/10">
+              <Presentation className="w-5 h-5 text-emerald-500" />
+            </div>
+            Create Slide Deck
           </DialogTitle>
+          <DialogDescription>
+            Generate a professional presentation from your sources
+          </DialogDescription>
         </DialogHeader>
         
-        <div className="space-y-5 py-2">
+        <div className="py-4 space-y-5">
+          {/* Source Selection */}
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <Label className="text-sm font-medium">Sources to Include</Label>
+              <button
+                type="button"
+                className="text-xs text-primary hover:underline"
+                onClick={() => {
+                  if (slideSelectedSources.length === sources.length) {
+                    setSlideSelectedSources([]);
+                  } else {
+                    setSlideSelectedSources(sources.map(s => s.id));
+                  }
+                }}
+              >
+                {slideSelectedSources.length === sources.length ? 'Deselect All' : 'Select All'}
+              </button>
+            </div>
+            <div className="max-h-[160px] overflow-y-auto rounded-lg border bg-muted/30">
+              {sources.map((source, idx) => (
+                <label
+                  key={source.id}
+                  className={`flex items-center gap-3 px-3 py-2.5 cursor-pointer hover:bg-muted/50 transition-colors ${idx !== sources.length - 1 ? 'border-b border-border/50' : ''}`}
+                >
+                  <Checkbox
+                    checked={slideSelectedSources.includes(source.id)}
+                    onCheckedChange={(checked) => {
+                      setSlideSelectedSources(prev =>
+                        checked
+                          ? [...prev, source.id]
+                          : prev.filter(id => id !== source.id)
+                      );
+                    }}
+                  />
+                  <span className="text-sm flex-1 truncate">{source.name}</span>
+                </label>
+              ))}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              {slideSelectedSources.length} of {sources.length} sources selected
+            </p>
+          </div>
+
           {/* Format Selection */}
           <div className="space-y-2">
-            <Label>Format</Label>
+            <Label className="text-sm font-medium">Presentation Style</Label>
             <div className="grid grid-cols-2 gap-3">
               {FORMATS.map((fmt) => (
                 <button
                   key={fmt.value}
                   onClick={() => setFormat(fmt.value)}
-                  className={`p-4 rounded-lg border text-left transition-all ${
+                  className={`p-3 rounded-lg border text-left transition-all ${
                     format === fmt.value
-                      ? 'border-primary bg-primary/5 ring-1 ring-primary'
-                      : 'border-border hover:border-primary/50'
+                      ? 'border-emerald-500 bg-emerald-500/5 ring-1 ring-emerald-500'
+                      : 'border-border hover:border-emerald-500/50'
                   }`}
                 >
                   <div className="flex items-center gap-2 mb-1">
                     <span className="font-medium text-sm">{fmt.label}</span>
                     {format === fmt.value && (
-                      <Check className="w-4 h-4 text-primary" />
+                      <Check className="w-4 h-4 text-emerald-500" />
                     )}
                   </div>
                   <p className="text-xs text-muted-foreground line-clamp-2">
@@ -222,7 +276,7 @@ Generate a polished, professional presentation.`;
           {/* Language and Length Row */}
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label>Choose language</Label>
+              <Label className="text-sm font-medium">Language</Label>
               <Select value={language} onValueChange={setLanguage}>
                 <SelectTrigger className="rounded-lg">
                   <SelectValue placeholder="Select language" />
@@ -238,7 +292,7 @@ Generate a polished, professional presentation.`;
             </div>
             
             <div className="space-y-2">
-              <Label>Length</Label>
+              <Label className="text-sm font-medium">Length</Label>
               <div className="flex rounded-lg border overflow-hidden">
                 {LENGTHS.map((len) => (
                   <button
@@ -246,11 +300,10 @@ Generate a polished, professional presentation.`;
                     onClick={() => setLength(len.value)}
                     className={`flex-1 px-3 py-2 text-sm font-medium transition-colors ${
                       length === len.value
-                        ? 'bg-primary text-primary-foreground'
+                        ? 'bg-emerald-600 text-white'
                         : 'bg-background hover:bg-muted'
                     }`}
                   >
-                    {length === len.value && '✓ '}
                     {len.label}
                   </button>
                 ))}
@@ -260,31 +313,26 @@ Generate a polished, professional presentation.`;
           
           {/* Description */}
           <div className="space-y-2">
-            <Label>Describe the slide deck you want to create</Label>
+            <Label className="text-sm font-medium">
+              Topic Focus <span className="text-muted-foreground font-normal">(optional)</span>
+            </Label>
             <Textarea
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              placeholder='Add a high-level outline, or guide the audience, style, and focus: "Create a deck for beginners using a bold and playful style with a focus on step-by-step instructions."'
-              className="rounded-lg min-h-[100px] resize-none"
+              placeholder="What should the presentation focus on? e.g., Key insights for executives, step-by-step tutorial..."
+              className="rounded-lg min-h-[80px] resize-none"
             />
-          </div>
-          
-          {/* Source Count */}
-          <div className="p-3 bg-muted/50 rounded-lg text-sm">
-            <span className="text-muted-foreground">Using </span>
-            <span className="font-medium">{sourceCount}</span>
-            <span className="text-muted-foreground"> source(s) for generation</span>
           </div>
         </div>
         
-        <DialogFooter className="gap-2">
+        <DialogFooter className="pt-4 border-t gap-2 sm:gap-2">
           <Button variant="outline" onClick={handleClose}>
             Cancel
           </Button>
           <Button 
             onClick={handleGenerate}
-            disabled={generateMutation.isPending}
-            className="gap-2 bg-primary"
+            disabled={generateMutation.isPending || slideSelectedSources.length === 0}
+            className="gap-2 bg-emerald-600 hover:bg-emerald-700"
           >
             {generateMutation.isPending ? (
               <>
@@ -293,8 +341,8 @@ Generate a polished, professional presentation.`;
               </>
             ) : (
               <>
-                <Sparkles className="w-4 h-4" />
-                Generate
+                <Presentation className="w-4 h-4" />
+                Generate Slides
               </>
             )}
           </Button>

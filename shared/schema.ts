@@ -107,7 +107,7 @@ export const insertMessageSchema = createInsertSchema(messages).omit({ id: true,
   role: z.enum(['user', 'assistant', 'system']),
   a2uiComponents: z.array(z.object({
     id: z.string(),
-    type: z.enum(['card', 'chart', 'table', 'list', 'code', 'quote', 'image', 'accordion', 'tabs', 'progress', 'badge', 'button', 'link', 'mindmap', 'timeline', 'slides']),
+    type: z.enum(['card', 'chart', 'table', 'list', 'code', 'quote', 'image', 'accordion', 'tabs', 'progress', 'badge', 'button', 'link', 'mindmap', 'timeline', 'slides', 'audio_transcript']),
     parentId: z.string().optional(),
     properties: z.record(z.any()),
     data: z.any().optional(),
@@ -168,7 +168,7 @@ export interface WorkflowStep {
 
 export interface A2UIComponent {
   id: string;
-  type: 'card' | 'chart' | 'table' | 'list' | 'code' | 'quote' | 'image' | 'accordion' | 'tabs' | 'progress' | 'badge' | 'button' | 'link' | 'mindmap' | 'timeline' | 'slides';
+  type: 'card' | 'chart' | 'table' | 'list' | 'code' | 'quote' | 'image' | 'accordion' | 'tabs' | 'progress' | 'badge' | 'button' | 'link' | 'mindmap' | 'timeline' | 'slides' | 'audio_transcript';
   parentId?: string;
   properties: Record<string, any>;
   data?: any;

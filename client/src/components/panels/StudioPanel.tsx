@@ -202,6 +202,11 @@ export default function StudioPanel({
   const [configModel, setConfigModel] = useState('gemini-2.5-pro');
   const [configPrompt, setConfigPrompt] = useState('');
 
+  // Audio Overview modal state
+  const [audioModalOpen, setAudioModalOpen] = useState(false);
+  const [audioInstructions, setAudioInstructions] = useState('');
+  const [audioSelectedSources, setAudioSelectedSources] = useState<string[]>([]);
+
   // Handle Escape key to exit fullscreen
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -278,13 +283,22 @@ export default function StudioPanel({
       return;
     }
 
-    // Show custom modals for slides and infographics
+    // Show custom modals for slides, infographics, and audio overview
     if (type === 'infographic') {
       setInfographicModalOpen(true);
       return;
     }
     if (type === 'slides') {
       setSlideDeckModalOpen(true);
+      return;
+    }
+    if (type === 'audio_overview') {
+      // Pre-select all sources or currently selected ones
+      setAudioSelectedSources(
+        selectedSourceIds.length > 0 ? selectedSourceIds : sources.map(s => s.id)
+      );
+      setAudioInstructions('');
+      setAudioModalOpen(true);
       return;
     }
 
@@ -353,6 +367,31 @@ export default function StudioPanel({
 
   const parseA2UIComponents = (content: any): A2UIComponent[] => {
     if (!content) return [];
+    
+    // Check if it's audio overview content (has segments array with speaker/timing/text)
+    if (content.segments && Array.isArray(content.segments)) {
+      return [{
+        id: 'audio-overview',
+        type: 'audio_transcript',
+        properties: {
+          title: content.title || 'Audio Overview',
+          audioUrl: content.audioUrl
+        },
+        data: { segments: content.segments }
+      }];
+    }
+    
+    // Check if it's an array of segments directly (audio overview format)
+    if (Array.isArray(content) && content.length > 0 && content[0].speaker && content[0].text) {
+      return [{
+        id: 'audio-overview',
+        type: 'audio_transcript',
+        properties: {
+          title: 'Audio Overview'
+        },
+        data: { segments: content }
+      }];
+    }
     
     // Check if it's an array of slides (has slideType property)
     if (Array.isArray(content) && content.length > 0 && content[0].slideType) {
@@ -856,6 +895,112 @@ export default function StudioPanel({
           setActiveView('canvas');
         }}
       />
+
+      {/* Audio Overview Modal */}
+      <Dialog open={audioModalOpen} onOpenChange={setAudioModalOpen}>
+        <DialogContent className="sm:max-w-[560px] max-h-[85vh] overflow-y-auto">
+          <DialogHeader className="pb-4 border-b">
+            <DialogTitle className="flex items-center gap-3 text-lg">
+              <div className="p-2 rounded-lg bg-purple-500/10">
+                <Mic className="w-5 h-5 text-purple-500" />
+              </div>
+              Generate Audio Overview
+            </DialogTitle>
+            <DialogDescription className="text-sm">
+              Create a podcast-style audio discussion of your selected sources
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="py-4 space-y-5">
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <Label className="text-sm font-medium">Sources to Include</Label>
+                <button
+                  type="button"
+                  className="text-xs text-primary hover:underline"
+                  onClick={() => {
+                    if (audioSelectedSources.length === sources.length) {
+                      setAudioSelectedSources([]);
+                    } else {
+                      setAudioSelectedSources(sources.map(s => s.id));
+                    }
+                  }}
+                >
+                  {audioSelectedSources.length === sources.length ? 'Deselect All' : 'Select All'}
+                </button>
+              </div>
+              <div className="max-h-[200px] overflow-y-auto rounded-lg border bg-muted/30">
+                {sources.map((source, idx) => (
+                  <label
+                    key={source.id}
+                    className={`flex items-center gap-3 px-3 py-2.5 cursor-pointer hover:bg-muted/50 transition-colors ${idx !== sources.length - 1 ? 'border-b border-border/50' : ''}`}
+                  >
+                    <Checkbox
+                      checked={audioSelectedSources.includes(source.id)}
+                      onCheckedChange={(checked) => {
+                        setAudioSelectedSources(prev =>
+                          checked
+                            ? [...prev, source.id]
+                            : prev.filter(id => id !== source.id)
+                        );
+                      }}
+                    />
+                    <span className="text-sm flex-1 truncate">{source.name}</span>
+                  </label>
+                ))}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                {audioSelectedSources.length} of {sources.length} sources selected
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="audio-instructions" className="text-sm font-medium">
+                Topic Focus <span className="text-muted-foreground font-normal">(optional)</span>
+              </Label>
+              <Textarea
+                id="audio-instructions"
+                placeholder="What should the hosts discuss? e.g., Focus on key insights and actionable takeaways..."
+                value={audioInstructions}
+                onChange={(e) => setAudioInstructions(e.target.value)}
+                rows={3}
+                className="resize-none"
+              />
+            </div>
+          </div>
+
+          <DialogFooter className="pt-4 border-t gap-2 sm:gap-2">
+            <Button variant="outline" onClick={() => setAudioModalOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={() => {
+                if (audioSelectedSources.length === 0) {
+                  toast({
+                    title: 'No Sources Selected',
+                    description: 'Please select at least one source.',
+                    variant: 'destructive'
+                  });
+                  return;
+                }
+                setAudioModalOpen(false);
+                setLoadingType('audio_overview');
+                generateMutation.mutate({
+                  type: 'audio_overview',
+                  sourceIds: audioSelectedSources,
+                  model: 'gpt-4.1',
+                  customPrompt: audioInstructions || undefined
+                });
+              }}
+              disabled={audioSelectedSources.length === 0}
+              className="gap-2 bg-purple-600 hover:bg-purple-700"
+            >
+              <Mic className="w-4 h-4" />
+              Generate Audio
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={customDialogOpen} onOpenChange={setCustomDialogOpen}>
         <DialogContent className="max-w-lg" data-testid="dialog-custom-generate">

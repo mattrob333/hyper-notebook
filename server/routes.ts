@@ -1310,11 +1310,76 @@ You help users analyze and work with their sources. When the user asks about the
         return res.status(400).json({ error: "No sources or custom prompt provided" });
       }
       
-      const content = await generateContent(
+      let content = await generateContent(
         type as ContentType,
         sourceContents,
         { model: model as ModelId, customPrompt }
       );
+
+      console.log('[Generate] Type:', type, 'Content keys:', Object.keys(content || {}));
+
+      // For audio_overview, also generate actual audio via ElevenLabs
+      if (type === 'audio_overview') {
+        console.log('[Audio] Content has segments:', !!content?.segments, 'Is array:', Array.isArray(content));
+        // Handle case where content IS the segments array directly
+        if (Array.isArray(content)) {
+          content = { segments: content };
+        }
+      }
+      
+      if (type === 'audio_overview' && content.segments) {
+        const apiKey = process.env.ELEVENLABS_API_KEY;
+        console.log('[Audio] Checking ElevenLabs - API key exists:', !!apiKey, 'Segments:', content.segments?.length);
+        
+        if (apiKey) {
+          try {
+            console.log('[Audio] Starting ElevenLabs audio generation...');
+            // Combine all segment text for TTS
+            const fullScript = content.segments
+              .map((seg: any) => `${seg.speaker}: ${seg.text}`)
+              .join('\n\n');
+            
+            // Use two different voices for the two hosts
+            const voice1Id = 'EXAVITQu4vr4xnSDxMaL'; // Sarah
+            const voice2Id = '21m00Tcm4TlvDq8ikWAM'; // Rachel
+            
+            // Generate audio for each segment or use a single voice for simplicity
+            const elevenLabsResponse = await fetch(
+              `https://api.elevenlabs.io/v1/text-to-speech/${voice1Id}`,
+              {
+                method: 'POST',
+                headers: {
+                  'Accept': 'audio/mpeg',
+                  'Content-Type': 'application/json',
+                  'xi-api-key': apiKey,
+                },
+                body: JSON.stringify({
+                  text: fullScript.slice(0, 5000), // ElevenLabs has limits
+                  model_id: 'eleven_turbo_v2_5',
+                  voice_settings: {
+                    stability: 0.5,
+                    similarity_boost: 0.75,
+                  },
+                }),
+              }
+            );
+
+            if (elevenLabsResponse.ok) {
+              const audioBuffer = await elevenLabsResponse.arrayBuffer();
+              const base64Audio = Buffer.from(audioBuffer).toString('base64');
+              content.audioUrl = `data:audio/mpeg;base64,${base64Audio}`;
+              console.log('[Audio] Generated audio for audio_overview');
+            } else {
+              console.error('[Audio] ElevenLabs error:', await elevenLabsResponse.text());
+            }
+          } catch (audioError) {
+            console.error('[Audio] Failed to generate audio:', audioError);
+            // Continue without audio - transcript still works
+          }
+        } else {
+          console.log('[Audio] No ELEVENLABS_API_KEY configured, skipping audio generation');
+        }
+      }
 
       const generated = await storage.createGeneratedContent({
         type,

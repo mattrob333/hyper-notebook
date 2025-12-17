@@ -762,6 +762,126 @@ interface Slide {
   image?: string;
 }
 
+interface TranscriptSegment {
+  text: string;
+  timing?: string;
+  speaker?: string;
+}
+
+function A2AudioTranscript({ 
+  segments = [],
+  title,
+  audioUrl: initialAudioUrl
+}: { 
+  segments?: TranscriptSegment[];
+  title?: string;
+  audioUrl?: string;
+}) {
+  const [audioUrl, setAudioUrl] = useState<string | undefined>(initialAudioUrl);
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const generateAudio = async () => {
+    setIsGenerating(true);
+    setError(null);
+    try {
+      // Combine all segments into a script
+      const script = segments
+        .map(seg => `${seg.speaker || 'Speaker'}: ${seg.text}`)
+        .join('\n\n');
+      
+      const response = await fetch('/api/audio/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: script })
+      });
+      
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.message || data.error || 'Failed to generate audio');
+      }
+      
+      const data = await response.json();
+      if (data.audioUrl) {
+        setAudioUrl(data.audioUrl);
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to generate audio');
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
+  if (!segments.length) {
+    return null;
+  }
+
+  return (
+    <div className="w-full space-y-4" data-testid="a2ui-audio-transcript">
+      {title && <h3 className="text-lg font-semibold">{title}</h3>}
+      
+      {/* Audio Player */}
+      <div className="p-4 rounded-lg bg-primary/5 border border-primary/20">
+        {audioUrl ? (
+          <audio controls className="w-full" src={audioUrl}>
+            Your browser does not support the audio element.
+          </audio>
+        ) : (
+          <div className="flex items-center gap-3">
+            <button
+              onClick={generateAudio}
+              disabled={isGenerating}
+              className="flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 transition-colors"
+            >
+              {isGenerating ? (
+                <>
+                  <svg className="w-4 h-4 animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <circle cx="12" cy="12" r="10" strokeOpacity="0.25" />
+                    <path d="M12 2a10 10 0 0 1 10 10" />
+                  </svg>
+                  Generating Audio...
+                </>
+              ) : (
+                <>
+                  <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <polygon points="5 3 19 12 5 21 5 3"></polygon>
+                  </svg>
+                  Generate Audio
+                </>
+              )}
+            </button>
+            {error && (
+              <p className="text-sm text-destructive">{error}</p>
+            )}
+          </div>
+        )}
+      </div>
+      
+      <div className="space-y-3 max-h-[500px] overflow-y-auto pr-2">
+        {segments.map((segment, idx) => (
+          <div 
+            key={idx} 
+            className="p-3 rounded-lg bg-muted/50 border border-border/50"
+            data-testid={`a2ui-transcript-segment-${idx}`}
+          >
+            <div className="flex items-center gap-2 mb-1.5">
+              {segment.speaker && (
+                <span className="font-medium text-sm text-primary">{segment.speaker}</span>
+              )}
+              {segment.timing && (
+                <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded">
+                  {segment.timing}
+                </span>
+              )}
+            </div>
+            <p className="text-sm leading-relaxed">{segment.text}</p>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function A2Slides({ 
   slides = [],
   title
@@ -871,6 +991,9 @@ function renderA2UIComponent(
 
       case 'slides':
         return <A2Slides {...properties} slides={data?.slides || properties.slides} />;
+
+      case 'audio_transcript':
+        return <A2AudioTranscript {...properties} segments={data?.segments || properties.segments} />;
 
       default:
         console.warn(`Unknown A2UI component type: ${type}`);
