@@ -31,6 +31,7 @@ import { ExternalLink, Circle, CheckCircle, Clock, AlertCircle } from "lucide-re
 
 interface A2UIRendererProps {
   components: A2UIComponent[];
+  onAction?: (action: string, data?: any) => void;
 }
 
 const fadeInUp = {
@@ -52,13 +53,15 @@ function A2Card({
   description, 
   content, 
   actions, 
-  children 
+  children,
+  onAction
 }: { 
   title?: string; 
   description?: string; 
   content?: string; 
-  actions?: Array<{ label: string; variant?: 'default' | 'secondary' | 'outline'; onClick?: () => void }>;
+  actions?: Array<{ label: string; variant?: 'default' | 'secondary' | 'outline'; action?: string; onClick?: () => void }>;
   children?: React.ReactNode;
+  onAction?: (action: string, data?: any) => void;
 }) {
   return (
     <Card className="w-full" data-testid="a2ui-card">
@@ -74,15 +77,21 @@ function A2Card({
       </CardContent>
       {actions && actions.length > 0 && (
         <CardFooter className="gap-2 flex-wrap">
-          {actions.map((action, idx) => (
+          {actions.map((actionItem, idx) => (
             <Button
               key={idx}
-              variant={action.variant || 'default'}
+              variant={actionItem.variant || 'default'}
               size="sm"
-              onClick={action.onClick}
+              onClick={() => {
+                if (actionItem.onClick) {
+                  actionItem.onClick();
+                } else if (actionItem.action && onAction) {
+                  onAction(actionItem.action, { label: actionItem.label });
+                }
+              }}
               data-testid={`a2ui-card-action-${idx}`}
             >
-              {action.label}
+              {actionItem.label}
             </Button>
           ))}
         </CardFooter>
@@ -803,7 +812,8 @@ function A2Slides({
 function renderA2UIComponent(
   component: A2UIComponent,
   allComponents: A2UIComponent[],
-  renderChildren: (parentId: string) => React.ReactNode
+  renderChildren: (parentId: string) => React.ReactNode,
+  onAction?: (action: string, data?: any) => void
 ): React.ReactNode {
   const { type, properties = {}, data, children: componentChildren } = component;
   const childNodes = renderChildren(component.id);
@@ -812,7 +822,7 @@ function renderA2UIComponent(
     switch (type) {
       case 'card':
         return (
-          <A2Card {...properties}>
+          <A2Card {...properties} onAction={onAction}>
             {childNodes}
           </A2Card>
         );
@@ -886,7 +896,7 @@ function renderA2UIComponent(
   }
 }
 
-export default function A2UIRenderer({ components }: A2UIRendererProps) {
+export default function A2UIRenderer({ components, onAction }: A2UIRendererProps) {
   const rootComponents = components.filter(c => !c.parentId);
 
   const renderChildren = (parentId: string): React.ReactNode => {
@@ -901,7 +911,7 @@ export default function A2UIRenderer({ components }: A2UIRendererProps) {
             {...fadeInUp}
             data-testid={`a2ui-component-${child.id}`}
           >
-            {renderA2UIComponent(child, components, renderChildren)}
+            {renderA2UIComponent(child, components, renderChildren, onAction)}
           </motion.div>
         ))}
       </div>
@@ -915,7 +925,7 @@ export default function A2UIRenderer({ components }: A2UIRendererProps) {
         {...fadeInUp}
         data-testid={`a2ui-component-${component.id}`}
       >
-        {renderA2UIComponent(component, components, renderChildren)}
+        {renderA2UIComponent(component, components, renderChildren, onAction)}
       </motion.div>
     );
   };

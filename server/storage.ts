@@ -1,7 +1,7 @@
 import { eq, desc, sql } from "drizzle-orm";
 import { db } from "./db";
 import {
-  users, sources, notes, conversations, messages, workflows, generatedContent, notebooks,
+  users, sources, notes, conversations, messages, workflows, generatedContent, notebooks, feeds,
   type User, type InsertUser,
   type Source, type InsertSource,
   type Note, type InsertNote,
@@ -10,6 +10,7 @@ import {
   type Workflow, type InsertWorkflow,
   type GeneratedContent, type InsertGeneratedContent,
   type Notebook, type InsertNotebook,
+  type Feed, type InsertFeed,
 } from "@shared/schema";
 
 export interface IStorage {
@@ -54,6 +55,13 @@ export interface IStorage {
   getGeneratedContentById(id: string): Promise<GeneratedContent | undefined>;
   createGeneratedContent(content: InsertGeneratedContent): Promise<GeneratedContent>;
   deleteGeneratedContent(id: string): Promise<boolean>;
+
+  // Feeds
+  getFeeds(notebookId?: string): Promise<Feed[]>;
+  getFeed(id: string): Promise<Feed | undefined>;
+  createFeed(feed: InsertFeed): Promise<Feed>;
+  updateFeed(id: string, feed: Partial<InsertFeed>): Promise<Feed | undefined>;
+  deleteFeed(id: string): Promise<boolean>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -242,6 +250,34 @@ export class DatabaseStorage implements IStorage {
 
   async deleteGeneratedContent(id: string): Promise<boolean> {
     await db.delete(generatedContent).where(eq(generatedContent.id, id));
+    return true;
+  }
+
+  // Feeds
+  async getFeeds(notebookId?: string): Promise<Feed[]> {
+    if (notebookId) {
+      return db.select().from(feeds).where(eq(feeds.notebookId, notebookId)).orderBy(desc(feeds.createdAt));
+    }
+    return db.select().from(feeds).orderBy(desc(feeds.createdAt));
+  }
+
+  async getFeed(id: string): Promise<Feed | undefined> {
+    const [feed] = await db.select().from(feeds).where(eq(feeds.id, id));
+    return feed;
+  }
+
+  async createFeed(feed: InsertFeed): Promise<Feed> {
+    const [created] = await db.insert(feeds).values(feed).returning();
+    return created;
+  }
+
+  async updateFeed(id: string, feed: Partial<InsertFeed>): Promise<Feed | undefined> {
+    const [updated] = await db.update(feeds).set(feed).where(eq(feeds.id, id)).returning();
+    return updated;
+  }
+
+  async deleteFeed(id: string): Promise<boolean> {
+    await db.delete(feeds).where(eq(feeds.id, id));
     return true;
   }
 }

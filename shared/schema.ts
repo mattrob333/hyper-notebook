@@ -37,6 +37,7 @@ export const sources = pgTable("sources", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   notebookId: varchar("notebook_id").references(() => notebooks.id, { onDelete: 'cascade' }),
   type: text("type").notNull().$type<'url' | 'pdf' | 'text' | 'audio' | 'video'>(),
+  category: text("category").$type<'context' | 'feed' | 'reference'>().default('context'),
   name: text("name").notNull(),
   content: text("content").notNull(),
   summary: text("summary"),
@@ -46,10 +47,28 @@ export const sources = pgTable("sources", {
 
 export const insertSourceSchema = createInsertSchema(sources).omit({ id: true, createdAt: true }).extend({
   type: z.enum(['url', 'pdf', 'text', 'audio', 'video']),
+  category: z.enum(['context', 'feed', 'reference']).optional().default('context'),
   metadata: z.record(z.any()).optional().nullable(),
 });
 export type InsertSource = z.infer<typeof insertSourceSchema>;
 export type Source = typeof sources.$inferSelect;
+
+// RSS Feeds table - stores discovered RSS/Atom feed subscriptions
+export const feeds = pgTable("feeds", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  notebookId: varchar("notebook_id").references(() => notebooks.id, { onDelete: 'cascade' }),
+  name: text("name").notNull(),
+  url: text("url").notNull(),
+  sourceUrl: text("source_url"), // The website where the feed was discovered
+  lastFetched: timestamp("last_fetched"),
+  itemCount: integer("item_count").default(0),
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertFeedSchema = createInsertSchema(feeds).omit({ id: true, createdAt: true, lastFetched: true, itemCount: true });
+export type InsertFeed = z.infer<typeof insertFeedSchema>;
+export type Feed = typeof feeds.$inferSelect;
 
 export const notes = pgTable("notes", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),

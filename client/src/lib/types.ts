@@ -10,5 +10,7 @@ export type {
   GeneratedContent,
   ContentType,
   Notebook,
-  InsertNotebook
+  InsertNotebook,
+  Feed,
+  InsertFeed
 } from "@shared/schema";

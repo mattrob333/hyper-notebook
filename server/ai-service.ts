@@ -177,14 +177,43 @@ export async function* streamChat(
 
 export async function generateImage(
   prompt: string,
-  options: { size?: '1024x1024' | '512x512' | '256x256' } = {}
+  options: { size?: '1024x1024' | '512x512' | '256x256'; aspectRatio?: string } = {}
 ): Promise<string> {
-  // Use Nano Banana Pro (Gemini 3 Pro Image) for image generation
+  // Use Nano Banana 3 Pro (Gemini 3 Pro Image) for image generation
+  // OpenRouter requires modalities parameter for image generation
   const response = await openrouter.chat.completions.create({
     model: 'google/gemini-3-pro-image-preview',
-    messages: [{ role: 'user', content: prompt }],
-  });
-  return response.choices[0]?.message?.content || '';
+    messages: [{ 
+      role: 'user', 
+      content: `Generate an image: ${prompt}` 
+    }],
+    // @ts-ignore - OpenRouter-specific parameters
+    modalities: ['image', 'text'],
+    image_config: {
+      aspect_ratio: options.aspectRatio || '16:9'
+    }
+  } as any);
+  
+  // Extract image from the response
+  // OpenRouter returns images in message.images array
+  const message = response.choices[0]?.message as any;
+  
+  if (message?.images && message.images.length > 0) {
+    // Return the base64 data URL directly
+    const imageUrl = message.images[0]?.image_url?.url;
+    if (imageUrl) {
+      return imageUrl;
+    }
+  }
+  
+  // Fallback: check if content contains base64 data
+  const content = message?.content || '';
+  if (content.startsWith('data:image')) {
+    return content;
+  }
+  
+  console.log('Image generation response:', JSON.stringify(message, null, 2));
+  return '';
 }
 
 const contentPrompts: Record<ContentType, string> = {
@@ -311,12 +340,28 @@ export async function summarizeSource(content: string, options: { model?: ModelI
     m.id.includes('haiku') || m.id.includes('chat') || m.id.includes('flash')
   )?.id || DEFAULT_MODEL;
 
+  // Filter out code/CSS content - focus on text
+  const cleanContent = content
+    .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
+    .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
+    .replace(/```[\s\S]*?```/g, '')
+    .replace(/\{[^}]*:[^}]*\}/g, '') // Remove CSS-like blocks
+    .replace(/\s+/g, ' ')
+    .trim();
+
   return chat(
-    [{ role: 'user', content: `Summarize the following content in 1-2 sentences only. Be brief and capture the main point:\n\n${content.slice(0, 5000)}` }],
+    [{ role: 'user', content: `Based on the following content, write a brief 2-3 sentence description that explains:
+1. What this source is about (the main topic/subject)
+2. What it would be useful for (how someone might use this information)
+
+Ignore any code, CSS, or technical markup - focus only on the actual article/page content.
+
+Content:
+${cleanContent.slice(0, 8000)}` }],
     {
       model: options.model || fastModel,
-      systemPrompt: 'You are a helpful assistant that creates very brief, 1-2 sentence summaries. Be concise.',
-      maxTokens: 150,
+      systemPrompt: 'You are a helpful assistant that describes web sources in plain language. Focus on WHAT the content is about and WHY it would be useful. Ignore code snippets, CSS, and technical markup. Write naturally as if explaining to a colleague.',
+      maxTokens: 200,
     }
   );
 }

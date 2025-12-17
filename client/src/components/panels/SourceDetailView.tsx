@@ -1,3 +1,4 @@
+import ReactMarkdown from "react-markdown";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -33,41 +34,9 @@ export default function SourceDetailView({ source, onClose }: SourceDetailViewPr
     }
   };
 
-  const mockSummary = `The emergence of agent engineering is driven by the challenge of making non-deterministic Large Language Model (LLM) agents reliable in real-world production environments, which is vastly different from traditional software development. This new discipline is defined as the iterative process of refining these systems through a continuous cycle of build, test, ship, observe, refine, repeat. Successful implementation requires integrating three distinct skillsets: Product thinking to shape agent behavior and define success, Engineering to build robust infrastructure and tools, and Data science to measure performance and analyze usage patterns. This approach acknowledges that shipping an agent is not the endpoint but rather the first step for gaining the insights needed to harness the powerful, yet unpredictable, nature of agents operating complex workflows.`;
-
-  const mockContent = `
-## Agent Engineering: A New Discipline
-
-If you've built an agent, you know that the delta between "it works on my machine" and "it works in production" can be huge. Traditional software assumes you directly control the inputs and outputs. Agents give you neither: users say literally anything, and the agent's responses—and their effects—are non-deterministic.
-
-Over the past 3 years, we've watched thousands of teams struggle with this reality. The ones who've succeeded in shipping something reliable to production—companies like Clay, Yuma, LinkedIn, and Cloudflare—aren't following the traditional software playbook. They're pioneering something new: agent engineering.
-
-### What is agent engineering?
-
-Agent engineering is the iterative process of refining non-deterministic LLM systems into reliable production experiences. It is a cyclical process: build, test, ship, observe, refine, repeat.
-
-The key here is that shipping isn't the end goal. It's just the way you keep moving to get new insights and improve your agent. To make improvements that matter, you need to understand what's happening in production. The faster you move through this cycle, the more reliable your agent becomes.
-
-We see agent engineering as a new discipline that combines 3 skillsets working together:
-
-### Product thinking
-Product thinking defines the scope and shapes agent behavior. This includes:
-- Defining what the agent should and shouldn't do
-- Setting success criteria for different scenarios
-- Understanding user expectations and edge cases
-
-### Engineering
-Engineering builds robust infrastructure and tools for:
-- Handling non-deterministic outputs reliably
-- Building feedback loops for continuous improvement
-- Creating monitoring and debugging capabilities
-
-### Data science
-Data science measures performance and analyzes patterns:
-- Tracking success metrics across user interactions
-- Identifying failure modes and their root causes
-- Quantifying improvements over time
-  `;
+  // Use actual source data instead of mock content
+  const sourceSummary = source.summary || 'No summary available for this source.';
+  const sourceContent = source.content || 'No content available.';
 
   return (
     <div className="flex-1 flex flex-col h-full min-w-0" data-testid="source-detail-view">
@@ -121,9 +90,9 @@ Data science measures performance and analyzes patterns:
                 </div>
               </div>
             </div>
-            <p className="text-sm text-muted-foreground leading-relaxed">
-              {mockSummary}
-            </p>
+            <div className="text-sm text-muted-foreground leading-relaxed prose prose-sm prose-neutral dark:prose-invert max-w-none">
+              <ReactMarkdown>{sourceSummary}</ReactMarkdown>
+            </div>
           </Card>
 
           {source.type === 'url' && (
@@ -147,7 +116,7 @@ Data science measures performance and analyzes patterns:
 
           <article className="prose prose-sm dark:prose-invert max-w-none">
             <div className="text-foreground leading-relaxed whitespace-pre-wrap">
-              {mockContent}
+              {sourceContent}
             </div>
           </article>
         </div>

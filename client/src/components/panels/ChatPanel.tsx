@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from "react";
+import ReactMarkdown from "react-markdown";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -17,8 +18,10 @@ import {
 import { Send, Paperclip, Loader2, Bot, User, Sparkles, ThumbsUp, ThumbsDown, Copy, Pin, Plus, SlidersHorizontal, History, ChevronDown, ArrowUp, Mail, Users, Trash2 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import A2UIRenderer from "../a2ui/A2UIRenderer";
+import OnboardingWorkflow from "../workflows/OnboardingWorkflow";
+import ResearchWorkflow from "../workflows/ResearchWorkflow";
 import type { ChatMessage, Source, A2UIComponent } from "@/lib/types";
-import { apiRequest } from "@/lib/queryClient";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useQuery } from "@tanstack/react-query";
 import { useEmailBuilder } from "@/contexts/EmailBuilderContext";
 import { useToast } from "@/hooks/use-toast";
@@ -54,18 +57,25 @@ interface ChatPanelProps {
   sourceSummaries?: SourceSummary[];
 }
 
-function parseA2UIComponents(content: string): A2UIComponent[] {
+function parseA2UIComponents(content: string): { components: A2UIComponent[]; cleanedContent: string } {
   const components: A2UIComponent[] = [];
+  let cleanedContent = content;
 
-  const jsonBlockRegex = /```(?:json)?\s*\n?([\s\S]*?)```/g;
+  // Match JSON code blocks - be more flexible with the pattern
+  const jsonBlockRegex = /```(?:json)?\s*\n([\s\S]*?)\n```/g;
   let match;
+  const blocksToRemove: string[] = [];
 
   while ((match = jsonBlockRegex.exec(content)) !== null) {
     try {
-      const parsed = JSON.parse(match[1].trim());
+      const jsonStr = match[1].trim();
+      const parsed = JSON.parse(jsonStr);
+      let isA2UIBlock = false;
+      
       if (Array.isArray(parsed)) {
         parsed.forEach((item, idx) => {
           if (item.type && typeof item.type === 'string') {
+            isA2UIBlock = true;
             components.push({
               id: item.id || `parsed-${Date.now()}-${idx}`,
               type: item.type,
@@ -76,6 +86,7 @@ function parseA2UIComponents(content: string): A2UIComponent[] {
           }
         });
       } else if (parsed.type && typeof parsed.type === 'string') {
+        isA2UIBlock = true;
         components.push({
           id: parsed.id || `parsed-${Date.now()}`,
           type: parsed.type,
@@ -86,6 +97,7 @@ function parseA2UIComponents(content: string): A2UIComponent[] {
       } else if (parsed.components && Array.isArray(parsed.components)) {
         parsed.components.forEach((item: any, idx: number) => {
           if (item.type && typeof item.type === 'string') {
+            isA2UIBlock = true;
             components.push({
               id: item.id || `parsed-${Date.now()}-${idx}`,
               type: item.type,
@@ -96,56 +108,70 @@ function parseA2UIComponents(content: string): A2UIComponent[] {
           }
         });
       }
-    } catch {
+      
+      // Mark block for removal if it's A2UI
+      if (isA2UIBlock) {
+        blocksToRemove.push(match[0]);
+      }
+    } catch (e) {
       // Not valid JSON, skip
+      console.log('JSON parse error:', e);
     }
   }
 
-  return components;
+  // Remove all A2UI blocks from content
+  for (const block of blocksToRemove) {
+    cleanedContent = cleanedContent.replace(block, '');
+  }
+
+  // Clean up extra whitespace
+  cleanedContent = cleanedContent.replace(/\n{3,}/g, '\n\n').trim();
+
+  console.log('parseA2UIComponents result:', { componentsCount: components.length, cleanedContentLength: cleanedContent.length });
+
+  return { components, cleanedContent };
 }
 
-function generateSuggestedPrompts(sources: Source[], sourceSummaries?: SourceSummary[]): string[] {
-  const defaultPrompts = [
-    "Summarize the key points from all sources",
-    "Compare and contrast the different perspectives",
-    "Generate a study guide from this material",
-    "Create a timeline of events mentioned"
+// Workflow suggested prompts with special triggers
+interface SuggestedPrompt {
+  text: string;
+  isWorkflow?: boolean;
+  workflowId?: string;
+  icon?: string;
+}
+
+function generateSuggestedPrompts(sources: Source[], sourceSummaries?: SourceSummary[]): SuggestedPrompt[] {
+  // Always include workflow triggers first
+  const workflowPrompts: SuggestedPrompt[] = [
+    { 
+      text: "🚀 User Onboarding - Set up your profile", 
+      isWorkflow: true, 
+      workflowId: 'user-onboarding',
+      icon: '🚀'
+    },
+    { 
+      text: "📊 Research & Create Content", 
+      isWorkflow: true, 
+      workflowId: 'research-content',
+      icon: '📊'
+    },
   ];
 
-  if (!sources.length && !sourceSummaries?.length) {
-    return defaultPrompts;
-  }
-
-  const prompts: string[] = [];
-
-  if (sourceSummaries && sourceSummaries.length > 0) {
-    const firstSummary = sourceSummaries[0];
-    if (firstSummary.summary) {
-      prompts.push(`Explain the main concepts from "${firstSummary.name}"`);
-    }
-
-    if (sourceSummaries.length > 1) {
-      prompts.push(`Compare "${sourceSummaries[0].name}" with "${sourceSummaries[1].name}"`);
-    }
-  }
+  const contextPrompts: SuggestedPrompt[] = [];
 
   if (sources.length > 0) {
     const sourceTypes = Array.from(new Set(sources.map(s => s.type)));
-    if (sourceTypes.includes('pdf')) {
-      prompts.push("Extract key findings from the PDF documents");
-    }
     if (sourceTypes.includes('url')) {
-      prompts.push("Summarize the web articles and highlight important links");
+      contextPrompts.push({ text: "Summarize the web articles and highlight important links" });
     }
+    contextPrompts.push({ text: "Summarize the key points from all sources" });
+  } else {
+    contextPrompts.push({ text: "Summarize the key points from all sources" });
+    contextPrompts.push({ text: "Generate a study guide from this material" });
   }
 
-  while (prompts.length < 4) {
-    const remaining = defaultPrompts.filter(p => !prompts.includes(p));
-    if (remaining.length === 0) break;
-    prompts.push(remaining[0]);
-  }
-
-  return prompts.slice(0, 4);
+  // Return 2 workflows + 2 context prompts
+  return [...workflowPrompts, ...contextPrompts.slice(0, 2)];
 }
 
 export default function ChatPanel({
@@ -161,6 +187,7 @@ export default function ChatPanel({
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [isStreaming, setIsStreaming] = useState(false);
   const [streamingContent, setStreamingContent] = useState('');
+  const [activeWorkflow, setActiveWorkflow] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
@@ -280,7 +307,8 @@ export default function ChatPanel({
     }
   }, [selectedModel]);
 
-  const handleStreamChat = useCallback(async (userMessage: string) => {
+  // Stream chat - showUserMessage controls whether to display the user message
+  const handleStreamChat = useCallback(async (userMessage: string, showUserMessage: boolean = true) => {
     setIsStreaming(true);
     setStreamingContent('');
 
@@ -330,8 +358,19 @@ ${emailContext.contacts.length > 0 ? `- Recipients loaded: ${emailContext.contac
       // Add conversation history
       chatMessages.push(...messages.map(m => ({ role: m.role as 'user' | 'assistant', content: m.content })));
       chatMessages.push({ role: 'user' as const, content: userMessage });
+      
+      // Track if we should show the user message
+      const displayUserMessage = showUserMessage ? userMessage : '';
 
       abortControllerRef.current = new AbortController();
+
+      // Build source context for the AI
+      const sourceContext = sources.length > 0 ? sources.map(s => ({
+        name: s.name,
+        type: s.type,
+        content: s.content?.slice(0, 5000), // Limit content size
+        summary: s.summary,
+      })) : [];
 
       const response = await fetch('/api/chat', {
         method: 'POST',
@@ -340,6 +379,8 @@ ${emailContext.contacts.length > 0 ? `- Recipients loaded: ${emailContext.contac
           messages: chatMessages,
           model: selectedModel,
           conversationId: currentConversationId,
+          sources: sourceContext,
+          sourceSummaries: sourceSummaries,
         }),
         signal: abortControllerRef.current.signal,
       });
@@ -372,8 +413,9 @@ ${emailContext.contacts.length > 0 ? `- Recipients loaded: ${emailContext.contac
                 fullContent += data.token;
                 setStreamingContent(fullContent);
               } else if (data.type === 'done' && !messageHandled) {
-                const a2uiComponents = parseA2UIComponents(fullContent);
-                onNewMessage(userMessage, fullContent, a2uiComponents);
+                const { components: a2uiComponents, cleanedContent } = parseA2UIComponents(fullContent);
+                console.log('Stream done - components:', a2uiComponents.length, 'cleanedContent:', cleanedContent.substring(0, 100));
+                onNewMessage(displayUserMessage, cleanedContent, a2uiComponents);
                 setStreamingContent('');
                 messageHandled = true;
               }
@@ -386,8 +428,8 @@ ${emailContext.contacts.length > 0 ? `- Recipients loaded: ${emailContext.contac
 
       // Fallback: only add message if not already handled
       if (fullContent && !messageHandled) {
-        const a2uiComponents = parseA2UIComponents(fullContent);
-        onNewMessage(userMessage, fullContent, a2uiComponents);
+        const { components: a2uiComponents, cleanedContent } = parseA2UIComponents(fullContent);
+        onNewMessage(displayUserMessage, cleanedContent, a2uiComponents);
       }
 
     } catch (error) {
@@ -419,11 +461,203 @@ ${emailContext.contacts.length > 0 ? `- Recipients loaded: ${emailContext.contac
     }
   };
 
-  const handleSuggestionClick = useCallback((question: string) => {
+  const handleSuggestionClick = useCallback((prompt: SuggestedPrompt) => {
     if (!isLoading) {
-      handleStreamChat(question);
+      if (prompt.isWorkflow && prompt.workflowId) {
+        // Launch the workflow component directly
+        setActiveWorkflow(prompt.workflowId);
+      } else {
+        handleStreamChat(prompt.text);
+      }
     }
   }, [isLoading, handleStreamChat]);
+
+  // Handle A2UI button actions
+  const handleA2UIAction = useCallback(async (action: string, data?: any) => {
+    console.log('A2UI Action:', action, data);
+    
+    // Workflow step instructions - explicit prompts for each step
+    const workflowStepPrompts: Record<string, string> = {
+      // After role selection -> Step 2
+      'role:': `[WORKFLOW_STEP:2]
+The user selected their role. Now generate Step 2: Daily Tasks.
+You MUST respond with ONLY this JSON (no other text):
+\`\`\`json
+[
+  { "id": "progress-2", "type": "progress", "properties": { "value": 33, "label": "Step 2 of 6: Daily Tasks" } },
+  { "id": "step2-card", "type": "card", "properties": { 
+    "title": "What do you spend most time on?",
+    "description": "Select your primary daily activities",
+    "actions": [
+      { "label": "🔍 Research & Analysis", "variant": "outline", "action": "task:research" },
+      { "label": "👥 Meetings & Calls", "variant": "outline", "action": "task:meetings" },
+      { "label": "✍️ Creating Content", "variant": "outline", "action": "task:content" },
+      { "label": "📊 Data & Reporting", "variant": "outline", "action": "task:analysis" },
+      { "label": "🔄 Coordinating Projects", "variant": "outline", "action": "task:coordination" }
+    ]
+  }}
+]
+\`\`\``,
+      // After task selection -> Step 3
+      'task:': `[WORKFLOW_STEP:3]
+The user selected their tasks. Now generate Step 3: Information Sources.
+You MUST respond with ONLY this JSON (no other text):
+\`\`\`json
+[
+  { "id": "progress-3", "type": "progress", "properties": { "value": 50, "label": "Step 3 of 6: Information Sources" } },
+  { "id": "step3-card", "type": "card", "properties": {
+    "title": "Where do you get your information?",
+    "description": "Select your main sources",
+    "actions": [
+      { "label": "📰 News & Industry Sites", "variant": "outline", "action": "source:news" },
+      { "label": "💬 Social Media & Communities", "variant": "outline", "action": "source:social" },
+      { "label": "📁 Internal Documents", "variant": "outline", "action": "source:internal" },
+      { "label": "📊 Research Reports", "variant": "outline", "action": "source:reports" },
+      { "label": "🎯 Competitor Intelligence", "variant": "outline", "action": "source:competitor" }
+    ]
+  }}
+]
+\`\`\``,
+      // After source selection -> Step 4
+      'source:': `[WORKFLOW_STEP:4]
+The user selected their sources. Now generate Step 4: Team Communication.
+You MUST respond with ONLY this JSON (no other text):
+\`\`\`json
+[
+  { "id": "progress-4", "type": "progress", "properties": { "value": 66, "label": "Step 4 of 6: Team Communication" } },
+  { "id": "step4-card", "type": "card", "properties": {
+    "title": "How do you share information with your team?",
+    "actions": [
+      { "label": "📧 Email Updates", "variant": "outline", "action": "share:email" },
+      { "label": "💬 Slack/Teams Messages", "variant": "outline", "action": "share:chat" },
+      { "label": "🗓️ Team Meetings", "variant": "outline", "action": "share:meetings" },
+      { "label": "📄 Written Reports", "variant": "outline", "action": "share:reports" },
+      { "label": "📊 Dashboards", "variant": "outline", "action": "share:dashboards" }
+    ]
+  }}
+]
+\`\`\``,
+      // After share selection -> Step 5
+      'share:': `[WORKFLOW_STEP:5]
+The user selected their sharing method. Now generate Step 5: Pain Points.
+You MUST respond with ONLY this JSON (no other text):
+\`\`\`json
+[
+  { "id": "progress-5", "type": "progress", "properties": { "value": 83, "label": "Step 5 of 6: Pain Points" } },
+  { "id": "step5-card", "type": "card", "properties": {
+    "title": "What's your biggest challenge?",
+    "description": "What frustrates you most about managing information?",
+    "actions": [
+      { "label": "🔀 Information is scattered everywhere", "variant": "outline", "action": "pain:scattered" },
+      { "label": "⏱️ Takes too long to find what I need", "variant": "outline", "action": "pain:slow" },
+      { "label": "✋ Too much manual copy-paste work", "variant": "outline", "action": "pain:manual" },
+      { "label": "🤷 Hard to get actionable insights", "variant": "outline", "action": "pain:insights" },
+      { "label": "📈 Can't keep up with changes", "variant": "outline", "action": "pain:keepup" }
+    ]
+  }}
+]
+\`\`\``,
+      // After pain selection -> Step 6
+      'pain:': `[WORKFLOW_STEP:6]
+The user selected their pain point. Now generate Step 6: Goals.
+You MUST respond with ONLY this JSON (no other text):
+\`\`\`json
+[
+  { "id": "progress-6", "type": "progress", "properties": { "value": 100, "label": "Step 6 of 6: Your Goals" } },
+  { "id": "step6-card", "type": "card", "properties": {
+    "title": "What do you want to achieve?",
+    "description": "What's most important to you?",
+    "actions": [
+      { "label": "⏰ Save time on research", "variant": "outline", "action": "goal:time" },
+      { "label": "🎯 Make better decisions", "variant": "outline", "action": "goal:decisions" },
+      { "label": "🤖 Automate repetitive tasks", "variant": "outline", "action": "goal:automate" },
+      { "label": "📡 Stay informed automatically", "variant": "outline", "action": "goal:informed" },
+      { "label": "✍️ Create content faster", "variant": "outline", "action": "goal:content" }
+    ]
+  }}
+]
+\`\`\``,
+      // After goal selection -> Complete
+      'goal:': `[WORKFLOW_COMPLETE]
+The user completed all steps. Now show the completion card.
+You MUST respond with ONLY this JSON (no other text):
+\`\`\`json
+[
+  { "id": "complete", "type": "card", "properties": {
+    "title": "✅ Profile Complete!",
+    "description": "Great! I've learned about your role, tasks, sources, communication style, challenges, and goals. Save your profile to personalize your experience.",
+    "actions": [
+      { "label": "💾 Save My Profile", "variant": "default", "action": "save_profile" },
+      { "label": "🔄 Start Over", "variant": "outline", "action": "restart" }
+    ]
+  }}
+]
+\`\`\``,
+    };
+    
+    // Check if this is a workflow action
+    const workflowPrefix = Object.keys(workflowStepPrompts).find(prefix => action.startsWith(prefix));
+    
+    if (workflowPrefix) {
+      // Send the explicit workflow step prompt
+      handleStreamChat(workflowStepPrompts[workflowPrefix], false);
+    } else if (action === 'save_context' || action === 'save_profile') {
+      // Save the conversation context as a source
+      const lastAssistantMessage = messages.filter(m => m.role === 'assistant').pop();
+      if (lastAssistantMessage) {
+        try {
+          // Get notebook ID from URL if available
+          const notebookId = window.location.pathname.split('/').pop();
+          await apiRequest('POST', '/api/sources', {
+            notebookId: notebookId || null,
+            type: 'text',
+            category: 'context',
+            name: 'User Profile Context',
+            content: lastAssistantMessage.content,
+            metadata: { generatedBy: 'onboarding-workflow', timestamp: new Date().toISOString() }
+          });
+          toast({ title: 'Profile Saved', description: 'Your profile has been saved as a context source.' });
+        } catch (error) {
+          toast({ title: 'Error', description: 'Failed to save profile', variant: 'destructive' });
+        }
+      }
+    } else if (action === 'save_report') {
+      // Save as generated content/report
+      const lastAssistantMessage = messages.filter(m => m.role === 'assistant').pop();
+      if (lastAssistantMessage) {
+        try {
+          const notebookId = window.location.pathname.split('/').pop();
+          await apiRequest('POST', '/api/sources', {
+            notebookId: notebookId || null,
+            type: 'text',
+            category: 'reference',
+            name: 'Research Report - ' + new Date().toLocaleDateString(),
+            content: lastAssistantMessage.content,
+            metadata: { generatedBy: 'research-workflow', timestamp: new Date().toISOString() }
+          });
+          toast({ title: 'Report Saved', description: 'Your report has been saved to sources.' });
+        } catch (error) {
+          toast({ title: 'Error', description: 'Failed to save report', variant: 'destructive' });
+        }
+      }
+    } else if (action === 'send_email') {
+      // Send to email builder
+      const lastAssistantMessage = messages.filter(m => m.role === 'assistant').pop();
+      if (lastAssistantMessage) {
+        handleSendToEmailBuilder(lastAssistantMessage.content);
+      }
+    } else if (action === 'copy') {
+      // Copy to clipboard
+      const lastAssistantMessage = messages.filter(m => m.role === 'assistant').pop();
+      if (lastAssistantMessage) {
+        navigator.clipboard.writeText(lastAssistantMessage.content);
+        toast({ title: 'Copied', description: 'Content copied to clipboard.' });
+      }
+    } else {
+      // Unknown action - treat as workflow step selection (sent silently)
+      handleStreamChat(`Selected: ${action}`, false);
+    }
+  }, [messages, handleStreamChat, toast, handleSendToEmailBuilder]);
 
   const suggestedQuestions = generateSuggestedPrompts(sources, sourceSummaries);
 
@@ -462,7 +696,58 @@ ${emailContext.contacts.length > 0 ? `- Recipients loaded: ${emailContext.contac
 
       <ScrollArea className="flex-1 px-4" ref={scrollRef} data-testid="scroll-messages">
         <div className="py-6 space-y-6">
-          {messages.length === 0 && !streamingContent ? (
+          {/* Active Workflow */}
+          {activeWorkflow === 'user-onboarding' && (
+            <OnboardingWorkflow
+              notebookId={window.location.pathname.split('/').pop()}
+              onComplete={(profileData) => {
+                console.log('Onboarding complete:', profileData);
+                setActiveWorkflow(null);
+                queryClient.invalidateQueries({ queryKey: ['/api/sources'] });
+                toast({ title: 'Welcome!', description: 'Your profile has been set up. Start exploring!' });
+              }}
+              onCancel={() => setActiveWorkflow(null)}
+            />
+          )}
+
+          {activeWorkflow === 'research-content' && (
+            <ResearchWorkflow
+              notebookId={window.location.pathname.split('/').pop()}
+              onComplete={(content) => {
+                console.log('Content generated:', content);
+                setActiveWorkflow(null);
+                queryClient.invalidateQueries({ queryKey: ['/api/sources'] });
+                toast({ title: 'Content Created!', description: 'Your content has been generated and saved.' });
+              }}
+              onCancel={() => setActiveWorkflow(null)}
+              onSendToEmail={(content, subject) => {
+                // Defer to avoid setState during render
+                setTimeout(() => {
+                  if (emailContext?.sendToEmailBuilder) {
+                    emailContext.sendToEmailBuilder(content, subject);
+                  }
+                  setActiveWorkflow(null);
+                }, 0);
+              }}
+              onCreateReport={(content, title) => {
+                // For now, save as a report-type source
+                apiRequest('POST', '/api/sources', {
+                  notebookId: window.location.pathname.split('/').pop() || null,
+                  type: 'text',
+                  category: 'reports',
+                  name: title,
+                  content: content,
+                  metadata: { type: 'report', createdAt: new Date().toISOString() }
+                }).then(() => {
+                  queryClient.invalidateQueries({ queryKey: ['/api/sources'] });
+                });
+                setActiveWorkflow(null);
+              }}
+            />
+          )}
+          
+          {/* Empty State / Suggested Prompts */}
+          {!activeWorkflow && messages.length === 0 && !streamingContent ? (
             <div className="text-center py-12" data-testid="container-empty-state">
               <div className="w-16 h-16 mx-auto mb-6 rounded-2xl bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center">
                 <Sparkles className="w-8 h-8 text-primary" />
@@ -473,19 +758,22 @@ ${emailContext.contacts.length > 0 ? `- Recipients loaded: ${emailContext.contac
                 I can generate interactive UI components to help visualize results.
               </p>
               <div className="grid grid-cols-2 gap-3 max-w-lg mx-auto">
-                {suggestedQuestions.map((question, idx) => (
+                {suggestedQuestions.map((prompt, idx) => (
                   <Card
                     key={idx}
-                    className="p-3 rounded-xl cursor-pointer hover-elevate text-left"
-                    onClick={() => handleSuggestionClick(question)}
+                    className={`p-3 rounded-xl cursor-pointer hover-elevate text-left ${prompt.isWorkflow ? 'border-primary/30 bg-primary/5' : ''}`}
+                    onClick={() => handleSuggestionClick(prompt)}
                     data-testid={`card-suggestion-${idx}`}
                   >
-                    <p className="text-sm">{question}</p>
+                    <p className="text-sm">{prompt.text}</p>
+                    {prompt.isWorkflow && (
+                      <span className="text-xs text-primary mt-1 block">Interactive workflow</span>
+                    )}
                   </Card>
                 ))}
               </div>
             </div>
-          ) : (
+          ) : !activeWorkflow && (
             <AnimatePresence>
               {messages.map((message) => (
                 <motion.div
@@ -525,15 +813,15 @@ ${emailContext.contacts.length > 0 ? `- Recipients loaded: ${emailContext.contac
                       <div className="flex-1 min-w-0">
                         {message.content && (
                           <div
-                            className="text-sm whitespace-pre-wrap leading-relaxed prose prose-sm dark:prose-invert max-w-none"
+                            className="text-sm leading-relaxed prose prose-sm dark:prose-invert max-w-none"
                             data-testid={`card-message-content-${message.id}`}
                           >
-                            {message.content}
+                            <ReactMarkdown>{message.content}</ReactMarkdown>
                           </div>
                         )}
                         {message.a2uiComponents && message.a2uiComponents.length > 0 && (
                           <div className="mt-3" data-testid={`container-a2ui-${message.id}`}>
-                            <A2UIRenderer components={message.a2uiComponents} />
+                            <A2UIRenderer components={message.a2uiComponents} onAction={handleA2UIAction} />
                           </div>
                         )}
                         <div className="flex items-center gap-1 mt-2 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -595,8 +883,15 @@ ${emailContext.contacts.length > 0 ? `- Recipients loaded: ${emailContext.contac
               </Avatar>
               <div className="flex-1 min-w-0">
                 {streamingContent ? (
-                  <div className="text-sm whitespace-pre-wrap leading-relaxed prose prose-sm dark:prose-invert max-w-none" data-testid="text-streaming-content">
-                    {streamingContent}
+                  <div className="text-sm leading-relaxed prose prose-sm dark:prose-invert max-w-none" data-testid="text-streaming-content">
+                    {/* Hide JSON code blocks during streaming - just show loading indicator */}
+                    {streamingContent.includes('```') ? (
+                      <div className="flex items-center gap-2 text-muted-foreground">
+                        <span className="animate-pulse">Generating interactive components...</span>
+                      </div>
+                    ) : (
+                      <ReactMarkdown>{streamingContent}</ReactMarkdown>
+                    )}
                     <span className="inline-block w-2 h-4 bg-foreground/60 ml-0.5 animate-pulse" />
                   </div>
                 ) : (

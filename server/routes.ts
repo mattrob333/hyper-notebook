@@ -2,11 +2,14 @@ import type { Express, Request, Response } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { streamChat, chat, generateContent, summarizeSource, generateImage, availableModels, getModelsByProvider, DEFAULT_MODEL, type ModelId } from "./ai-service";
-import { insertSourceSchema, insertNoteSchema, insertWorkflowSchema, insertNotebookSchema, type ContentType } from "@shared/schema";
+import { insertSourceSchema, insertNoteSchema, insertWorkflowSchema, insertNotebookSchema, sources, type ContentType } from "@shared/schema";
 import { z } from "zod";
 import multer from "multer";
 import { extractText } from "unpdf";
 import { Hyperbrowser } from "@hyperbrowser/sdk";
+import { db } from "./db";
+import { eq, and } from "drizzle-orm";
+import { getWorkflowByTrigger } from "./workflows";
 
 const upload = multer({ 
   storage: multer.memoryStorage(),
@@ -124,6 +127,45 @@ export async function registerRoutes(
     }
   });
 
+  // Feeds API
+  app.get("/api/feeds", async (req: Request, res: Response) => {
+    try {
+      const notebookId = req.query.notebookId as string | undefined;
+      const feedsList = await storage.getFeeds(notebookId);
+      res.json(feedsList);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch feeds" });
+    }
+  });
+
+  app.get("/api/notebooks/:notebookId/feeds", async (req: Request, res: Response) => {
+    try {
+      const feedsList = await storage.getFeeds(req.params.notebookId);
+      res.json(feedsList);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch feeds" });
+    }
+  });
+
+  app.post("/api/feeds", async (req: Request, res: Response) => {
+    try {
+      const feed = await storage.createFeed(req.body);
+      res.status(201).json(feed);
+    } catch (error) {
+      console.error('[Create Feed] Error:', error);
+      res.status(500).json({ error: "Failed to create feed" });
+    }
+  });
+
+  app.delete("/api/feeds/:id", async (req: Request, res: Response) => {
+    try {
+      await storage.deleteFeed(req.params.id);
+      res.status(204).send();
+    } catch (error) {
+      res.status(500).json({ error: "Failed to delete feed" });
+    }
+  });
+
   app.post("/api/sources", async (req: Request, res: Response) => {
     try {
       const validated = insertSourceSchema.parse(req.body);
@@ -143,10 +185,60 @@ export async function registerRoutes(
       if (!source) {
         return res.status(404).json({ error: "Source not found" });
       }
-      const summary = await summarizeSource(source.content, { model: req.body.model });
+
+      let contentToSummarize = source.content;
+
+      // For URL sources, fetch the actual content using Firecrawl
+      if (source.type === 'url') {
+        const firecrawlKey = process.env.FIRECRAWL_API_KEY;
+        const url = source.content;
+
+        if (firecrawlKey) {
+          console.log('[Summarize] Fetching URL content via Firecrawl:', url);
+          try {
+            const scrapeResponse = await fetch('https://api.firecrawl.dev/v1/scrape', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${firecrawlKey}`,
+              },
+              body: JSON.stringify({
+                url,
+                formats: ['markdown'],
+                onlyMainContent: true,
+              }),
+            });
+
+            if (scrapeResponse.ok) {
+              const scrapeResult = await scrapeResponse.json();
+              if (scrapeResult.success && scrapeResult.data?.markdown) {
+                contentToSummarize = scrapeResult.data.markdown;
+                // Also update the source content with the scraped data
+                await storage.updateSource(req.params.id, { 
+                  content: contentToSummarize.slice(0, 50000) // Limit stored content
+                });
+              }
+            }
+          } catch (scrapeError) {
+            console.error('[Summarize] Firecrawl error:', scrapeError);
+          }
+        } else {
+          // Fallback to basic fetch
+          try {
+            const response = await fetch(url);
+            const html = await response.text();
+            contentToSummarize = html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 10000);
+          } catch (fetchError) {
+            console.error('[Summarize] Fetch error:', fetchError);
+          }
+        }
+      }
+
+      const summary = await summarizeSource(contentToSummarize, { model: req.body.model });
       await storage.updateSource(req.params.id, { summary });
       res.json({ summary });
     } catch (error) {
+      console.error('[Summarize] Error:', error);
       res.status(500).json({ error: "Failed to summarize source" });
     }
   });
@@ -157,6 +249,24 @@ export async function registerRoutes(
       res.status(204).send();
     } catch (error) {
       res.status(500).json({ error: "Failed to delete source" });
+    }
+  });
+
+  app.patch("/api/sources/:id", async (req: Request, res: Response) => {
+    try {
+      const { category, summary, content } = req.body;
+      const updates: Record<string, any> = {};
+      
+      if (category) updates.category = category;
+      if (summary !== undefined) updates.summary = summary;
+      if (content !== undefined) updates.content = content;
+      
+      await storage.updateSource(req.params.id, updates);
+      const updated = await storage.getSource(req.params.id);
+      res.json(updated);
+    } catch (error) {
+      console.error('[PATCH Source] Error:', error);
+      res.status(500).json({ error: "Failed to update source" });
     }
   });
 
@@ -388,6 +498,511 @@ Write ONLY the script text, no stage directions or speaker labels.`;
     }
   });
 
+  // Firecrawl fast scrape endpoint
+  app.post("/api/firecrawl-scrape", async (req: Request, res: Response) => {
+    try {
+      const { url, formats = ['markdown'] } = req.body;
+      
+      if (!url) {
+        return res.status(400).json({ error: "URL is required" });
+      }
+
+      const apiKey = process.env.FIRECRAWL_API_KEY;
+      
+      if (!apiKey) {
+        console.log('[Firecrawl] No API key, falling back to Hyperbrowser/fetch');
+        // Redirect to the regular scrape endpoint
+        return res.redirect(307, '/api/scrape');
+      }
+
+      console.log('[Firecrawl] Scraping:', url);
+      
+      const response = await fetch('https://api.firecrawl.dev/v1/scrape', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify({
+          url,
+          formats,
+          onlyMainContent: true,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('[Firecrawl] API error:', response.status, errorText);
+        throw new Error(`Firecrawl API error: ${response.status}`);
+      }
+
+      const result = await response.json();
+      
+      if (!result.success) {
+        throw new Error(result.error || 'Firecrawl scrape failed');
+      }
+
+      const data = result.data;
+      const title = data?.metadata?.title || new URL(url).hostname;
+      const content = data?.markdown || data?.content || "";
+
+      res.json({
+        title,
+        content,
+        text: content,
+        url,
+        metadata: data?.metadata,
+      });
+    } catch (error) {
+      console.error("[Firecrawl] Error:", error);
+      res.status(500).json({
+        error: error instanceof Error ? error.message : "Unknown error occurred",
+      });
+    }
+  });
+
+  // Firecrawl Search endpoint - web search with content
+  app.post("/api/firecrawl-search", async (req: Request, res: Response) => {
+    try {
+      const { query, limit = 5 } = req.body;
+      
+      if (!query) {
+        return res.status(400).json({ error: "Query is required" });
+      }
+
+      const apiKey = process.env.FIRECRAWL_API_KEY;
+      
+      if (!apiKey) {
+        return res.status(400).json({ error: "Firecrawl API key not configured" });
+      }
+
+      console.log('[Firecrawl Search] Query:', query);
+      
+      const response = await fetch('https://api.firecrawl.dev/v1/search', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify({
+          query,
+          limit,
+          scrapeOptions: {
+            formats: ['markdown'],
+            onlyMainContent: true,
+          },
+        }),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('[Firecrawl Search] API error:', response.status, errorText);
+        throw new Error(`Firecrawl API error: ${response.status}`);
+      }
+
+      const result = await response.json();
+      
+      res.json({
+        success: true,
+        results: result.data || [],
+        query,
+      });
+    } catch (error) {
+      console.error("[Firecrawl Search] Error:", error);
+      res.status(500).json({
+        error: error instanceof Error ? error.message : "Unknown error occurred",
+      });
+    }
+  });
+
+  // Firecrawl Crawl endpoint - crawl multiple pages from a site
+  app.post("/api/firecrawl-crawl", async (req: Request, res: Response) => {
+    try {
+      const { url, limit = 10, maxDepth = 2 } = req.body;
+      
+      if (!url) {
+        return res.status(400).json({ error: "URL is required" });
+      }
+
+      const apiKey = process.env.FIRECRAWL_API_KEY;
+      
+      if (!apiKey) {
+        return res.status(400).json({ error: "Firecrawl API key not configured" });
+      }
+
+      console.log('[Firecrawl Crawl] URL:', url);
+      
+      const response = await fetch('https://api.firecrawl.dev/v1/crawl', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify({
+          url,
+          limit,
+          maxDiscoveryDepth: maxDepth,
+          scrapeOptions: {
+            formats: ['markdown'],
+            onlyMainContent: true,
+          },
+        }),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('[Firecrawl Crawl] API error:', response.status, errorText);
+        throw new Error(`Firecrawl API error: ${response.status}`);
+      }
+
+      const result = await response.json();
+      
+      // Crawl returns a job ID - we need to poll for results
+      res.json({
+        success: true,
+        jobId: result.id,
+        status: result.status,
+        message: "Crawl job started. Use /api/firecrawl-crawl-status to check progress.",
+      });
+    } catch (error) {
+      console.error("[Firecrawl Crawl] Error:", error);
+      res.status(500).json({
+        error: error instanceof Error ? error.message : "Unknown error occurred",
+      });
+    }
+  });
+
+  // Firecrawl Crawl Status endpoint
+  app.get("/api/firecrawl-crawl-status/:jobId", async (req: Request, res: Response) => {
+    try {
+      const { jobId } = req.params;
+      
+      const apiKey = process.env.FIRECRAWL_API_KEY;
+      
+      if (!apiKey) {
+        return res.status(400).json({ error: "Firecrawl API key not configured" });
+      }
+
+      const response = await fetch(`https://api.firecrawl.dev/v1/crawl/${jobId}`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${apiKey}`,
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`Firecrawl API error: ${response.status}`);
+      }
+
+      const result = await response.json();
+      
+      res.json(result);
+    } catch (error) {
+      console.error("[Firecrawl Crawl Status] Error:", error);
+      res.status(500).json({
+        error: error instanceof Error ? error.message : "Unknown error occurred",
+      });
+    }
+  });
+
+  // Firecrawl Extract endpoint - extract structured data
+  app.post("/api/firecrawl-extract", async (req: Request, res: Response) => {
+    try {
+      const { urls, prompt, schema } = req.body;
+      
+      if (!urls || !Array.isArray(urls) || urls.length === 0) {
+        return res.status(400).json({ error: "URLs array is required" });
+      }
+
+      const apiKey = process.env.FIRECRAWL_API_KEY;
+      
+      if (!apiKey) {
+        return res.status(400).json({ error: "Firecrawl API key not configured" });
+      }
+
+      console.log('[Firecrawl Extract] URLs:', urls);
+      
+      const response = await fetch('https://api.firecrawl.dev/v1/extract', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify({
+          urls,
+          prompt: prompt || "Extract the main content and key information from this page",
+          schema: schema || {
+            type: "object",
+            properties: {
+              title: { type: "string" },
+              description: { type: "string" },
+              mainContent: { type: "string" },
+              keyPoints: { type: "array", items: { type: "string" } },
+            },
+          },
+        }),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('[Firecrawl Extract] API error:', response.status, errorText);
+        throw new Error(`Firecrawl API error: ${response.status}`);
+      }
+
+      const result = await response.json();
+      
+      res.json({
+        success: true,
+        data: result.data || result,
+      });
+    } catch (error) {
+      console.error("[Firecrawl Extract] Error:", error);
+      res.status(500).json({
+        error: error instanceof Error ? error.message : "Unknown error occurred",
+      });
+    }
+  });
+
+  // RSS Feed Discovery endpoint - extracts RSS feed links from a website
+  app.post("/api/discover-rss", async (req: Request, res: Response) => {
+    try {
+      const { url } = req.body;
+      
+      if (!url) {
+        return res.status(400).json({ error: "URL is required" });
+      }
+
+      const apiKey = process.env.FIRECRAWL_API_KEY;
+      
+      if (!apiKey) {
+        return res.status(400).json({ error: "Firecrawl API key not configured" });
+      }
+
+      console.log('[RSS Discovery] URL:', url);
+      
+      // Scrape the page and look for RSS/Atom feed links
+      const response = await fetch('https://api.firecrawl.dev/v1/scrape', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify({
+          url,
+          formats: ['html', 'links'],
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Firecrawl API error: ${response.status}`);
+      }
+
+      const result = await response.json();
+      const html = result.data?.html || '';
+      const links = result.data?.links || [];
+      
+      // Extract RSS/Atom feed URLs from link tags and common patterns
+      const feedPatterns = [
+        /href=["']([^"']*(?:rss|feed|atom)[^"']*)["']/gi,
+        /href=["']([^"']*\.xml)["']/gi,
+        /href=["']([^"']*\/feed\/?)["']/gi,
+      ];
+      
+      const feedUrls = new Set<string>();
+      
+      // Check link tags for RSS
+      const linkTagRegex = /<link[^>]*type=["']application\/(rss|atom)\+xml["'][^>]*href=["']([^"']+)["'][^>]*>/gi;
+      let match;
+      while ((match = linkTagRegex.exec(html)) !== null) {
+        feedUrls.add(match[2]);
+      }
+      
+      // Also check alternate link format
+      const altLinkRegex = /<link[^>]*href=["']([^"']+)["'][^>]*type=["']application\/(rss|atom)\+xml["'][^>]*>/gi;
+      while ((match = altLinkRegex.exec(html)) !== null) {
+        feedUrls.add(match[1]);
+      }
+      
+      // Check links array for common feed patterns
+      for (const link of links) {
+        const linkUrl = typeof link === 'string' ? link : link.url;
+        if (linkUrl && (
+          linkUrl.includes('/rss') ||
+          linkUrl.includes('/feed') ||
+          linkUrl.includes('/atom') ||
+          linkUrl.endsWith('.xml') ||
+          linkUrl.includes('feeds.')
+        )) {
+          feedUrls.add(linkUrl);
+        }
+      }
+      
+      // Resolve relative URLs
+      const baseUrl = new URL(url);
+      const resolvedFeeds = Array.from(feedUrls).map(feedUrl => {
+        try {
+          return new URL(feedUrl, baseUrl).href;
+        } catch {
+          return feedUrl;
+        }
+      });
+      
+      res.json({
+        success: true,
+        feeds: resolvedFeeds,
+        sourceUrl: url,
+      });
+    } catch (error) {
+      console.error("[RSS Discovery] Error:", error);
+      res.status(500).json({
+        error: error instanceof Error ? error.message : "Unknown error occurred",
+      });
+    }
+  });
+
+  // Refresh feeds endpoint - scrapes all feed-category sources
+  app.post("/api/refresh-feeds", async (req: Request, res: Response) => {
+    try {
+      const { notebookId } = req.body;
+      
+      if (!notebookId) {
+        return res.status(400).json({ error: "notebookId is required" });
+      }
+
+      // Get all feed sources for this notebook
+      const feedSources = await db.select()
+        .from(sources)
+        .where(and(
+          eq(sources.notebookId, notebookId),
+          eq(sources.category, 'feed')
+        ));
+
+      if (feedSources.length === 0) {
+        return res.json({ 
+          message: "No feed sources found",
+          results: [],
+          digest: null 
+        });
+      }
+
+      console.log(`[RefreshFeeds] Scraping ${feedSources.length} feed sources`);
+
+      // Scrape all feeds in parallel
+      const firecrawlKey = process.env.FIRECRAWL_API_KEY;
+      const scrapePromises = feedSources
+        .filter(source => source.type === 'url')
+        .map(async (source) => {
+          try {
+            let content = '';
+            let title = source.name;
+
+            if (firecrawlKey) {
+              // Use Firecrawl for fast scraping
+              const response = await fetch('https://api.firecrawl.dev/v1/scrape', {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Authorization': `Bearer ${firecrawlKey}`,
+                },
+                body: JSON.stringify({
+                  url: source.content,
+                  formats: ['markdown'],
+                  onlyMainContent: true,
+                }),
+              });
+
+              if (response.ok) {
+                const result = await response.json();
+                if (result.success) {
+                  content = result.data?.markdown || '';
+                  title = result.data?.metadata?.title || source.name;
+                }
+              }
+            } else {
+              // Fallback to basic fetch
+              const response = await fetch(source.content);
+              const html = await response.text();
+              content = html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 5000);
+            }
+
+            return {
+              id: source.id,
+              name: title,
+              url: source.content,
+              content: content.slice(0, 3000), // Limit content size
+              success: true,
+            };
+          } catch (err) {
+            console.error(`[RefreshFeeds] Error scraping ${source.name}:`, err);
+            return {
+              id: source.id,
+              name: source.name,
+              url: source.content,
+              content: '',
+              success: false,
+              error: err instanceof Error ? err.message : 'Unknown error',
+            };
+          }
+        });
+
+      const results = await Promise.all(scrapePromises);
+      const successfulResults = results.filter(r => r.success && r.content);
+
+      // Generate AI digest if we have content
+      let digest = null;
+      if (successfulResults.length > 0) {
+        const combinedContent = successfulResults
+          .map(r => `## ${r.name}\nSource: ${r.url}\n\n${r.content}`)
+          .join('\n\n---\n\n');
+
+        const apiKey = process.env.OPENROUTER_API_KEY;
+        if (apiKey) {
+          try {
+            const aiResponse = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+              method: "POST",
+              headers: {
+                "Authorization": `Bearer ${apiKey}`,
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({
+                model: "anthropic/claude-3.5-sonnet",
+                messages: [
+                  {
+                    role: "system",
+                    content: "You are a news digest assistant. Summarize the following articles into a concise news digest with key highlights and takeaways. Format with clear sections and bullet points."
+                  },
+                  {
+                    role: "user",
+                    content: `Create a news digest from these ${successfulResults.length} sources:\n\n${combinedContent}`
+                  }
+                ],
+                max_tokens: 2000,
+              }),
+            });
+
+            if (aiResponse.ok) {
+              const aiResult = await aiResponse.json();
+              digest = aiResult.choices?.[0]?.message?.content || null;
+            }
+          } catch (aiError) {
+            console.error('[RefreshFeeds] AI digest error:', aiError);
+          }
+        }
+      }
+
+      res.json({
+        message: `Refreshed ${successfulResults.length} of ${feedSources.length} feeds`,
+        results,
+        digest,
+      });
+    } catch (error) {
+      console.error("[RefreshFeeds] Error:", error);
+      res.status(500).json({
+        error: error instanceof Error ? error.message : "Unknown error occurred",
+      });
+    }
+  });
+
   // Web search endpoint for finding sources
   app.post("/api/search/web", async (req: Request, res: Response) => {
     try {
@@ -493,6 +1108,7 @@ Write ONLY the script text, no stage directions or speaker labels.`;
       // Create the source
       const source = await storage.createSource({
         type: sourceType,
+        category: 'context',
         name: generatedTitle,
         content: content,
         notebookId: notebookId,
@@ -582,7 +1198,7 @@ Write ONLY the script text, no stage directions or speaker labels.`;
 
   app.post("/api/chat", async (req: Request, res: Response) => {
     try {
-      const { messages, model, conversationId, systemPrompt } = req.body;
+      const { messages, model, conversationId, systemPrompt, sources, sourceSummaries } = req.body;
       
       res.setHeader("Content-Type", "text/event-stream");
       res.setHeader("Cache-Control", "no-cache");
@@ -590,9 +1206,57 @@ Write ONLY the script text, no stage directions or speaker labels.`;
 
       let fullResponse = "";
       
+      // Check if this is a workflow trigger
+      const lastMessage = messages[messages.length - 1]?.content || '';
+      const workflow = getWorkflowByTrigger(lastMessage);
+      
+      // Build source context section if sources are provided
+      let sourceContextSection = '';
+      if (sources && sources.length > 0) {
+        sourceContextSection = `\n\n## Available Sources\n\nThe user has provided the following sources for context. Use this information to answer their questions:\n\n`;
+        sources.forEach((source: { name: string; type: string; content?: string; summary?: string }, idx: number) => {
+          sourceContextSection += `### Source ${idx + 1}: ${source.name}\n`;
+          sourceContextSection += `- **Type:** ${source.type}\n`;
+          if (source.summary) {
+            sourceContextSection += `- **Summary:** ${source.summary}\n`;
+          }
+          if (source.content) {
+            sourceContextSection += `- **Content:**\n\`\`\`\n${source.content.slice(0, 3000)}${source.content.length > 3000 ? '\n...(truncated)' : ''}\n\`\`\`\n`;
+          }
+          sourceContextSection += '\n';
+        });
+      }
+      
+      // Use workflow system prompt if detected, otherwise default
+      let finalSystemPrompt: string;
+      
+      if (workflow) {
+        // Workflow-specific prompt with source context appended
+        finalSystemPrompt = workflow.systemPrompt + sourceContextSection;
+      } else if (systemPrompt) {
+        finalSystemPrompt = systemPrompt;
+      } else {
+        finalSystemPrompt = `You are a helpful research assistant. When appropriate, format your responses with markdown for readability.
+
+## Your Role
+
+You help users analyze and work with their sources. When the user asks about their sources:
+- Read and understand the source content provided below
+- Synthesize information across multiple sources
+- Create summaries, newsletters, reports, or other content based on the sources
+- Answer questions using the source material
+
+## Response Format
+
+- Use markdown formatting (headers, bold, lists, etc.)
+- Structure long responses with clear sections
+- When creating newsletters or content, use professional formatting
+- Cite which sources you're drawing from when relevant${sourceContextSection}`;
+      }
+
       for await (const token of streamChat(messages, { 
         model: model as ModelId,
-        systemPrompt: systemPrompt || "You are a helpful research assistant. When appropriate, format your responses with structured data that can be rendered as interactive components."
+        systemPrompt: finalSystemPrompt
       })) {
         fullResponse += token;
         res.write(`data: ${JSON.stringify({ token, type: "token" })}\n\n`);
@@ -693,6 +1357,25 @@ Write ONLY the script text, no stage directions or speaker labels.`;
       res.status(204).send();
     } catch (error) {
       res.status(500).json({ error: "Failed to delete content" });
+    }
+  });
+
+  // Save workflow-generated content directly
+  app.post("/api/generated/save", async (req: Request, res: Response) => {
+    try {
+      const { type, title, content, sourceIds, metadata } = req.body;
+      
+      const generated = await storage.createGeneratedContent({
+        type: type || 'workflow_content',
+        title: title || `Generated Content - ${new Date().toLocaleDateString()}`,
+        content: content,
+        sourceIds: sourceIds || [],
+      });
+
+      res.json(generated);
+    } catch (error) {
+      console.error("Save generated content error:", error);
+      res.status(500).json({ error: "Failed to save generated content" });
     }
   });
 

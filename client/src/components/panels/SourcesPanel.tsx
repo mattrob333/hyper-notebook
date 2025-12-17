@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import ReactMarkdown from "react-markdown";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -31,7 +32,10 @@ import {
   Search,
   ArrowRight,
   Hourglass,
-  X
+  X,
+  Rss,
+  RefreshCw,
+  Tag
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -41,7 +45,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import type { Source } from "@/lib/types";
+import type { Source, Feed } from "@/lib/types";
 
 interface SourcesPanelProps {
   onSourcesChange?: (selectedSourceIds: string[]) => void;
@@ -89,9 +93,15 @@ export default function SourcesPanel({
   }>>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [showSearchResults, setShowSearchResults] = useState(false);
+  const [feedsExpanded, setFeedsExpanded] = useState(false);
+  const [discoveringRss, setDiscoveringRss] = useState<string | null>(null);
 
   const { data: sources = [], isLoading, isError, error } = useQuery<Source[]>({
     queryKey: notebookId ? [`/api/notebooks/${notebookId}/sources`] : ['/api/sources'],
+  });
+
+  const { data: feedsList = [] } = useQuery<Feed[]>({
+    queryKey: notebookId ? [`/api/notebooks/${notebookId}/feeds`] : ['/api/feeds'],
   });
 
   useEffect(() => {
@@ -152,6 +162,34 @@ export default function SourcesPanel({
     },
   });
 
+  const updateSourceCategoryMutation = useMutation({
+    mutationFn: async ({ id, category }: { id: string; category: 'context' | 'feed' | 'reference' }) => {
+      const res = await apiRequest('PATCH', `/api/sources/${id}`, { category });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: notebookId ? [`/api/notebooks/${notebookId}/sources`] : ['/api/sources'] });
+      toast({ title: "Category updated" });
+    },
+    onError: (err: Error) => {
+      toast({ title: "Failed to update category", description: err.message, variant: "destructive" });
+    },
+  });
+
+  const refreshFeedsMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest('POST', '/api/refresh-feeds', { notebookId });
+      return res.json();
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: notebookId ? [`/api/notebooks/${notebookId}/sources`] : ['/api/sources'] });
+      toast({ title: "Feeds refreshed", description: `Updated ${data.updated || 0} feed sources` });
+    },
+    onError: (err: Error) => {
+      toast({ title: "Failed to refresh feeds", description: err.message, variant: "destructive" });
+    },
+  });
+
   const deepResearchMutation = useMutation({
     mutationFn: async (topic: string) => {
       const res = await apiRequest('POST', '/api/chat/simple', {
@@ -173,6 +211,75 @@ export default function SourcesPanel({
       toast({ title: "Research failed", description: err.message, variant: "destructive" });
     },
   });
+
+  const createFeedMutation = useMutation({
+    mutationFn: async (feed: { name: string; url: string; sourceUrl?: string }) => {
+      const res = await apiRequest('POST', '/api/feeds', { ...feed, notebookId });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: notebookId ? [`/api/notebooks/${notebookId}/feeds`] : ['/api/feeds'] });
+      toast({ title: "Feed added" });
+    },
+    onError: (err: Error) => {
+      toast({ title: "Failed to add feed", description: err.message, variant: "destructive" });
+    },
+  });
+
+  const deleteFeedMutation = useMutation({
+    mutationFn: async (id: string) => {
+      await apiRequest('DELETE', `/api/feeds/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: notebookId ? [`/api/notebooks/${notebookId}/feeds`] : ['/api/feeds'] });
+      toast({ title: "Feed removed" });
+    },
+    onError: (err: Error) => {
+      toast({ title: "Failed to remove feed", description: err.message, variant: "destructive" });
+    },
+  });
+
+  const getSourceUrl = (source: Source): string | null => {
+    // For URL sources, content should be the URL, but check if it's valid
+    if (source.content?.startsWith('http://') || source.content?.startsWith('https://')) {
+      return source.content;
+    }
+    // Check metadata for URL
+    if (source.metadata?.url) {
+      return source.metadata.url as string;
+    }
+    if (source.metadata?.sourceUrl) {
+      return source.metadata.sourceUrl as string;
+    }
+    return null;
+  };
+
+  const discoverRssFeed = async (source: Source) => {
+    const sourceUrl = getSourceUrl(source);
+    if (!sourceUrl) {
+      toast({ title: "Cannot find URL", description: "This source doesn't have a valid URL", variant: "destructive" });
+      return;
+    }
+    
+    setDiscoveringRss(source.id);
+    try {
+      const res = await apiRequest('POST', '/api/discover-rss', { url: sourceUrl });
+      const data = await res.json();
+      if (data.feeds && data.feeds.length > 0) {
+        // Auto-add the first discovered feed
+        const feedUrl = data.feeds[0];
+        const feedName = new URL(feedUrl).hostname + ' RSS Feed';
+        await createFeedMutation.mutateAsync({ name: feedName, url: feedUrl, sourceUrl });
+        toast({ title: "RSS feed discovered", description: `Found ${data.feeds.length} feed(s)` });
+      } else {
+        toast({ title: "No RSS feeds found", description: "This website doesn't appear to have an RSS feed", variant: "destructive" });
+      }
+    } catch (err) {
+      toast({ title: "Failed to discover RSS", description: err instanceof Error ? err.message : "Unknown error", variant: "destructive" });
+    } finally {
+      setDiscoveringRss(null);
+    }
+  };
 
   const [isFetchingMetadata, setIsFetchingMetadata] = useState(false);
   
@@ -389,19 +496,6 @@ export default function SourcesPanel({
           Add sources
         </Button>
 
-        {/* Deep Research Banner */}
-        <button
-          className="w-full flex items-center gap-2 px-3 py-2 rounded-xl bg-primary/5 dark:bg-primary/10 border border-primary/20 hover-elevate transition-colors text-left"
-          onClick={() => setDeepResearchDialogOpen(true)}
-          data-testid="button-deep-research-banner"
-        >
-          <Hourglass className="w-4 h-4 text-primary shrink-0" />
-          <span className="text-sm">
-            <span className="text-primary font-medium">Try Deep Research</span>
-            <span className="text-muted-foreground"> for an in-depth report and new sources!</span>
-          </span>
-        </button>
-
         {/* Web Search Section */}
         <div className="space-y-2">
           <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-muted/50 border border-border/50">
@@ -469,6 +563,22 @@ export default function SourcesPanel({
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
+
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-1 rounded-lg"
+              onClick={() => refreshFeedsMutation.mutate()}
+              disabled={refreshFeedsMutation.isPending}
+              data-testid="button-refresh-feeds"
+            >
+              {refreshFeedsMutation.isPending ? (
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              ) : (
+                <RefreshCw className="w-3.5 h-3.5" />
+              )}
+              Refresh Feeds
+            </Button>
           </div>
         </div>
       </div>
@@ -518,21 +628,26 @@ export default function SourcesPanel({
               ))}
             </div>
           ) : searchResults.length > 0 ? (
-            <ScrollArea className="max-h-48">
-              <div className="space-y-1">
+            <div className="h-64 overflow-y-scroll scrollbar-thin">
+              <div className="space-y-1 pr-2 pb-2">
                 {searchResults.map((result) => (
                   <div
                     key={result.id}
-                    className={`flex items-start gap-2 p-2 rounded-lg cursor-pointer hover-elevate transition-colors ${
+                    className={`flex items-start gap-2 p-2 rounded-lg cursor-pointer hover:bg-muted/50 transition-colors ${
                       result.selected ? 'bg-primary/10' : ''
                     }`}
-                    onClick={() => toggleSearchResult(result.id)}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      toggleSearchResult(result.id);
+                    }}
                     data-testid={`search-result-${result.id}`}
                   >
                     <Checkbox
                       checked={result.selected}
                       onCheckedChange={() => toggleSearchResult(result.id)}
                       className="mt-0.5"
+                      onClick={(e) => e.stopPropagation()}
                     />
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium truncate">{result.title}</p>
@@ -541,7 +656,7 @@ export default function SourcesPanel({
                   </div>
                 ))}
               </div>
-            </ScrollArea>
+            </div>
           ) : (
             <p className="text-sm text-muted-foreground text-center py-4">No results found</p>
           )}
@@ -555,11 +670,12 @@ export default function SourcesPanel({
         <Checkbox
           checked={sources.length > 0 && selectedSources.size === sources.length}
           onCheckedChange={toggleSelectAll}
+          className="mr-2"
           data-testid="checkbox-select-all"
         />
       </div>
 
-      <ScrollArea className="flex-1">
+      <div className="flex-1 overflow-y-auto">
         <div className="px-4 pb-4">
           {isLoading ? (
             <div className="space-y-2" data-testid="sources-loading">
@@ -588,7 +704,7 @@ export default function SourcesPanel({
               </p>
             </div>
           ) : (
-            <div className="space-y-1" data-testid="sources-list">
+            <div className="space-y-1 w-full" data-testid="sources-list">
               {sources.map((source) => {
                 const Icon = sourceTypeIcons[source.type] || FileText;
                 const isSelected = selectedSources.has(source.id);
@@ -600,13 +716,13 @@ export default function SourcesPanel({
                 return (
                   <div
                     key={source.id}
-                    className={`rounded-xl border border-border/50 transition-colors ${
+                    className={`w-full rounded-xl border border-border/50 transition-colors overflow-hidden ${
                       isActive ? 'bg-primary/10 border-primary/30' : 'bg-card'
                     }`}
                     data-testid={`source-item-${source.id}`}
                   >
                     <div
-                      className="flex items-center gap-3 px-3 py-2.5 cursor-pointer hover-elevate"
+                      className="flex items-center gap-2 px-2 py-2.5 cursor-pointer hover:bg-muted/50 transition-colors min-w-0"
                       onClick={() => {
                         toggleExpand(source.id);
                         onSelectSource?.(source);
@@ -629,13 +745,16 @@ export default function SourcesPanel({
                       <div className="p-1.5 rounded-lg bg-muted shrink-0">
                         <Icon className="w-4 h-4 text-muted-foreground" />
                       </div>
-                      <span className="flex-1 text-sm truncate" data-testid={`text-source-name-${source.id}`}>
-                        {source.name}
-                      </span>
+                      <div className="flex-1 min-w-0 overflow-hidden">
+                        <span className="text-sm block truncate" data-testid={`text-source-name-${source.id}`}>
+                          {source.name}
+                        </span>
+                      </div>
                       <Checkbox
                         checked={isSelected}
                         onCheckedChange={() => toggleSourceSelection(source.id)}
                         onClick={(e) => e.stopPropagation()}
+                        className="shrink-0 ml-1"
                         data-testid={`checkbox-source-${source.id}`}
                       />
                     </div>
@@ -643,9 +762,9 @@ export default function SourcesPanel({
                     {isExpanded && (
                       <div className="px-3 pb-3 pt-1 border-t border-border/30">
                         {source.summary ? (
-                          <p className="text-xs text-muted-foreground mb-3 leading-relaxed" data-testid={`text-summary-${source.id}`}>
-                            {source.summary}
-                          </p>
+                          <div className="text-xs text-muted-foreground mb-3 leading-relaxed prose prose-sm prose-neutral dark:prose-invert max-w-none" data-testid={`text-summary-${source.id}`}>
+                            <ReactMarkdown>{source.summary}</ReactMarkdown>
+                          </div>
                         ) : (
                           <p className="text-xs text-muted-foreground/50 mb-3 italic" data-testid={`text-no-summary-${source.id}`}>
                             No summary available
@@ -683,6 +802,65 @@ export default function SourcesPanel({
                             <Trash2 className="w-3 h-3 mr-1" />
                             Delete
                           </Button>
+                          
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={(e) => e.stopPropagation()}
+                                data-testid={`dropdown-category-${source.id}`}
+                              >
+                                {source.category === 'feed' ? (
+                                  <Rss className="w-3 h-3 mr-1" />
+                                ) : source.category === 'reference' ? (
+                                  <FileText className="w-3 h-3 mr-1" />
+                                ) : (
+                                  <Tag className="w-3 h-3 mr-1" />
+                                )}
+                                {source.category || 'context'}
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="start" onClick={(e) => e.stopPropagation()}>
+                              <DropdownMenuItem 
+                                onClick={() => updateSourceCategoryMutation.mutate({ id: source.id, category: 'context' })}
+                              >
+                                <Tag className="w-3 h-3 mr-2" />
+                                Context
+                              </DropdownMenuItem>
+                              <DropdownMenuItem 
+                                onClick={() => updateSourceCategoryMutation.mutate({ id: source.id, category: 'feed' })}
+                              >
+                                <Rss className="w-3 h-3 mr-2" />
+                                Feed (auto-refresh)
+                              </DropdownMenuItem>
+                              <DropdownMenuItem 
+                                onClick={() => updateSourceCategoryMutation.mutate({ id: source.id, category: 'reference' })}
+                              >
+                                <FileText className="w-3 h-3 mr-2" />
+                                Reference
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                          
+                          {source.type === 'url' && getSourceUrl(source) && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                discoverRssFeed(source);
+                              }}
+                              disabled={discoveringRss === source.id}
+                            >
+                              {discoveringRss === source.id ? (
+                                <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+                              ) : (
+                                <Rss className="w-3 h-3 mr-1" />
+                              )}
+                              Find RSS
+                            </Button>
+                          )}
                         </div>
                       </div>
                     )}
@@ -692,7 +870,59 @@ export default function SourcesPanel({
             </div>
           )}
         </div>
-      </ScrollArea>
+      </div>
+
+      {/* Feeds Section */}
+      <div className="border-t border-border/50">
+        <button
+          onClick={() => setFeedsExpanded(!feedsExpanded)}
+          className="w-full px-4 py-3 flex items-center justify-between hover:bg-muted/30 transition-colors"
+        >
+          <div className="flex items-center gap-2">
+            <Rss className="w-4 h-4 text-orange-500" />
+            <span className="text-sm font-medium">RSS Feeds</span>
+            <span className="text-xs text-muted-foreground">({feedsList.length})</span>
+          </div>
+          {feedsExpanded ? (
+            <ChevronDown className="w-4 h-4 text-muted-foreground" />
+          ) : (
+            <ChevronRight className="w-4 h-4 text-muted-foreground" />
+          )}
+        </button>
+        
+        {feedsExpanded && (
+          <div className="px-4 pb-4 space-y-2">
+            {feedsList.length === 0 ? (
+              <p className="text-xs text-muted-foreground/50 italic py-2">
+                No RSS feeds yet. Click "Find RSS" on a URL source to discover feeds.
+              </p>
+            ) : (
+              feedsList.map((feed) => (
+                <div
+                  key={feed.id}
+                  className="flex items-center justify-between p-2 rounded-lg bg-muted/30 border border-border/30"
+                >
+                  <div className="flex items-center gap-2 min-w-0 flex-1">
+                    <Rss className="w-3.5 h-3.5 text-orange-500 shrink-0" />
+                    <div className="min-w-0 flex-1">
+                      <p className="text-xs font-medium truncate">{feed.name}</p>
+                      <p className="text-[10px] text-muted-foreground truncate">{feed.url}</p>
+                    </div>
+                  </div>
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    className="h-6 w-6 shrink-0 text-muted-foreground hover:text-destructive"
+                    onClick={() => deleteFeedMutation.mutate(feed.id)}
+                  >
+                    <Trash2 className="w-3 h-3" />
+                  </Button>
+                </div>
+              ))
+            )}
+          </div>
+        )}
+      </div>
 
       <Dialog open={addUrlDialogOpen} onOpenChange={setAddUrlDialogOpen}>
         <DialogContent className="rounded-2xl" data-testid="dialog-add-url">

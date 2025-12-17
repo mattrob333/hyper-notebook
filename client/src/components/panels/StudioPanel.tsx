@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import ReactMarkdown from "react-markdown";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
@@ -497,6 +498,70 @@ export default function StudioPanel({
             setIsFullscreen(false);
           }}
         />
+      );
+    }
+
+    // Workflow-generated content (has markdown field)
+    // Use type assertion to handle workflow content types not in the original enum
+    const contentType = generatedContent.type as string;
+    if (generatedContent.content?.markdown || contentType === 'workflow_content' || contentType === 'email_draft' || contentType === 'report') {
+      const markdownContent = generatedContent.content?.markdown || 
+        (typeof generatedContent.content === 'string' ? generatedContent.content : '');
+      const imageData = generatedContent.content?.image;
+      
+      return (
+        <div className={`flex flex-col h-full ${isFullscreen ? 'fixed inset-0 z-50 bg-background' : ''}`}>
+          <div className="flex items-center justify-between gap-2 p-3 border-b border-border/50 shrink-0">
+            <div className="flex items-center gap-2">
+              <Button 
+                variant="ghost" 
+                size="icon"
+                onClick={() => {
+                  setActiveView('main');
+                  setIsFullscreen(false);
+                }}
+              >
+                <ArrowLeft className="w-4 h-4" />
+              </Button>
+              <div className="p-1.5 rounded-lg bg-primary/10">
+                <FileText className="w-4 h-4 text-primary" />
+              </div>
+              <div className="min-w-0">
+                <h3 className="font-medium text-sm truncate">{generatedContent.title}</h3>
+                <p className="text-xs text-muted-foreground">
+                  {generatedContent.sourceIds?.length || 0} sources
+                </p>
+              </div>
+            </div>
+            <Button 
+              variant="ghost" 
+              size="icon"
+              onClick={() => setIsFullscreen(!isFullscreen)}
+            >
+              {isFullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
+            </Button>
+          </div>
+          <ScrollArea className="flex-1">
+            <div className="p-4 space-y-4">
+              {/* Image preview if available */}
+              {imageData && (
+                <div className="rounded-lg border overflow-hidden bg-muted">
+                  <img 
+                    src={imageData.startsWith('http') ? imageData : 
+                         imageData.startsWith('data:') ? imageData :
+                         `data:image/png;base64,${imageData}`}
+                    alt="Generated content image"
+                    className="w-full h-auto max-h-[300px] object-contain"
+                  />
+                </div>
+              )}
+              {/* Markdown content */}
+              <div className="prose prose-sm dark:prose-invert max-w-none">
+                <ReactMarkdown>{markdownContent}</ReactMarkdown>
+              </div>
+            </div>
+          </ScrollArea>
+        </div>
       );
     }
     

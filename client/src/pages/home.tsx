@@ -60,22 +60,35 @@ export default function Home() {
   }, []);
 
   const handleNewMessage = async (content: string, response?: string, a2uiComponents?: A2UIComponent[]) => {
-    if (response) {
-      const userMessage: ChatMessage = {
-        id: Date.now().toString(),
-        role: 'user',
-        content,
-        timestamp: new Date(),
-      };
-      const assistantMessage: ChatMessage = {
+    // Check if we have a response OR a2ui components to display
+    const hasResponse = response || (a2uiComponents && a2uiComponents.length > 0);
+    
+    if (hasResponse) {
+      const newMessages: ChatMessage[] = [];
+      
+      // Only add user message if content is not empty
+      if (content && content.trim()) {
+        newMessages.push({
+          id: Date.now().toString(),
+          role: 'user',
+          content,
+          timestamp: new Date(),
+        });
+      }
+      
+      // Always add assistant message with response or components
+      newMessages.push({
         id: (Date.now() + 1).toString(),
         role: 'assistant',
-        content: response,
+        content: response || '',
         a2uiComponents,
         timestamp: new Date(),
-      };
-      setMessages(prev => [...prev, userMessage, assistantMessage]);
-    } else {
+      });
+      
+      console.log('Adding messages:', newMessages.length, 'with components:', a2uiComponents?.length || 0);
+      setMessages(prev => [...prev, ...newMessages]);
+    } else if (content && content.trim()) {
+      // Only add user message if there's content
       const userMessage: ChatMessage = {
         id: Date.now().toString(),
         role: 'user',
