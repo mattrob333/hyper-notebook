@@ -49,25 +49,25 @@ export default function Navbar({
   onCreateNotebook
 }: NavbarProps) {
   return (
-    <header className="h-12 border-b flex items-center justify-between gap-4 px-4 bg-background" data-testid="navbar">
-      <div className="flex items-center gap-3">
+    <header className="h-12 border-b flex items-center justify-between gap-2 sm:gap-4 px-2 sm:px-4 bg-background" data-testid="navbar">
+      <div className="flex items-center gap-2 sm:gap-3 min-w-0">
         {/* Logo - click to go back to dashboard */}
         <button 
           onClick={onBackToDashboard}
-          className="h-8 w-8 rounded-lg overflow-hidden hover:opacity-80 transition-opacity flex-shrink-0"
+          className="h-7 w-7 sm:h-8 sm:w-8 rounded-lg overflow-hidden hover:opacity-80 transition-opacity flex-shrink-0"
           title="Back to notebooks"
         >
           <img src="/favicon.png" alt="Logo" className="w-full h-full object-contain" />
         </button>
 
         {notebookName ? (
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 min-w-0">
             {/* Notebook dropdown selector */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="sm" className="gap-1 text-sm font-medium">
-                  {notebookName}
-                  <ChevronDown className="w-4 h-4 text-muted-foreground" />
+                <Button variant="ghost" size="sm" className="gap-1 text-xs sm:text-sm font-medium max-w-[120px] sm:max-w-[200px] truncate">
+                  <span className="truncate">{notebookName}</span>
+                  <ChevronDown className="w-3 h-3 sm:w-4 sm:h-4 text-muted-foreground flex-shrink-0" />
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="start" className="rounded-xl min-w-[200px]">
@@ -96,38 +96,38 @@ export default function Navbar({
             </DropdownMenu>
           </div>
         ) : (
-          <span className="font-medium text-sm">Hyper-Notebook</span>
+          <span className="font-medium text-xs sm:text-sm">Hyper-Notebook</span>
         )}
       </div>
 
-      <div className="flex items-center gap-1">
-        {/* Create notebook button */}
+      <div className="flex items-center gap-0.5 sm:gap-1">
+        {/* Create notebook button - icon only on mobile */}
         <Button 
           variant="ghost" 
-          size="sm" 
-          className="gap-2 text-xs rounded-lg" 
+          size="icon"
+          className="h-8 w-8 sm:h-auto sm:w-auto sm:gap-2 sm:text-xs sm:px-3 rounded-lg" 
           data-testid="button-create-notebook"
           onClick={onCreateNotebook}
         >
           <Plus className="w-4 h-4" />
-          New Notebook
+          <span className="hidden sm:inline">New</span>
         </Button>
 
-        <Button variant="ghost" size="sm" className="gap-2 text-xs rounded-lg" data-testid="button-share">
+        <Button variant="ghost" size="icon" className="h-8 w-8 sm:h-auto sm:w-auto sm:gap-2 sm:text-xs sm:px-3 rounded-lg" data-testid="button-share">
           <Share2 className="w-4 h-4" />
-          Share
+          <span className="hidden sm:inline">Share</span>
         </Button>
 
-        <Button variant="ghost" size="sm" className="gap-2 text-xs rounded-lg" data-testid="button-settings">
+        <Button variant="ghost" size="icon" className="h-8 w-8 sm:h-auto sm:w-auto sm:gap-2 sm:text-xs sm:px-3 rounded-lg hidden sm:flex" data-testid="button-settings">
           <Settings className="w-4 h-4" />
-          Settings
+          <span className="hidden sm:inline">Settings</span>
         </Button>
 
         <Button 
           variant="ghost" 
           size="icon" 
           onClick={onToggleDarkMode}
-          className="ml-2"
+          className="h-8 w-8"
           data-testid="button-theme-toggle"
         >
           {isDarkMode ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
@@ -141,22 +141,21 @@ export default function Navbar({
                 afterSignOutUrl="/"
                 appearance={{
                   elements: {
-                    avatarBox: "w-8 h-8"
+                    avatarBox: "w-7 h-7 sm:w-8 sm:h-8"
                   }
                 }}
               />
             </SignedIn>
             <SignedOut>
               <SignInButton mode="modal">
-                <Button variant="ghost" size="sm" className="gap-2 text-xs rounded-lg">
+                <Button variant="ghost" size="icon" className="h-8 w-8">
                   <User className="w-4 h-4" />
-                  Sign In
                 </Button>
               </SignInButton>
             </SignedOut>
           </>
         ) : (
-          <Avatar className="w-8 h-8">
+          <Avatar className="w-7 h-7 sm:w-8 sm:h-8">
             <AvatarFallback className="text-xs">U</AvatarFallback>
           </Avatar>
         )}

@@ -7,6 +7,8 @@ import {
   ResizableHandle,
   type ImperativePanelHandle
 } from "@/components/ui/resizable";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { FileText, MessageSquare, Sparkles } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import SourcesPanel from "@/components/panels/SourcesPanel";
 import ChatPanel from "@/components/panels/ChatPanel";
@@ -17,16 +19,32 @@ import { DocumentPanelProvider, useDocumentPanel } from "@/contexts/DocumentPane
 import type { Source, ChatMessage, A2UIComponent, Notebook } from "@/lib/types";
 import type { DocumentType } from "@/components/studio/DocumentPanel";
 
+// Hook to detect mobile screen
+function useIsMobile() {
+  const [isMobile, setIsMobile] = useState(false);
+  
+  useEffect(() => {
+    const checkMobile = () => setIsMobile(window.innerWidth < 768);
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+  
+  return isMobile;
+}
+
 function HomeContent() {
   const params = useParams<{ id: string }>();
   const [, navigate] = useLocation();
   const notebookId = params.id;
+  const isMobile = useIsMobile();
   
   const [isDarkMode, setIsDarkMode] = useState(true);
   const [selectedSourceId, setSelectedSourceId] = useState<string>();
   const [selectedSourceIds, setSelectedSourceIds] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [showBrowserMonitor, setShowBrowserMonitor] = useState(false);
+  const [mobileTab, setMobileTab] = useState<'sources' | 'chat' | 'studio'>('chat');
   const [viewingCsvSourceId, setViewingCsvSourceId] = useState<string | null>(null);
   const [browserStatus, setBrowserStatus] = useState<'idle' | 'running' | 'paused' | 'completed' | 'error'>('idle');
   const [browserStep, setBrowserStep] = useState<string>('');
@@ -171,6 +189,172 @@ function HomeContent() {
     setSourcesCollapsed(false);
   };
 
+  // Mobile layout with tabs
+  const renderMobileLayout = () => (
+    <div className="flex-1 flex flex-col overflow-hidden">
+      <Tabs value={mobileTab} onValueChange={(v) => setMobileTab(v as typeof mobileTab)} className="flex-1 flex flex-col">
+        <TabsList className="w-full justify-around bg-sidebar border-b rounded-none h-12 px-2">
+          <TabsTrigger value="sources" className="flex-1 gap-2 data-[state=active]:bg-primary/10">
+            <FileText className="w-4 h-4" />
+            <span className="text-xs">Sources</span>
+          </TabsTrigger>
+          <TabsTrigger value="chat" className="flex-1 gap-2 data-[state=active]:bg-primary/10">
+            <MessageSquare className="w-4 h-4" />
+            <span className="text-xs">Chat</span>
+          </TabsTrigger>
+          <TabsTrigger value="studio" className="flex-1 gap-2 data-[state=active]:bg-primary/10">
+            <Sparkles className="w-4 h-4" />
+            <span className="text-xs">Studio</span>
+          </TabsTrigger>
+        </TabsList>
+        
+        <TabsContent value="sources" className="flex-1 m-0 overflow-hidden">
+          <div className="h-full bg-sidebar overflow-hidden">
+            <SourcesPanel
+              selectedSourceId={selectedSourceId}
+              onSourcesChange={setSelectedSourceIds}
+              collapsed={false}
+              onToggleCollapse={() => {}}
+              onSelectSource={(source) => {
+                let isCsv = source.type === 'csv';
+                if (!isCsv && source.content) {
+                  try {
+                    const parsed = JSON.parse(source.content);
+                    isCsv = parsed.type === 'spreadsheet' && parsed.headers && parsed.rows;
+                  } catch {}
+                }
+                if (isCsv) {
+                  setViewingCsvSourceId(source.id);
+                  setSelectedSourceId(undefined);
+                  setMobileTab('studio');
+                } else {
+                  setSelectedSourceId(source.id);
+                  setViewingCsvSourceId(null);
+                  setMobileTab('chat');
+                }
+              }}
+              notebookId={notebookId}
+            />
+          </div>
+        </TabsContent>
+        
+        <TabsContent value="chat" className="flex-1 m-0 overflow-hidden">
+          <div className="h-full bg-sidebar overflow-hidden">
+            {selectedSource ? (
+              <SourceDetailView 
+                source={selectedSource}
+                onClose={() => setSelectedSourceId(undefined)}
+              />
+            ) : (
+              <ChatPanel
+                sources={sources.filter(s => selectedSourceIds.includes(s.id))}
+                messages={messages}
+                onNewMessage={handleNewMessage}
+                onClearMessages={handleClearMessages}
+                isLoading={isLoading}
+              />
+            )}
+          </div>
+        </TabsContent>
+        
+        <TabsContent value="studio" className="flex-1 m-0 overflow-hidden">
+          <div className="h-full bg-sidebar overflow-hidden">
+            <StudioPanel
+              selectedSourceIds={selectedSourceIds}
+              viewingCsvSourceId={viewingCsvSourceId}
+              onViewCsvSource={setViewingCsvSourceId}
+              documentPanelOpen={documentPanel.isOpen}
+              onCloseDocument={handleCloseDocument}
+            />
+          </div>
+        </TabsContent>
+      </Tabs>
+    </div>
+  );
+
+  // Desktop layout with resizable panels
+  const renderDesktopLayout = () => (
+    <div className="flex-1 p-4 overflow-hidden">
+      <ResizablePanelGroup direction="horizontal" className="h-full gap-3">
+        <ResizablePanel 
+          ref={sourcesPanelRef}
+          defaultSize={20} 
+          minSize={4} 
+          maxSize={30}
+          collapsible={true}
+          collapsedSize={4}
+          onCollapse={() => setSourcesCollapsed(true)}
+          onExpand={() => setSourcesCollapsed(false)}
+        >
+          <div className="h-full bg-sidebar rounded-2xl border border-sidebar-border overflow-hidden">
+            <SourcesPanel
+              selectedSourceId={selectedSourceId}
+              onSourcesChange={setSelectedSourceIds}
+              collapsed={sourcesCollapsed}
+              onToggleCollapse={toggleSourcesCollapse}
+              onSelectSource={(source) => {
+                let isCsv = source.type === 'csv';
+                if (!isCsv && source.content) {
+                  try {
+                    const parsed = JSON.parse(source.content);
+                    isCsv = parsed.type === 'spreadsheet' && parsed.headers && parsed.rows;
+                  } catch {}
+                }
+                if (isCsv) {
+                  setViewingCsvSourceId(source.id);
+                  setSelectedSourceId(undefined);
+                } else {
+                  setSelectedSourceId(source.id);
+                  setViewingCsvSourceId(null);
+                }
+              }}
+              notebookId={notebookId}
+            />
+          </div>
+        </ResizablePanel>
+        
+        <ResizableHandle className="w-1 bg-transparent hover:bg-primary/20 transition-colors rounded-full" />
+        
+        <ResizablePanel defaultSize={55} minSize={35}>
+          <div className="h-full bg-sidebar rounded-2xl border border-sidebar-border overflow-hidden">
+            {selectedSource ? (
+              <SourceDetailView 
+                source={selectedSource}
+                onClose={() => setSelectedSourceId(undefined)}
+              />
+            ) : (
+              <ChatPanel
+                sources={sources.filter(s => selectedSourceIds.includes(s.id))}
+                messages={messages}
+                onNewMessage={handleNewMessage}
+                onClearMessages={handleClearMessages}
+                isLoading={isLoading}
+              />
+            )}
+          </div>
+        </ResizablePanel>
+        
+        <ResizableHandle className="w-1 bg-transparent hover:bg-primary/20 transition-colors rounded-full" />
+        
+        <ResizablePanel 
+          defaultSize={documentPanel.isOpen ? 55 : 25} 
+          minSize={documentPanel.isOpen ? 45 : 18} 
+          maxSize={documentPanel.isOpen ? 70 : 35}
+        >
+          <div className="h-full bg-sidebar rounded-2xl border border-sidebar-border overflow-hidden">
+            <StudioPanel
+              selectedSourceIds={selectedSourceIds}
+              viewingCsvSourceId={viewingCsvSourceId}
+              onViewCsvSource={setViewingCsvSourceId}
+              documentPanelOpen={documentPanel.isOpen}
+              onCloseDocument={handleCloseDocument}
+            />
+          </div>
+        </ResizablePanel>
+      </ResizablePanelGroup>
+    </div>
+  );
+
   return (
     <div className="h-screen flex flex-col bg-background" data-testid="home-page">
       <Navbar 
@@ -184,90 +368,7 @@ function HomeContent() {
         onCreateNotebook={() => navigate('/')}
       />
       
-      <div className="flex-1 p-4 overflow-hidden">
-        <ResizablePanelGroup direction="horizontal" className="h-full gap-3">
-          <ResizablePanel 
-            ref={sourcesPanelRef}
-            defaultSize={20} 
-            minSize={4} 
-            maxSize={30}
-            collapsible={true}
-            collapsedSize={4}
-            onCollapse={() => setSourcesCollapsed(true)}
-            onExpand={() => setSourcesCollapsed(false)}
-          >
-            <div className="h-full bg-sidebar rounded-2xl border border-sidebar-border overflow-hidden">
-              <SourcesPanel
-                selectedSourceId={selectedSourceId}
-                onSourcesChange={setSelectedSourceIds}
-                collapsed={sourcesCollapsed}
-                onToggleCollapse={toggleSourcesCollapse}
-                onSelectSource={(source) => {
-                  // Check if source is CSV by type OR by content structure
-                  let isCsv = source.type === 'csv';
-                  if (!isCsv && source.content) {
-                    try {
-                      const parsed = JSON.parse(source.content);
-                      isCsv = parsed.type === 'spreadsheet' && parsed.headers && parsed.rows;
-                    } catch {
-                      // Not JSON, not a CSV
-                    }
-                  }
-                  
-                  // For CSV sources, open in Studio spreadsheet view
-                  if (isCsv) {
-                    setViewingCsvSourceId(source.id);
-                    setSelectedSourceId(undefined);
-                  } else {
-                    setSelectedSourceId(source.id);
-                    setViewingCsvSourceId(null);
-                  }
-                }}
-                notebookId={notebookId}
-              />
-            </div>
-          </ResizablePanel>
-          
-          <ResizableHandle className="w-1 bg-transparent hover:bg-primary/20 transition-colors rounded-full" />
-          
-          <ResizablePanel defaultSize={55} minSize={35}>
-            <div className="h-full bg-sidebar rounded-2xl border border-sidebar-border overflow-hidden">
-              {selectedSource ? (
-                <SourceDetailView 
-                  source={selectedSource}
-                  onClose={() => setSelectedSourceId(undefined)}
-                />
-              ) : (
-                <ChatPanel
-                  sources={sources.filter(s => selectedSourceIds.includes(s.id))}
-                  messages={messages}
-                  onNewMessage={handleNewMessage}
-                  onClearMessages={handleClearMessages}
-                  isLoading={isLoading}
-                />
-              )}
-            </div>
-          </ResizablePanel>
-          
-          <ResizableHandle className="w-1 bg-transparent hover:bg-primary/20 transition-colors rounded-full" />
-          
-          <ResizablePanel 
-            defaultSize={documentPanel.isOpen ? 55 : 25} 
-            minSize={documentPanel.isOpen ? 45 : 18} 
-            maxSize={documentPanel.isOpen ? 70 : 35}
-          >
-            <div className="h-full bg-sidebar rounded-2xl border border-sidebar-border overflow-hidden">
-              <StudioPanel
-                selectedSourceIds={selectedSourceIds}
-                viewingCsvSourceId={viewingCsvSourceId}
-                onViewCsvSource={setViewingCsvSourceId}
-                documentPanelOpen={documentPanel.isOpen}
-                onCloseDocument={handleCloseDocument}
-              />
-            </div>
-          </ResizablePanel>
-        </ResizablePanelGroup>
-      </div>
+      {isMobile ? renderMobileLayout() : renderDesktopLayout()}
 
       <BrowserAgentMonitor
         isVisible={showBrowserMonitor}

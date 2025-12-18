@@ -107,15 +107,16 @@ export default function NotebooksDashboard() {
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
-      <header className="h-14 border-b flex items-center justify-between px-6 bg-background">
-        <div className="flex items-center gap-3">
-          <img src="/favicon.png" alt="Tier 4 Logo" className="w-8 h-8 object-contain" />
-          <span className="font-semibold text-lg">Tier 4 Notebook</span>
+      <header className="h-14 border-b flex items-center justify-between px-4 sm:px-6 bg-background">
+        <div className="flex items-center gap-2 sm:gap-3">
+          <img src="/favicon.png" alt="Tier 4 Logo" className="w-7 h-7 sm:w-8 sm:h-8 object-contain" />
+          <span className="font-semibold text-base sm:text-lg hidden xs:inline">Tier 4 Notebook</span>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1 sm:gap-2">
           <Button 
             variant="ghost" 
             size="icon"
+            className="h-9 w-9"
             onClick={() => setIsDarkMode(!isDarkMode)}
           >
             {isDarkMode ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
@@ -123,6 +124,7 @@ export default function NotebooksDashboard() {
           <Button 
             variant="ghost" 
             size="icon"
+            className="h-9 w-9"
             onClick={() => navigate("/settings")}
           >
             <Settings className="w-5 h-5" />
@@ -131,14 +133,14 @@ export default function NotebooksDashboard() {
       </header>
 
       {/* Main Content */}
-      <main className="max-w-6xl mx-auto px-6 py-8">
+      <main className="max-w-6xl mx-auto px-4 sm:px-6 py-4 sm:py-8">
         {/* Tabs and Controls */}
-        <div className="flex items-center justify-between mb-6">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
           <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as typeof activeTab)}>
-            <TabsList className="bg-muted/50">
-              <TabsTrigger value="all" className="text-sm">All</TabsTrigger>
-              <TabsTrigger value="my" className="text-sm">My notebooks</TabsTrigger>
-              <TabsTrigger value="featured" className="text-sm">Featured notebooks</TabsTrigger>
+            <TabsList className="bg-muted/50 w-full sm:w-auto overflow-x-auto">
+              <TabsTrigger value="all" className="text-xs sm:text-sm">All</TabsTrigger>
+              <TabsTrigger value="my" className="text-xs sm:text-sm">My notebooks</TabsTrigger>
+              <TabsTrigger value="featured" className="text-xs sm:text-sm hidden sm:inline-flex">Featured</TabsTrigger>
             </TabsList>
           </Tabs>
 
@@ -168,13 +170,13 @@ export default function NotebooksDashboard() {
               onClick={handleCreateNotebook}
             >
               <Plus className="w-4 h-4" />
-              Create new
+              <span className="hidden sm:inline">Create new</span>
             </Button>
           </div>
         </div>
 
         {/* Section Title */}
-        <h2 className="text-xl font-semibold mb-4">My notebooks</h2>
+        <h2 className="text-lg sm:text-xl font-semibold mb-4">My notebooks</h2>
 
         {/* Notebooks Grid/List */}
         {isLoading ? (

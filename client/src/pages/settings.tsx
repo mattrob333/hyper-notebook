@@ -158,82 +158,86 @@ export default function SettingsPage() {
     <div className="min-h-screen bg-background">
       {/* Header */}
       <header className="border-b border-border/50 bg-card/50 backdrop-blur-sm sticky top-0 z-50">
-        <div className="container mx-auto px-6 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
+        <div className="container mx-auto px-4 sm:px-6 py-3 sm:py-4">
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2 sm:gap-4">
               <Button
                 variant="ghost"
                 size="icon"
+                className="h-9 w-9"
                 onClick={() => setLocation("/")}
               >
                 <ArrowLeft className="w-5 h-5" />
               </Button>
               <div>
-                <h1 className="text-xl font-bold">Settings</h1>
-                <p className="text-sm text-muted-foreground">Configure your Hyper Notebook</p>
+                <h1 className="text-lg sm:text-xl font-bold">Settings</h1>
+                <p className="text-xs sm:text-sm text-muted-foreground hidden sm:block">Configure your Hyper Notebook</p>
               </div>
             </div>
-            <Button onClick={handleSaveSettings}>
-              <Save className="w-4 h-4 mr-2" />
-              Save Changes
+            <Button size="sm" className="sm:size-default" onClick={handleSaveSettings}>
+              <Save className="w-4 h-4 sm:mr-2" />
+              <span className="hidden sm:inline">Save Changes</span>
             </Button>
           </div>
         </div>
       </header>
 
       {/* Main Content */}
-      <main className="container mx-auto px-6 py-8">
-        <Tabs defaultValue="api-keys" className="space-y-6">
-          <TabsList className="grid w-full max-w-2xl grid-cols-4 bg-muted/50">
-            <TabsTrigger value="api-keys" className="gap-2">
+      <main className="container mx-auto px-4 sm:px-6 py-4 sm:py-8">
+        <Tabs defaultValue="api-keys" className="space-y-4 sm:space-y-6">
+          <TabsList className="w-full sm:w-auto sm:max-w-2xl grid grid-cols-4 bg-muted/50 h-auto p-1">
+            <TabsTrigger value="api-keys" className="gap-1 sm:gap-2 text-xs sm:text-sm py-2 px-1 sm:px-3 flex-col sm:flex-row">
               <Key className="w-4 h-4" />
-              API Keys
+              <span className="hidden sm:inline">API Keys</span>
+              <span className="sm:hidden">APIs</span>
             </TabsTrigger>
-            <TabsTrigger value="appearance" className="gap-2">
+            <TabsTrigger value="appearance" className="gap-1 sm:gap-2 text-xs sm:text-sm py-2 px-1 sm:px-3 flex-col sm:flex-row">
               <Palette className="w-4 h-4" />
-              Appearance
+              <span className="hidden sm:inline">Appearance</span>
+              <span className="sm:hidden">Look</span>
             </TabsTrigger>
-            <TabsTrigger value="ai" className="gap-2">
+            <TabsTrigger value="ai" className="gap-1 sm:gap-2 text-xs sm:text-sm py-2 px-1 sm:px-3 flex-col sm:flex-row">
               <Sparkles className="w-4 h-4" />
-              AI Settings
+              <span>AI</span>
             </TabsTrigger>
-            <TabsTrigger value="preferences" className="gap-2">
+            <TabsTrigger value="preferences" className="gap-1 sm:gap-2 text-xs sm:text-sm py-2 px-1 sm:px-3 flex-col sm:flex-row">
               <Bell className="w-4 h-4" />
-              Preferences
+              <span className="hidden sm:inline">Preferences</span>
+              <span className="sm:hidden">Prefs</span>
             </TabsTrigger>
           </TabsList>
 
           {/* API Keys Tab */}
           <TabsContent value="api-keys">
             <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Key className="w-5 h-5 text-primary" />
+              <CardHeader className="px-4 sm:px-6">
+                <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
+                  <Key className="w-4 h-4 sm:w-5 sm:h-5 text-primary" />
                   API Keys Configuration
                 </CardTitle>
-                <CardDescription>
+                <CardDescription className="text-xs sm:text-sm">
                   Configure your API keys to enable AI features. Keys are stored securely in your .env file on the server.
                 </CardDescription>
               </CardHeader>
-              <CardContent>
-                <div className="space-y-6">
+              <CardContent className="px-4 sm:px-6">
+                <div className="space-y-4 sm:space-y-6">
                   {apiKeys.map((apiKey) => (
-                    <div key={apiKey.envVar} className="space-y-3">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                          <div className={`p-2 rounded-lg ${apiKey.isConfigured ? 'bg-emerald-500/10' : 'bg-muted'}`}>
+                    <div key={apiKey.envVar} className="space-y-2 sm:space-y-3">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                        <div className="flex items-center gap-2 sm:gap-3">
+                          <div className={`p-1.5 sm:p-2 rounded-lg ${apiKey.isConfigured ? 'bg-emerald-500/10' : 'bg-muted'}`}>
                             {apiKey.isConfigured ? (
-                              <Check className="w-4 h-4 text-emerald-500" />
+                              <Check className="w-3 h-3 sm:w-4 sm:h-4 text-emerald-500" />
                             ) : (
-                              <AlertCircle className="w-4 h-4 text-muted-foreground" />
+                              <AlertCircle className="w-3 h-3 sm:w-4 sm:h-4 text-muted-foreground" />
                             )}
                           </div>
                           <div>
-                            <Label className="text-base font-medium">{apiKey.name}</Label>
-                            <p className="text-xs text-muted-foreground">{apiKey.description}</p>
+                            <Label className="text-sm sm:text-base font-medium">{apiKey.name}</Label>
+                            <p className="text-xs text-muted-foreground hidden sm:block">{apiKey.description}</p>
                           </div>
                         </div>
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 ml-7 sm:ml-0">
                           {apiKey.isConfigured && (
                             <span className="text-xs text-emerald-500 font-medium">Configured</span>
                           )}
@@ -241,7 +245,7 @@ export default function SettingsPage() {
                             <Button
                               variant="ghost"
                               size="sm"
-                              className="text-xs"
+                              className="text-xs h-7 px-2"
                               onClick={() => window.open(apiKey.docsUrl, '_blank')}
                             >
                               Get Key →
@@ -298,16 +302,16 @@ export default function SettingsPage() {
           {/* Appearance Tab */}
           <TabsContent value="appearance">
             <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Palette className="w-5 h-5 text-primary" />
+              <CardHeader className="px-4 sm:px-6">
+                <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
+                  <Palette className="w-4 h-4 sm:w-5 sm:h-5 text-primary" />
                   Appearance
                 </CardTitle>
-                <CardDescription>
+                <CardDescription className="text-xs sm:text-sm">
                   Customize how Hyper Notebook looks and feels.
                 </CardDescription>
               </CardHeader>
-              <CardContent className="space-y-6">
+              <CardContent className="space-y-4 sm:space-y-6 px-4 sm:px-6">
                 {/* Theme */}
                 <div className="space-y-3">
                   <Label>Theme</Label>
@@ -373,21 +377,21 @@ export default function SettingsPage() {
           {/* AI Settings Tab */}
           <TabsContent value="ai">
             <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Sparkles className="w-5 h-5 text-primary" />
+              <CardHeader className="px-4 sm:px-6">
+                <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
+                  <Sparkles className="w-4 h-4 sm:w-5 sm:h-5 text-primary" />
                   AI Configuration
                 </CardTitle>
-                <CardDescription>
+                <CardDescription className="text-xs sm:text-sm">
                   Configure AI behavior and model preferences.
                 </CardDescription>
               </CardHeader>
-              <CardContent className="space-y-6">
+              <CardContent className="space-y-4 sm:space-y-6 px-4 sm:px-6">
                 {/* Default Model */}
                 <div className="space-y-3">
-                  <Label>Default AI Model</Label>
+                  <Label className="text-sm">Default AI Model</Label>
                   <Select value={defaultModel} onValueChange={setDefaultModel}>
-                    <SelectTrigger className="w-72">
+                    <SelectTrigger className="w-full sm:w-72">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -445,16 +449,16 @@ export default function SettingsPage() {
           {/* Preferences Tab */}
           <TabsContent value="preferences">
             <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Bell className="w-5 h-5 text-primary" />
+              <CardHeader className="px-4 sm:px-6">
+                <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
+                  <Bell className="w-4 h-4 sm:w-5 sm:h-5 text-primary" />
                   Preferences
                 </CardTitle>
-                <CardDescription>
+                <CardDescription className="text-xs sm:text-sm">
                   Manage notifications and general preferences.
                 </CardDescription>
               </CardHeader>
-              <CardContent className="space-y-6">
+              <CardContent className="space-y-4 sm:space-y-6 px-4 sm:px-6">
                 {/* Auto Save */}
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
