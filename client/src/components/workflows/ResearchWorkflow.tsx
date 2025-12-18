@@ -1159,7 +1159,7 @@ Do NOT include any preamble or explanation. Output ONLY the content itself.`
     <Card className="w-full max-w-3xl mx-auto">
       <CardHeader className="pb-4">
         <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-4">
             {steps.map((s, i) => {
               const Icon = s.icon;
               return (

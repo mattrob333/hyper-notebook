@@ -154,6 +154,7 @@ export const insertMessageSchema = createInsertSchema(messages).omit({ id: true,
 export type InsertMessage = z.infer<typeof insertMessageSchema>;
 export type Message = typeof messages.$inferSelect;
 
+// Legacy browser automation workflows (keep for backward compatibility)
 export const workflows = pgTable("workflows", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   name: text("name").notNull(),
@@ -174,6 +175,64 @@ export const insertWorkflowSchema = createInsertSchema(workflows).omit({ id: tru
 });
 export type InsertWorkflow = z.infer<typeof insertWorkflowSchema>;
 export type Workflow = typeof workflows.$inferSelect;
+
+// Generative UI Workflows - step-based wizards with A2UI components
+export const uiWorkflows = pgTable("ui_workflows", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  notebookId: varchar("notebook_id").references(() => notebooks.id, { onDelete: 'cascade' }),
+  name: text("name").notNull(),
+  description: text("description"),
+  shortDescription: text("short_description"),
+  category: text("category").notNull().$type<'onboarding' | 'strategy' | 'sales' | 'marketing' | 'content' | 'design' | 'product' | 'operations' | 'legal' | 'customer' | 'productivity' | 'meta'>(),
+  tags: text("tags").array(),
+  icon: text("icon"),
+  emoji: text("emoji"),
+  color: text("color"),
+  estimatedMinutes: integer("estimated_minutes"),
+  difficulty: text("difficulty").$type<'beginner' | 'intermediate' | 'advanced'>(),
+  definition: jsonb("definition").$type<any>().notNull(), // Full WorkflowDefinition JSON
+  isBuiltIn: boolean("is_built_in").default(false), // System-provided vs user-created
+  isPublic: boolean("is_public").default(false),
+  usageCount: integer("usage_count").default(0),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertUIWorkflowSchema = createInsertSchema(uiWorkflows).omit({ id: true, createdAt: true, updatedAt: true, usageCount: true });
+export type InsertUIWorkflow = z.infer<typeof insertUIWorkflowSchema>;
+export type UIWorkflow = typeof uiWorkflows.$inferSelect;
+
+// User workflow preferences (favorites, recently used)
+export const workflowPreferences = pgTable("workflow_preferences", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  notebookId: varchar("notebook_id").references(() => notebooks.id, { onDelete: 'cascade' }),
+  favorites: text("favorites").array().default([]), // Array of workflow IDs
+  hidden: text("hidden").array().default([]), // Hidden workflow IDs
+  customOrder: text("custom_order").array(), // Custom ordering
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertWorkflowPreferencesSchema = createInsertSchema(workflowPreferences).omit({ id: true, updatedAt: true });
+export type InsertWorkflowPreferences = z.infer<typeof insertWorkflowPreferencesSchema>;
+export type WorkflowPreferences = typeof workflowPreferences.$inferSelect;
+
+// Workflow run history
+export const workflowRuns = pgTable("workflow_runs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  workflowId: varchar("workflow_id").notNull(),
+  notebookId: varchar("notebook_id").references(() => notebooks.id, { onDelete: 'cascade' }),
+  state: jsonb("state").$type<Record<string, any>>().default({}),
+  currentStepIndex: integer("current_step_index").default(0),
+  completedSteps: text("completed_steps").array().default([]),
+  status: text("status").$type<'in_progress' | 'completed' | 'abandoned'>().default('in_progress'),
+  outputId: varchar("output_id"), // ID of created source/content
+  startedAt: timestamp("started_at").defaultNow(),
+  completedAt: timestamp("completed_at"),
+});
+
+export const insertWorkflowRunSchema = createInsertSchema(workflowRuns).omit({ id: true, startedAt: true });
+export type InsertWorkflowRun = z.infer<typeof insertWorkflowRunSchema>;
+export type WorkflowRun = typeof workflowRuns.$inferSelect;
 
 export const generatedContent = pgTable("generated_content", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),

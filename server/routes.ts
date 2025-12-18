@@ -1592,8 +1592,18 @@ Available report formats: Briefing Doc, Blog Post, LinkedIn Article, Twitter Thr
         return res.status(400).json({ error: "Text and prompt are required" });
       }
 
-      const systemPrompt = `You are a professional editor. Rewrite the following text according to the user's instructions. 
-Only output the rewritten text, nothing else. Do not include explanations or commentary.`;
+      const systemPrompt = `You are a professional editor working with a rich text editor. Rewrite the following text according to the user's instructions.
+
+CRITICAL: Return the text as clean HTML, NOT markdown. Use these HTML tags:
+- <h1>, <h2>, <h3> for headings
+- <strong> for bold text
+- <em> for italic text
+- <ul><li> for bullet lists
+- <ol><li> for numbered lists
+- <p> for paragraphs
+- <blockquote> for quotes
+
+Only output the rewritten HTML content, nothing else. Do not include explanations, commentary, or markdown syntax like # or **.`;
 
       const userPrompt = `Instructions: ${prompt}
 
@@ -1874,6 +1884,102 @@ Write the report in clean markdown format. Use proper headings (##, ###), bullet
       configured: hyperbrowserService.isConfigured(),
       workflowCount: hyperbrowserService.getAllWorkflows().length
     });
+  });
+
+  // ==========================================================================
+  // UI WORKFLOWS API
+  // ==========================================================================
+
+  // Get workflow preferences (favorites, hidden)
+  app.get("/api/workflows/preferences", async (req: Request, res: Response) => {
+    try {
+      const { notebookId } = req.query;
+      
+      // For now, return from a simple in-memory/localStorage approach
+      // In production, this would come from the database
+      const preferences = {
+        favorites: [],
+        hidden: [],
+        customOrder: [],
+      };
+      
+      res.json(preferences);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Save workflow preferences
+  app.post("/api/workflows/preferences", async (req: Request, res: Response) => {
+    try {
+      const { notebookId, favorites, hidden, customOrder } = req.body;
+      
+      // For now, just acknowledge - in production, save to database
+      res.json({ 
+        success: true,
+        favorites: favorites || [],
+        hidden: hidden || [],
+        customOrder: customOrder || [],
+      });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Get all UI workflows (built-in + custom)
+  app.get("/api/workflows/ui", async (req: Request, res: Response) => {
+    try {
+      const { notebookId, category } = req.query;
+      
+      // Import built-in workflows
+      const { BUILTIN_WORKFLOWS } = await import('@shared/builtin-workflows');
+      
+      let workflows = [...BUILTIN_WORKFLOWS];
+      
+      // Filter by category if provided
+      if (category && category !== 'all') {
+        workflows = workflows.filter(w => w.category === category);
+      }
+      
+      res.json(workflows);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Get a specific workflow by ID
+  app.get("/api/workflows/ui/:id", async (req: Request, res: Response) => {
+    try {
+      const { BUILTIN_WORKFLOWS } = await import('@shared/builtin-workflows');
+      const workflow = BUILTIN_WORKFLOWS.find(w => w.id === req.params.id);
+      
+      if (!workflow) {
+        return res.status(404).json({ error: "Workflow not found" });
+      }
+      
+      res.json(workflow);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Save workflow run/output
+  app.post("/api/workflows/run", async (req: Request, res: Response) => {
+    try {
+      const { workflowId, notebookId, state, status, outputId } = req.body;
+      
+      // Log the workflow run (in production, save to workflow_runs table)
+      console.log(`[Workflow] Run completed: ${workflowId}, status: ${status}`);
+      
+      res.json({ 
+        success: true,
+        workflowId,
+        status,
+        outputId,
+      });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
   });
 
   return httpServer;

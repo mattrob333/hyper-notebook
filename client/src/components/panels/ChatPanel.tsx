@@ -20,10 +20,12 @@ import { motion, AnimatePresence } from "framer-motion";
 import A2UIRenderer from "../a2ui/A2UIRenderer";
 import OnboardingWorkflow from "../workflows/OnboardingWorkflow";
 import ResearchWorkflow from "../workflows/ResearchWorkflow";
+import ChatWorkflowRunner from "../workflows/ChatWorkflowRunner";
+import { BUILTIN_WORKFLOWS } from "@shared/builtin-workflows";
 import type { ChatMessage, Source, A2UIComponent } from "@/lib/types";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useQuery } from "@tanstack/react-query";
-import { useEmailBuilder } from "@/contexts/EmailBuilderContext";
+import { useDocumentPanel } from "@/contexts/DocumentPanelContext";
 import { useOptionalLeadContext } from "@/contexts/LeadContext";
 import { useToast } from "@/hooks/use-toast";
 
@@ -193,8 +195,8 @@ export default function ChatPanel({
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
   
-  // Email builder context for AI integration
-  const emailContext = useEmailBuilder();
+  // Document panel context for sending content to editor
+  const documentPanel = useDocumentPanel();
   const leadContext = useOptionalLeadContext();
   const { toast } = useToast();
   
@@ -262,10 +264,10 @@ export default function ChatPanel({
     }
     
     const htmlContent = markdownToHtml(body);
-    emailContext.sendToEmailBuilder(htmlContent, subject);
+    documentPanel.sendToDocument(htmlContent, subject);
     toast({
-      title: 'Sent to Email Builder',
-      description: subject ? 'Subject and body added to email' : 'Content has been sent to the email editor',
+      title: 'Sent to Editor',
+      description: subject ? 'Subject and body added to document' : 'Content has been sent to the editor',
     });
   };
 
@@ -293,6 +295,21 @@ export default function ChatPanel({
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
   }, [messages, streamingContent]);
+
+  // Listen for workflow events from StudioPanel
+  useEffect(() => {
+    const handleStartWorkflow = (event: CustomEvent) => {
+      const { workflow } = event.detail;
+      if (workflow?.id) {
+        setActiveWorkflow(workflow.id);
+      }
+    };
+
+    window.addEventListener('start-workflow', handleStartWorkflow as EventListener);
+    return () => {
+      window.removeEventListener('start-workflow', handleStartWorkflow as EventListener);
+    };
+  }, []);
 
   const createConversation = useCallback(async (): Promise<string> => {
     try {
@@ -323,37 +340,11 @@ export default function ChatPanel({
       // Build chat messages with email mode context if active
       const chatMessages: Array<{ role: 'system' | 'user' | 'assistant', content: string }> = [];
       
-      // Add email mode system context
-      if (emailContext.isEmailMode) {
+      // Add document editing context if document panel is open
+      if (documentPanel.isOpen) {
         chatMessages.push({
           role: 'system',
-          content: `You are helping write email content. The user is in the Email Builder creating emails with pre-designed templates that already have a letterhead/header and signature/footer.
-
-FORMAT YOUR RESPONSE EXACTLY LIKE THIS:
-**Subject:** [Write a compelling subject line here]
-
-[Then write the email body content here]
-
-IMPORTANT RULES:
-- Always start with "**Subject:** " followed by your subject line
-- Then add a blank line and write the body content
-- Do NOT include To/From/Date lines (the UI handles this)
-- Do NOT include signature or closing (the template has this)
-- Do NOT use markdown tables (use simple lists instead)
-
-Write clean, professional body content that flows naturally. Use:
-- Short paragraphs for readability
-- Bullet points for lists (use - or •)
-- Bold (**text**) for emphasis
-- Simple section headers (## Header) only if needed for long content
-
-Start the body with a greeting (e.g., "Dear [Name],") or dive into content.
-End before the signature - the user's signature is already in the template.
-
-Current context:
-- Template type: ${emailContext.currentTemplate}
-- Company: ${emailContext.companyName}
-${emailContext.contacts.length > 0 ? `- Recipients loaded: ${emailContext.contacts.length} contacts` : ''}`
+          content: `You are helping write ${documentPanel.documentType} content. Format your response appropriately for a ${documentPanel.documentType}.`
         });
       }
       
@@ -753,16 +744,12 @@ You MUST respond with ONLY this JSON (no other text):
               }}
               onCancel={() => setActiveWorkflow(null)}
               onSendToEmail={(content, subject) => {
-                // Defer to avoid setState during render
                 setTimeout(() => {
-                  if (emailContext?.sendToEmailBuilder) {
-                    emailContext.sendToEmailBuilder(content, subject);
-                  }
+                  documentPanel.sendToDocument(content, subject);
                   setActiveWorkflow(null);
                 }, 0);
               }}
               onCreateReport={(content, title) => {
-                // For now, save as a report-type source
                 apiRequest('POST', '/api/sources', {
                   notebookId: window.location.pathname.split('/').pop() || null,
                   type: 'text',
@@ -777,6 +764,41 @@ You MUST respond with ONLY this JSON (no other text):
               }}
             />
           )}
+
+          {/* Builtin Workflows from Library */}
+          {activeWorkflow && !['user-onboarding', 'research-content'].includes(activeWorkflow) && (() => {
+            const workflow = BUILTIN_WORKFLOWS.find(w => w.id === activeWorkflow);
+            if (!workflow) return null;
+            return (
+              <ChatWorkflowRunner
+                workflow={workflow}
+                onComplete={() => {
+                  setActiveWorkflow(null);
+                  toast({ title: 'Workflow Complete', description: `"${workflow.name}" finished successfully.` });
+                }}
+                onCancel={() => setActiveWorkflow(null)}
+                onSendToEmail={(content, subject) => {
+                  setTimeout(() => {
+                    documentPanel.sendToDocument(content, subject);
+                    setActiveWorkflow(null);
+                  }, 0);
+                }}
+                onCreateReport={(content, title) => {
+                  apiRequest('POST', '/api/sources', {
+                    notebookId: window.location.pathname.split('/').pop() || null,
+                    type: 'text',
+                    category: 'reports',
+                    name: title,
+                    content: content,
+                    metadata: { type: 'report', createdAt: new Date().toISOString() }
+                  }).then(() => {
+                    queryClient.invalidateQueries({ queryKey: ['/api/sources'] });
+                  });
+                  setActiveWorkflow(null);
+                }}
+              />
+            );
+          })()}
           
           {/* Empty State / Suggested Prompts */}
           {!activeWorkflow && messages.length === 0 && !streamingContent ? (
@@ -878,18 +900,16 @@ You MUST respond with ONLY this JSON (no other text):
                           <Button variant="ghost" size="icon" className="h-7 w-7" data-testid={`button-pin-${message.id}`}>
                             <Pin className="w-3.5 h-3.5" />
                           </Button>
-                          {emailContext.isEmailMode && (
-                            <Button 
-                              variant="ghost" 
-                              size="sm" 
-                              className="h-7 px-2 gap-1 text-xs text-blue-500 hover:text-blue-600 hover:bg-blue-500/10" 
-                              data-testid={`button-send-to-email-${message.id}`}
-                              onClick={() => handleSendToEmailBuilder(message.content)}
-                            >
-                              <Mail className="w-3.5 h-3.5" />
-                              Send to Email
-                            </Button>
-                          )}
+                          <Button 
+                            variant="ghost" 
+                            size="sm" 
+                            className="h-7 px-2 gap-1 text-xs text-blue-500 hover:text-blue-600 hover:bg-blue-500/10" 
+                            data-testid={`button-send-to-editor-${message.id}`}
+                            onClick={() => handleSendToEmailBuilder(message.content)}
+                          >
+                            <Mail className="w-3.5 h-3.5" />
+                            Send to Editor
+                          </Button>
                         </div>
                         <p className="text-xs text-muted-foreground mt-1" data-testid={`text-timestamp-${message.id}`}>
                           {message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}

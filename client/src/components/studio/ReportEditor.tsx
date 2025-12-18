@@ -105,6 +105,22 @@ interface AIRewriteOption {
 }
 
 const AI_REWRITE_OPTIONS: AIRewriteOption[] = [
+  { label: 'Polish', prompt: `Polish this text for professional presentation while PRESERVING all formatting.
+
+KEEP EXACTLY AS-IS:
+- All heading sizes (h1, h2, h3)
+- All bold and italic text
+- All bullet points and numbered lists
+- The document's structure and hierarchy
+
+CLEAN UP ONLY:
+- Remove chat artifacts like "Here's what I found:", "Let me explain:", "Sure!"
+- Remove incomplete sentences or fragments
+- Fix inconsistent spacing between sections
+- Remove duplicate content
+- Remove any code blocks, JSON, or system metadata
+
+CRITICAL: Preserve the exact same formatting. If text is bold, keep it bold. If it's a heading, keep it as a heading. Do NOT flatten to plain text.` },
   { label: 'Make concise', prompt: 'Make this text more concise while keeping the key points' },
   { label: 'Expand', prompt: 'Expand on this text with more details and examples' },
   { label: 'More formal', prompt: 'Rewrite this in a more formal, professional tone' },

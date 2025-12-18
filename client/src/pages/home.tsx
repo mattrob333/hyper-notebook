@@ -1,10 +1,11 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useParams, useLocation } from "wouter";
 import { 
   ResizablePanelGroup, 
   ResizablePanel, 
-  ResizableHandle 
+  ResizableHandle,
+  type ImperativePanelHandle
 } from "@/components/ui/resizable";
 import Navbar from "@/components/Navbar";
 import SourcesPanel from "@/components/panels/SourcesPanel";
@@ -12,10 +13,11 @@ import ChatPanel from "@/components/panels/ChatPanel";
 import StudioPanel from "@/components/panels/StudioPanel";
 import SourceDetailView from "@/components/panels/SourceDetailView";
 import BrowserAgentMonitor from "@/components/browser/BrowserAgentMonitor";
-import ReportEditor from "@/components/studio/ReportEditor";
+import { DocumentPanelProvider, useDocumentPanel } from "@/contexts/DocumentPanelContext";
 import type { Source, ChatMessage, A2UIComponent, Notebook } from "@/lib/types";
+import type { DocumentType } from "@/components/studio/DocumentPanel";
 
-export default function Home() {
+function HomeContent() {
   const params = useParams<{ id: string }>();
   const [, navigate] = useLocation();
   const notebookId = params.id;
@@ -33,10 +35,32 @@ export default function Home() {
   const [browserUrl, setBrowserUrl] = useState('about:blank');
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   
-  // Report Editor state
-  const [showReportEditor, setShowReportEditor] = useState(false);
-  const [reportEditorContent, setReportEditorContent] = useState('');
-  const [reportEditorTitle, setReportEditorTitle] = useState('');
+  // Document panel context
+  const documentPanel = useDocumentPanel();
+  
+  // Track if sources panel is collapsed (when document is open)
+  const [sourcesCollapsed, setSourcesCollapsed] = useState(false);
+  const sourcesPanelRef = useRef<ImperativePanelHandle>(null);
+  
+  // Toggle sources panel collapse
+  const toggleSourcesCollapse = () => {
+    if (sourcesPanelRef.current) {
+      if (sourcesCollapsed) {
+        sourcesPanelRef.current.expand();
+      } else {
+        sourcesPanelRef.current.collapse();
+      }
+    }
+    setSourcesCollapsed(!sourcesCollapsed);
+  };
+  
+  // Collapse sources when document opens
+  useEffect(() => {
+    if (documentPanel.isOpen && sourcesPanelRef.current && !sourcesCollapsed) {
+      sourcesPanelRef.current.collapse();
+      setSourcesCollapsed(true);
+    }
+  }, [documentPanel.isOpen]);
 
   // Fetch notebook details
   const { data: notebook } = useQuery<Notebook>({
@@ -71,20 +95,31 @@ export default function Home() {
     document.documentElement.classList.add('dark');
   }, []);
 
-  // Listen for openReportEditor events from ChatPanel
+  // Listen for openDocument events - opens content in the DocumentPanel (side panel)
   useEffect(() => {
-    const handleOpenReportEditor = (event: CustomEvent) => {
-      const { content, title } = event.detail;
-      setReportEditorContent(content || '');
-      setReportEditorTitle(title || 'Report');
-      setShowReportEditor(true);
+    const handleOpenDocument = (event: CustomEvent) => {
+      const { content, title, type, recipient, subject } = event.detail;
+      documentPanel.openDocument({
+        content: content || '',
+        title: title || 'Untitled',
+        type: type || 'report',
+        recipient,
+        subject,
+      });
+      // Collapse sources panel when document opens
+      setSourcesCollapsed(true);
     };
 
-    window.addEventListener('openReportEditor', handleOpenReportEditor as EventListener);
+    // Support multiple event names for compatibility
+    window.addEventListener('openReportEditor', handleOpenDocument as EventListener);
+    window.addEventListener('openContentEditor', handleOpenDocument as EventListener);
+    window.addEventListener('openDocument', handleOpenDocument as EventListener);
     return () => {
-      window.removeEventListener('openReportEditor', handleOpenReportEditor as EventListener);
+      window.removeEventListener('openReportEditor', handleOpenDocument as EventListener);
+      window.removeEventListener('openContentEditor', handleOpenDocument as EventListener);
+      window.removeEventListener('openDocument', handleOpenDocument as EventListener);
     };
-  }, []);
+  }, [documentPanel]);
 
   const handleNewMessage = async (content: string, response?: string, a2uiComponents?: A2UIComponent[]) => {
     // Check if we have a response OR a2ui components to display
@@ -130,21 +165,11 @@ export default function Home() {
     setMessages([]);
   };
 
-  // Show full-screen report editor if triggered
-  if (showReportEditor) {
-    return (
-      <ReportEditor
-        initialContent={reportEditorContent}
-        title={reportEditorTitle}
-        onClose={() => {
-          setShowReportEditor(false);
-          setReportEditorContent('');
-          setReportEditorTitle('');
-        }}
-        notebookId={notebookId}
-      />
-    );
-  }
+  // Handle closing document panel
+  const handleCloseDocument = () => {
+    documentPanel.closeDocument();
+    setSourcesCollapsed(false);
+  };
 
   return (
     <div className="h-screen flex flex-col bg-background" data-testid="home-page">
@@ -161,11 +186,22 @@ export default function Home() {
       
       <div className="flex-1 p-4 overflow-hidden">
         <ResizablePanelGroup direction="horizontal" className="h-full gap-3">
-          <ResizablePanel defaultSize={20} minSize={15} maxSize={30}>
+          <ResizablePanel 
+            ref={sourcesPanelRef}
+            defaultSize={20} 
+            minSize={4} 
+            maxSize={30}
+            collapsible={true}
+            collapsedSize={4}
+            onCollapse={() => setSourcesCollapsed(true)}
+            onExpand={() => setSourcesCollapsed(false)}
+          >
             <div className="h-full bg-sidebar rounded-2xl border border-sidebar-border overflow-hidden">
               <SourcesPanel
                 selectedSourceId={selectedSourceId}
                 onSourcesChange={setSelectedSourceIds}
+                collapsed={sourcesCollapsed}
+                onToggleCollapse={toggleSourcesCollapse}
                 onSelectSource={(source) => {
                   // Check if source is CSV by type OR by content structure
                   let isCsv = source.type === 'csv';
@@ -215,12 +251,18 @@ export default function Home() {
           
           <ResizableHandle className="w-1 bg-transparent hover:bg-primary/20 transition-colors rounded-full" />
           
-          <ResizablePanel defaultSize={25} minSize={18} maxSize={35}>
+          <ResizablePanel 
+            defaultSize={documentPanel.isOpen ? 55 : 25} 
+            minSize={documentPanel.isOpen ? 45 : 18} 
+            maxSize={documentPanel.isOpen ? 70 : 35}
+          >
             <div className="h-full bg-sidebar rounded-2xl border border-sidebar-border overflow-hidden">
               <StudioPanel
                 selectedSourceIds={selectedSourceIds}
                 viewingCsvSourceId={viewingCsvSourceId}
                 onViewCsvSource={setViewingCsvSourceId}
+                documentPanelOpen={documentPanel.isOpen}
+                onCloseDocument={handleCloseDocument}
               />
             </div>
           </ResizablePanel>
@@ -242,5 +284,14 @@ export default function Home() {
         ]}
       />
     </div>
+  );
+}
+
+// Wrap with DocumentPanelProvider
+export default function Home() {
+  return (
+    <DocumentPanelProvider>
+      <HomeContent />
+    </DocumentPanelProvider>
   );
 }

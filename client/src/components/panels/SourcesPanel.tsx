@@ -37,7 +37,8 @@ import {
   Rss,
   RefreshCw,
   Tag,
-  Pencil
+  Pencil,
+  FolderArchive
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -54,6 +55,8 @@ interface SourcesPanelProps {
   onSelectSource?: (source: Source) => void;
   selectedSourceId?: string;
   notebookId?: string;
+  collapsed?: boolean;
+  onToggleCollapse?: () => void;
 }
 
 const sourceTypeIcons: Record<string, typeof Globe> = {
@@ -67,7 +70,9 @@ export default function SourcesPanel({
   onSourcesChange,
   onSelectSource,
   selectedSourceId,
-  notebookId
+  notebookId,
+  collapsed = false,
+  onToggleCollapse
 }: SourcesPanelProps) {
   const { toast } = useToast();
   const [addUrlDialogOpen, setAddUrlDialogOpen] = useState(false);
@@ -500,10 +505,36 @@ export default function SourcesPanel({
     }
   };
 
+  // Collapsed view - just a filing cabinet icon
+  if (collapsed) {
+    return (
+      <div className="flex flex-col h-full items-center pt-3" data-testid="sources-panel-collapsed">
+        <Button
+          variant="ghost"
+          size="icon"
+          className="w-9 h-9 rounded-lg hover:bg-primary/10"
+          onClick={onToggleCollapse}
+          title="Expand Sources"
+        >
+          <FolderArchive className="w-5 h-5 text-muted-foreground" />
+        </Button>
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-col h-full" data-testid="sources-panel">
-      <div className="p-4 border-b border-border/50">
+      <div className="p-4 border-b border-border/50 flex items-center justify-between">
         <h2 className="font-semibold text-base" data-testid="text-sources-title">Sources</h2>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="w-7 h-7 rounded-lg hover:bg-muted"
+          onClick={onToggleCollapse}
+          title="Collapse Sources"
+        >
+          <FolderArchive className="w-4 h-4 text-muted-foreground" />
+        </Button>
       </div>
 
       <div className="p-4 space-y-3">

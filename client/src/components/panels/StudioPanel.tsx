@@ -59,8 +59,8 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import WorkflowStudio from "../studio/WorkflowStudio";
-import EmailBuilder from "../studio/EmailBuilder";
+import DocumentPanel from "../studio/DocumentPanel";
+import { useDocumentPanel } from "@/contexts/DocumentPanelContext";
 // HyperBrowserBuilder removed - keeping simple scrape functionality
 import AIContextFileGenerator from "../studio/AIContextFileGenerator";
 import A2UIRenderer from "../a2ui/A2UIRenderer";
@@ -70,7 +70,8 @@ import CustomizeSlideDeckModal from "../studio/CustomizeSlideDeckModal";
 import SlideViewer from "../studio/SlideViewer";
 import InfographicViewer from "../studio/InfographicViewer";
 import ReportViewer from "../studio/ReportViewer";
-import type { Workflow as WorkflowType, Source } from "@/lib/types";
+import WorkflowsLibrary from "../workflows/WorkflowsLibrarySimple";
+import type { Source } from "@/lib/types";
 import type { A2UIComponent, ContentType } from "@shared/schema";
 
 interface Report {
@@ -93,6 +94,8 @@ interface StudioPanelProps {
   selectedSourceIds?: string[];
   onViewCsvSource?: (sourceId: string | null) => void;
   viewingCsvSourceId?: string | null;
+  documentPanelOpen?: boolean;
+  onCloseDocument?: () => void;
 }
 
 interface ContentCardProps {
@@ -179,12 +182,14 @@ const CONTENT_TYPE_DEFAULT_MODELS: Partial<Record<ContentType, string>> = {
   'infographic': 'google/gemini-3-pro-preview',
 };
 
-type ActiveView = 'main' | 'email' | 'context-file' | 'canvas';
+type ActiveView = 'main' | 'email' | 'document' | 'context-file' | 'canvas';
 
 export default function StudioPanel({
   selectedSourceIds = [],
   onViewCsvSource,
   viewingCsvSourceId,
+  documentPanelOpen = false,
+  onCloseDocument,
 }: StudioPanelProps) {
   const [activeView, setActiveView] = useState<ActiveView>('main');
   const [csvSourceId, setCsvSourceId] = useState<string | null>(viewingCsvSourceId || null);
@@ -223,6 +228,8 @@ export default function StudioPanel({
   const [audioInstructions, setAudioInstructions] = useState('');
   const [audioSelectedSources, setAudioSelectedSources] = useState<string[]>([]);
 
+  // UI Workflows - removed full-page runner, workflows run in chat now
+
   // Handle Escape key to exit fullscreen
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -248,10 +255,6 @@ export default function StudioPanel({
 
   const { data: savedContent = [] } = useQuery<GeneratedContent[]>({
     queryKey: ['/api/generated'],
-  });
-
-  const { data: workflows = [] } = useQuery<WorkflowType[]>({
-    queryKey: ['/api/workflows'],
   });
 
   const generateMutation = useMutation({
@@ -488,8 +491,24 @@ export default function StudioPanel({
     }];
   };
 
-  if (activeView === 'email') {
-    return <EmailBuilder onBack={() => setActiveView('main')} />;
+  // Use DocumentPanel context
+  const documentPanelContext = useDocumentPanel();
+  
+  // Show DocumentPanel when document is open (from context or activeView)
+  if (documentPanelOpen || activeView === 'document' || activeView === 'email') {
+    return (
+      <DocumentPanel
+        onBack={() => {
+          setActiveView('main');
+          onCloseDocument?.();
+        }}
+        initialContent={documentPanelContext.content}
+        initialTitle={documentPanelContext.title}
+        initialType={documentPanelContext.documentType}
+        initialRecipient={documentPanelContext.recipient}
+        initialSubject={documentPanelContext.subject}
+      />
+    );
   }
 
 
@@ -880,20 +899,16 @@ export default function StudioPanel({
         </TabsContent>
 
         <TabsContent value="workflows" className="flex-1 mt-0 overflow-hidden">
-          <WorkflowStudio
-            workflows={workflows}
-            onSaveWorkflow={async (workflow) => {
-              await apiRequest('POST', '/api/workflows', workflow);
-              queryClient.invalidateQueries({ queryKey: ['/api/workflows'] });
-            }}
-            onDeleteWorkflow={async (id) => {
-              await apiRequest('DELETE', `/api/workflows/${id}`);
-              queryClient.invalidateQueries({ queryKey: ['/api/workflows'] });
-            }}
+          <WorkflowsLibrary
             onRunWorkflow={(workflow) => {
+              // Dispatch workflow to run in chat container
+              // This will be handled by the chat panel via custom event
+              window.dispatchEvent(new CustomEvent('start-workflow', { 
+                detail: { workflow } 
+              }));
               toast({
-                title: 'Workflow Started',
-                description: `Running "${workflow.name}"...`
+                title: 'Starting Workflow',
+                description: `Running "${workflow.name}" in chat...`,
               });
             }}
           />
@@ -1259,6 +1274,7 @@ export default function StudioPanel({
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
     </div>
   );
 }

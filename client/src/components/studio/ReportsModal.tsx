@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import ReportEditor from './ReportEditor';
+import UnifiedContentEditor from './UnifiedContentEditor';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -366,8 +366,9 @@ export default function ReportsModal({ open, onOpenChange, selectedSourceIds = [
   // Show full-screen editor when report is generated
   if (showEditor) {
     return (
-      <ReportEditor
+      <UnifiedContentEditor
         initialContent={generatedContent}
+        initialType="report"
         title={reportTitle}
         onClose={handleEditorClose}
         notebookId={notebookId}
