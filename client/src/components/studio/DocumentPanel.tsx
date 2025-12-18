@@ -68,7 +68,19 @@ import {
   Briefcase,
   FileSignature,
   Building2,
+  Plus,
+  Trash2,
+  Pencil,
+  Copy,
 } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+  DialogDescription,
+} from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { cn } from "@/lib/utils";
@@ -168,9 +180,25 @@ interface DocumentTemplate {
   letterhead: string;
   signature: string;
   defaultContent: string;
+  isCustom?: boolean;
 }
 
-const DOCUMENT_TEMPLATES: DocumentTemplate[] = [
+// Load custom templates from localStorage
+const loadCustomTemplates = (): DocumentTemplate[] => {
+  try {
+    const saved = localStorage.getItem('custom-document-templates');
+    return saved ? JSON.parse(saved) : [];
+  } catch {
+    return [];
+  }
+};
+
+// Save custom templates to localStorage
+const saveCustomTemplates = (templates: DocumentTemplate[]) => {
+  localStorage.setItem('custom-document-templates', JSON.stringify(templates));
+};
+
+const BUILTIN_TEMPLATES: DocumentTemplate[] = [
   // Email templates
   {
     id: 'email-professional',
@@ -258,6 +286,9 @@ const DOCUMENT_TEMPLATES: DocumentTemplate[] = [
   },
 ];
 
+// Alignment type
+type AlignmentOption = 'left' | 'center' | 'right';
+
 // Branding/signature settings interface
 interface BrandingSettings {
   logoUrl: string;
@@ -265,6 +296,11 @@ interface BrandingSettings {
   senderTitle: string;
   senderCompany: string;
   senderEmail: string;
+  // Styling options
+  headerAlignment: AlignmentOption;
+  signatureAlignment: AlignmentOption;
+  showLogoInHeader: boolean;
+  showCompanyInHeader: boolean;
 }
 
 export interface DocumentPanelProps {
@@ -298,15 +334,28 @@ export default function DocumentPanel({
   const [showAIRewrite, setShowAIRewrite] = useState(false);
   const [selectedText, setSelectedText] = useState('');
   const [customRewritePrompt, setCustomRewritePrompt] = useState('');
-  const [activeTab, setActiveTab] = useState<'compose' | 'settings'>('compose');
+  const [activeTab, setActiveTab] = useState<'compose' | 'settings' | 'templates'>('compose');
+  
+  // Custom templates state
+  const [customTemplates, setCustomTemplates] = useState<DocumentTemplate[]>(loadCustomTemplates);
+  const allTemplates = [...BUILTIN_TEMPLATES, ...customTemplates];
+  
+  // Template editor state
+  const [templateEditorOpen, setTemplateEditorOpen] = useState(false);
+  const [editingTemplate, setEditingTemplate] = useState<DocumentTemplate | null>(null);
+  const [templateForm, setTemplateForm] = useState({
+    name: '',
+    type: 'email' as DocumentType,
+    fullHtml: '',
+  });
   
   // Template selection
   const [selectedTemplateId, setSelectedTemplateId] = useState<string>(() => {
-    const templates = DOCUMENT_TEMPLATES.filter(t => t.type === initialType);
+    const templates = allTemplates.filter((t: DocumentTemplate) => t.type === initialType);
     return templates[0]?.id || '';
   });
-  const selectedTemplate = DOCUMENT_TEMPLATES.find(t => t.id === selectedTemplateId);
-  const templatesForType = DOCUMENT_TEMPLATES.filter(t => t.type === documentType);
+  const selectedTemplate = allTemplates.find((t: DocumentTemplate) => t.id === selectedTemplateId);
+  const templatesForType = allTemplates.filter((t: DocumentTemplate) => t.type === documentType);
   
   // Branding settings from localStorage
   const [branding, setBranding] = useState<BrandingSettings>(() => {
@@ -319,6 +368,10 @@ export default function DocumentPanel({
         senderTitle: parsed.senderTitle || 'Your Title',
         senderCompany: parsed.senderCompany || 'Your Company',
         senderEmail: parsed.senderEmail || 'you@company.com',
+        headerAlignment: parsed.headerAlignment || 'left',
+        signatureAlignment: parsed.signatureAlignment || 'left',
+        showLogoInHeader: parsed.showLogoInHeader !== false,
+        showCompanyInHeader: parsed.showCompanyInHeader !== false,
       };
     }
     return {
@@ -327,6 +380,10 @@ export default function DocumentPanel({
       senderTitle: 'Your Title',
       senderCompany: 'Your Company',
       senderEmail: 'you@company.com',
+      headerAlignment: 'left',
+      signatureAlignment: 'left',
+      showLogoInHeader: true,
+      showCompanyInHeader: true,
     };
   });
 
@@ -335,11 +392,11 @@ export default function DocumentPanel({
 
   // Update template when document type changes
   useEffect(() => {
-    const templates = DOCUMENT_TEMPLATES.filter(t => t.type === documentType);
-    if (templates.length > 0 && !templates.find(t => t.id === selectedTemplateId)) {
+    const templates = allTemplates.filter((t: DocumentTemplate) => t.type === documentType);
+    if (templates.length > 0 && !templates.find((t: DocumentTemplate) => t.id === selectedTemplateId)) {
       setSelectedTemplateId(templates[0].id);
     }
-  }, [documentType]);
+  }, [documentType, customTemplates]);
 
   // Replace template variables with branding values
   const replaceTemplateVars = useCallback((html: string): string => {
@@ -477,12 +534,109 @@ export default function DocumentPanel({
 
   // Apply template function (defined after editor)
   const applyTemplate = useCallback((templateId: string) => {
-    const template = DOCUMENT_TEMPLATES.find(t => t.id === templateId);
+    const template = allTemplates.find((t: DocumentTemplate) => t.id === templateId);
     if (template && editor) {
       editor.commands.setContent(template.defaultContent);
       setSelectedTemplateId(templateId);
     }
-  }, [editor]);
+  }, [editor, customTemplates]);
+
+  // Template management functions
+  const openTemplateEditor = (template?: DocumentTemplate) => {
+    if (template) {
+      setEditingTemplate(template);
+      // Combine existing template parts into single HTML for editing
+      const combinedHtml = [
+        template.letterhead,
+        template.defaultContent,
+        template.signature
+      ].filter(Boolean).join('\n\n');
+      setTemplateForm({
+        name: template.name,
+        type: template.type,
+        fullHtml: combinedHtml,
+      });
+    } else {
+      setEditingTemplate(null);
+      setTemplateForm({
+        name: '',
+        type: documentType,
+        fullHtml: `<!-- EXAMPLE TEMPLATE - Paste your full HTML here -->
+<div style="text-align: center; padding: 20px; border-bottom: 2px solid #10b981;">
+  <!-- Logo: use text-align: left, center, or right to position -->
+  <img src="{{logo}}" alt="Logo" style="max-height: 60px; margin-bottom: 10px;" />
+  <h2 style="color: #10b981; margin: 0;">{{company}}</h2>
+</div>
+
+<div style="padding: 20px;">
+  <p>Dear [Recipient],</p>
+  <p>Your content here...</p>
+  <p>Best regards,</p>
+</div>
+
+<div style="padding: 20px; border-top: 1px solid #e5e7eb; text-align: center;">
+  <p style="margin: 0; font-weight: 600;">{{name}}</p>
+  <p style="margin: 4px 0; color: #6b7280;">{{title}} | {{company}}</p>
+  <p style="margin: 8px 0 0; color: #10b981;">{{email}}</p>
+</div>`,
+      });
+    }
+    setTemplateEditorOpen(true);
+  };
+
+  const saveTemplate = () => {
+    if (!templateForm.name.trim()) {
+      toast({ title: 'Error', description: 'Please enter a template name', variant: 'destructive' });
+      return;
+    }
+
+    // Store the full HTML as defaultContent (the main editable content)
+    const newTemplate: DocumentTemplate = {
+      id: editingTemplate?.id || `custom-${Date.now()}`,
+      name: templateForm.name,
+      type: templateForm.type,
+      letterhead: '', // Not used for custom templates - everything is in defaultContent
+      signature: '',  // Not used for custom templates - everything is in defaultContent
+      defaultContent: templateForm.fullHtml,
+      isCustom: true,
+    };
+
+    let updatedTemplates: DocumentTemplate[];
+    if (editingTemplate) {
+      updatedTemplates = customTemplates.map(t => t.id === editingTemplate.id ? newTemplate : t);
+    } else {
+      updatedTemplates = [...customTemplates, newTemplate];
+    }
+
+    setCustomTemplates(updatedTemplates);
+    saveCustomTemplates(updatedTemplates);
+    setTemplateEditorOpen(false);
+    toast({ title: 'Template saved', description: `"${newTemplate.name}" has been saved` });
+  };
+
+  const deleteTemplate = (templateId: string) => {
+    const updatedTemplates = customTemplates.filter(t => t.id !== templateId);
+    setCustomTemplates(updatedTemplates);
+    saveCustomTemplates(updatedTemplates);
+    if (selectedTemplateId === templateId) {
+      const fallback = allTemplates.find((t: DocumentTemplate) => t.type === documentType && t.id !== templateId);
+      setSelectedTemplateId(fallback?.id || '');
+    }
+    toast({ title: 'Template deleted', description: 'The template has been removed' });
+  };
+
+  const duplicateTemplate = (template: DocumentTemplate) => {
+    const newTemplate: DocumentTemplate = {
+      ...template,
+      id: `custom-${Date.now()}`,
+      name: `${template.name} (Copy)`,
+      isCustom: true,
+    };
+    const updatedTemplates = [...customTemplates, newTemplate];
+    setCustomTemplates(updatedTemplates);
+    saveCustomTemplates(updatedTemplates);
+    toast({ title: 'Template duplicated', description: `Created "${newTemplate.name}"` });
+  };
 
   // AI Rewrite mutation
   const rewriteMutation = useMutation({
@@ -600,8 +754,19 @@ export default function DocumentPanel({
     if (!editor) return '';
     const bodyHtml = editor.getHTML();
     
-    const logoHtml = branding.logoUrl 
-      ? `<img src="${branding.logoUrl}" alt="Logo" style="max-height: 60px; margin-bottom: 10px;" />`
+    // Logo alignment styles
+    const logoMarginStyle = branding.headerAlignment === 'center' 
+      ? 'margin: 0 auto 10px;' 
+      : branding.headerAlignment === 'right' 
+        ? 'margin: 0 0 10px auto;' 
+        : 'margin: 0 auto 10px 0;';
+    
+    const logoHtml = branding.showLogoInHeader && branding.logoUrl 
+      ? `<img src="${branding.logoUrl}" alt="Logo" style="display: block; max-height: 60px; ${logoMarginStyle}" />`
+      : '';
+    
+    const companyHtml = branding.showCompanyInHeader 
+      ? `<h1 style="color: #10b981; margin: 0;">${branding.senderCompany}</h1>`
       : '';
     
     return `<!DOCTYPE html>
@@ -612,9 +777,9 @@ export default function DocumentPanel({
   <style>
     body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; margin: 0; padding: 20px; background: #f9fafb; }
     .document-container { max-width: 700px; margin: 0 auto; background: white; border-radius: 8px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
-    .document-header { text-align: center; padding: 24px; border-bottom: 2px solid #10b981; }
+    .document-header { text-align: ${branding.headerAlignment}; padding: 24px; border-bottom: 2px solid #10b981; }
     .document-body { padding: 32px; line-height: 1.6; }
-    .document-footer { padding: 20px; border-top: 1px solid #e5e7eb; text-align: center; color: #6b7280; font-size: 14px; }
+    .document-footer { padding: 20px; border-top: 1px solid #e5e7eb; text-align: ${branding.signatureAlignment}; color: #6b7280; font-size: 14px; }
     h1 { font-size: 28px; color: #111827; margin: 0 0 16px; }
     h2 { font-size: 22px; color: #1f2937; margin: 24px 0 12px; }
     h3 { font-size: 18px; color: #374151; margin: 20px 0 10px; }
@@ -625,10 +790,10 @@ export default function DocumentPanel({
 </head>
 <body>
   <div class="document-container">
-    ${documentType !== 'article' ? `
+    ${documentType !== 'article' && (branding.showLogoInHeader || branding.showCompanyInHeader) ? `
     <div class="document-header">
       ${logoHtml}
-      <h1 style="color: #10b981; margin: 0;">${branding.senderCompany}</h1>
+      ${companyHtml}
     </div>
     ` : ''}
     ${heroImage ? `<img src="${heroImage}" alt="Hero" style="width: 100%; height: auto;" />` : ''}
@@ -750,7 +915,10 @@ export default function DocumentPanel({
                   "h-8 gap-1.5 text-xs",
                   documentType === type.id && "bg-primary/20"
                 )}
-                onClick={() => setDocumentType(type.id)}
+                onClick={() => {
+                  setDocumentType(type.id);
+                  setActiveTab('compose'); // Switch back to compose when changing document type
+                }}
               >
                 {type.icon}
                 {type.label}
@@ -758,20 +926,101 @@ export default function DocumentPanel({
             ))}
           </div>
           <div className="flex items-center gap-2">
-            {/* Template Dropdown */}
-            <Select value={selectedTemplateId} onValueChange={applyTemplate}>
-              <SelectTrigger className="w-[160px] h-8 text-xs">
-                <LayoutTemplate className="w-3.5 h-3.5 mr-1" />
-                <SelectValue placeholder="Template" />
-              </SelectTrigger>
-              <SelectContent>
-                {templatesForType.map((template) => (
-                  <SelectItem key={template.id} value={template.id} className="text-xs">
-                    {template.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            {/* Template Dropdown with Management */}
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="outline" size="sm" className="h-8 gap-1 text-xs w-[180px] justify-between">
+                  <div className="flex items-center gap-1">
+                    <LayoutTemplate className="w-3.5 h-3.5" />
+                    <span className="truncate">{selectedTemplate?.name || 'Select Template'}</span>
+                  </div>
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-[280px] p-2" align="end">
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between px-2 py-1">
+                    <span className="text-xs font-medium text-muted-foreground">Templates</span>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-6 px-2 text-xs"
+                      onClick={() => openTemplateEditor()}
+                    >
+                      <Plus className="w-3 h-3 mr-1" />
+                      New
+                    </Button>
+                  </div>
+                  <Separator />
+                  <ScrollArea className="max-h-[300px]">
+                    <div className="space-y-1">
+                      {templatesForType.length === 0 ? (
+                        <p className="text-xs text-muted-foreground text-center py-4">No templates for this type</p>
+                      ) : (
+                        templatesForType.map((template: DocumentTemplate) => (
+                          <div
+                            key={template.id}
+                            className={cn(
+                              "flex items-center justify-between px-2 py-1.5 rounded-md cursor-pointer group",
+                              selectedTemplateId === template.id ? "bg-primary/10" : "hover:bg-muted"
+                            )}
+                            onClick={() => applyTemplate(template.id)}
+                          >
+                            <div className="flex items-center gap-2 flex-1 min-w-0">
+                              <span className="text-xs truncate">{template.name}</span>
+                              {template.isCustom && (
+                                <span className="text-[10px] bg-primary/20 text-primary px-1 rounded">Custom</span>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100">
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-6 w-6"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  duplicateTemplate(template);
+                                }}
+                                title="Duplicate"
+                              >
+                                <Copy className="w-3 h-3" />
+                              </Button>
+                              {template.isCustom && (
+                                <>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-6 w-6"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      openTemplateEditor(template);
+                                    }}
+                                    title="Edit"
+                                  >
+                                    <Pencil className="w-3 h-3" />
+                                  </Button>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-6 w-6 text-destructive hover:text-destructive"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      deleteTemplate(template.id);
+                                    }}
+                                    title="Delete"
+                                  >
+                                    <Trash2 className="w-3 h-3" />
+                                  </Button>
+                                </>
+                              )}
+                            </div>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </ScrollArea>
+                </div>
+              </PopoverContent>
+            </Popover>
             {/* Settings Button */}
             <Button
               variant={activeTab === 'settings' ? 'secondary' : 'ghost'}
@@ -1055,6 +1304,45 @@ export default function DocumentPanel({
                     placeholder="Your Company"
                   />
                 </div>
+                <div>
+                  <Label className="text-xs text-muted-foreground">Header Alignment</Label>
+                  <div className="flex gap-2 mt-1">
+                    {(['left', 'center', 'right'] as const).map((align) => (
+                      <Button
+                        key={align}
+                        variant={branding.headerAlignment === align ? 'secondary' : 'outline'}
+                        size="sm"
+                        className="flex-1 capitalize"
+                        onClick={() => setBranding({ ...branding, headerAlignment: align })}
+                      >
+                        {align === 'left' && <AlignLeft className="w-4 h-4 mr-1" />}
+                        {align === 'center' && <AlignCenter className="w-4 h-4 mr-1" />}
+                        {align === 'right' && <AlignRight className="w-4 h-4 mr-1" />}
+                        {align}
+                      </Button>
+                    ))}
+                  </div>
+                </div>
+                <div className="flex items-center gap-4">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={branding.showLogoInHeader}
+                      onChange={(e) => setBranding({ ...branding, showLogoInHeader: e.target.checked })}
+                      className="rounded"
+                    />
+                    <span className="text-xs">Show logo in header</span>
+                  </label>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={branding.showCompanyInHeader}
+                      onChange={(e) => setBranding({ ...branding, showCompanyInHeader: e.target.checked })}
+                      className="rounded"
+                    />
+                    <span className="text-xs">Show company name in header</span>
+                  </label>
+                </div>
               </div>
             </div>
 
@@ -1093,6 +1381,25 @@ export default function DocumentPanel({
                     placeholder="you@company.com"
                   />
                 </div>
+                <div>
+                  <Label className="text-xs text-muted-foreground">Signature Alignment</Label>
+                  <div className="flex gap-2 mt-1">
+                    {(['left', 'center', 'right'] as const).map((align) => (
+                      <Button
+                        key={align}
+                        variant={branding.signatureAlignment === align ? 'secondary' : 'outline'}
+                        size="sm"
+                        className="flex-1 capitalize"
+                        onClick={() => setBranding({ ...branding, signatureAlignment: align })}
+                      >
+                        {align === 'left' && <AlignLeft className="w-4 h-4 mr-1" />}
+                        {align === 'center' && <AlignCenter className="w-4 h-4 mr-1" />}
+                        {align === 'right' && <AlignRight className="w-4 h-4 mr-1" />}
+                        {align}
+                      </Button>
+                    ))}
+                  </div>
+                </div>
               </div>
             </div>
 
@@ -1105,11 +1412,30 @@ export default function DocumentPanel({
               </Button>
             </div>
 
+            {/* Preview of header */}
+            <div>
+              <h4 className="text-xs text-muted-foreground mb-2">Header Preview</h4>
+              <div className="border rounded-lg p-4 bg-muted/20">
+                <div className={`text-${branding.headerAlignment} text-sm`} style={{ textAlign: branding.headerAlignment }}>
+                  {branding.showLogoInHeader && branding.logoUrl && (
+                    <img src={branding.logoUrl} alt="Logo" className="h-10 mb-2" style={{ 
+                      display: 'block',
+                      marginLeft: branding.headerAlignment === 'center' ? 'auto' : branding.headerAlignment === 'right' ? 'auto' : '0',
+                      marginRight: branding.headerAlignment === 'center' ? 'auto' : branding.headerAlignment === 'left' ? 'auto' : '0',
+                    }} />
+                  )}
+                  {branding.showCompanyInHeader && (
+                    <p className="font-semibold text-primary">{branding.senderCompany}</p>
+                  )}
+                </div>
+              </div>
+            </div>
+
             {/* Preview of signature */}
             <div>
               <h4 className="text-xs text-muted-foreground mb-2">Signature Preview</h4>
               <div className="border rounded-lg p-4 bg-muted/20">
-                <div className="text-center text-sm">
+                <div className="text-sm" style={{ textAlign: branding.signatureAlignment }}>
                   <p className="font-medium">{branding.senderName}</p>
                   <p className="text-muted-foreground">{branding.senderTitle}</p>
                   <p className="text-muted-foreground">{branding.senderCompany}</p>
@@ -1133,11 +1459,22 @@ export default function DocumentPanel({
                   <div dangerouslySetInnerHTML={{ __html: replaceTemplateVars(selectedTemplate.letterhead) }} />
                 )}
                 {!selectedTemplate?.letterhead && documentType !== 'article' && (
-                  <div className="text-center p-6 border-b border-border/30">
-                    {branding.logoUrl && (
-                      <img src={branding.logoUrl} alt="Logo" className="h-12 mx-auto mb-2" />
+                  <div className="p-6 border-b border-border/30" style={{ textAlign: branding.headerAlignment }}>
+                    {branding.showLogoInHeader && branding.logoUrl && (
+                      <img 
+                        src={branding.logoUrl} 
+                        alt="Logo" 
+                        className="h-12 mb-2" 
+                        style={{ 
+                          display: 'block',
+                          marginLeft: branding.headerAlignment === 'center' ? 'auto' : branding.headerAlignment === 'right' ? 'auto' : '0',
+                          marginRight: branding.headerAlignment === 'center' ? 'auto' : branding.headerAlignment === 'left' ? 'auto' : '0',
+                        }}
+                      />
                     )}
-                    <h2 className="text-lg font-semibold text-primary">{branding.senderCompany}</h2>
+                    {branding.showCompanyInHeader && (
+                      <h2 className="text-lg font-semibold text-primary">{branding.senderCompany}</h2>
+                    )}
                   </div>
                 )}
                 {heroImage && (
@@ -1148,7 +1485,7 @@ export default function DocumentPanel({
                 {selectedTemplate?.signature ? (
                   <div dangerouslySetInnerHTML={{ __html: replaceTemplateVars(selectedTemplate.signature) }} />
                 ) : config.showSignature && (
-                  <div className="border-t border-border/30 p-4 text-center text-sm text-muted-foreground">
+                  <div className="border-t border-border/30 p-4 text-sm text-muted-foreground" style={{ textAlign: branding.signatureAlignment }}>
                     <p className="font-medium">{branding.senderName}</p>
                     <p>{branding.senderTitle}</p>
                     <p>{branding.senderCompany}</p>
@@ -1194,6 +1531,82 @@ export default function DocumentPanel({
           )}
         </ScrollArea>
       )}
+
+      {/* Template Editor Dialog */}
+      <Dialog open={templateEditorOpen} onOpenChange={setTemplateEditorOpen}>
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>{editingTemplate ? 'Edit Template' : 'Create New Template'}</DialogTitle>
+            <DialogDescription>
+              {editingTemplate ? 'Modify your custom template' : 'Create a reusable document template with HTML styling'}
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4 py-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label className="text-sm">Template Name</Label>
+                <Input
+                  value={templateForm.name}
+                  onChange={(e) => setTemplateForm({ ...templateForm, name: e.target.value })}
+                  placeholder="My Custom Template"
+                  className="mt-1"
+                />
+              </div>
+              <div>
+                <Label className="text-sm">Document Type</Label>
+                <Select
+                  value={templateForm.type}
+                  onValueChange={(v: DocumentType) => setTemplateForm({ ...templateForm, type: v })}
+                >
+                  <SelectTrigger className="mt-1">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="email">Email</SelectItem>
+                    <SelectItem value="newsletter">Newsletter</SelectItem>
+                    <SelectItem value="report">Report</SelectItem>
+                    <SelectItem value="article">Article</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div>
+              <Label className="text-sm">Full HTML Template</Label>
+              <p className="text-xs text-muted-foreground mb-2">
+                Paste your complete HTML template below. Use placeholders: <code className="bg-muted px-1 rounded">{'{{company}}'}</code>, <code className="bg-muted px-1 rounded">{'{{name}}'}</code>, <code className="bg-muted px-1 rounded">{'{{email}}'}</code>, <code className="bg-muted px-1 rounded">{'{{title}}'}</code>, <code className="bg-muted px-1 rounded">{'{{date}}'}</code>, <code className="bg-muted px-1 rounded">{'{{logo}}'}</code>
+              </p>
+              <div className="bg-muted/30 rounded-md p-2 mb-2 text-xs text-muted-foreground">
+                <p className="font-medium mb-1">💡 Image/Logo Tips:</p>
+                <ul className="space-y-1 ml-3">
+                  <li>• <strong>Left:</strong> <code>{'<img src="URL" style="display: block;" />'}</code></li>
+                  <li>• <strong>Center:</strong> <code>{'<img src="URL" style="display: block; margin: 0 auto;" />'}</code></li>
+                  <li>• <strong>Right:</strong> <code>{'<img src="URL" style="display: block; margin-left: auto;" />'}</code></li>
+                  <li>• Use <code>{'{{logo}}'}</code> placeholder to use your branding logo</li>
+                  <li>• Or paste a direct image URL from your hosting</li>
+                </ul>
+              </div>
+              <Textarea
+                value={templateForm.fullHtml}
+                onChange={(e) => setTemplateForm({ ...templateForm, fullHtml: e.target.value })}
+                placeholder="Paste your full HTML template here..."
+                className="mt-1 font-mono text-xs min-h-[350px]"
+              />
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setTemplateEditorOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={saveTemplate}>
+              <Save className="w-4 h-4 mr-2" />
+              Save Template
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
