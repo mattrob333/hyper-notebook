@@ -29,6 +29,7 @@ export interface LetterheadSettings {
 // Notebooks table - each notebook contains its own sources, conversations, and generated content
 export const notebooks = pgTable("notebooks", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id"), // Clerk user ID - null for legacy/shared notebooks
   name: text("name").notNull(),
   description: text("description"),
   emoji: text("emoji").default("📓"),
@@ -39,7 +40,7 @@ export const notebooks = pgTable("notebooks", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
-export const insertNotebookSchema = createInsertSchema(notebooks).omit({ id: true, createdAt: true, updatedAt: true, sourceCount: true });
+export const insertNotebookSchema = createInsertSchema(notebooks).omit({ id: true, createdAt: true, updatedAt: true, sourceCount: true, userId: true });
 export type InsertNotebook = z.infer<typeof insertNotebookSchema>;
 export type Notebook = typeof notebooks.$inferSelect;
 

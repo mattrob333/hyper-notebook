@@ -5,10 +5,14 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { EmailBuilderProvider } from "@/contexts/EmailBuilderContext";
 import { LeadProvider } from "@/contexts/LeadContext";
+import { SignedIn, SignedOut } from "@clerk/clerk-react";
 import NotFound from "@/pages/not-found";
 import Home from "@/pages/home";
 import NotebooksDashboard from "@/pages/notebooks";
 import SettingsPage from "@/pages/settings";
+import LandingPage from "@/pages/landing";
+
+const isClerkAvailable = !!import.meta.env.VITE_CLERK_PUBLISHABLE_KEY;
 
 function Router() {
   return (
@@ -28,7 +32,18 @@ function App() {
         <EmailBuilderProvider>
           <LeadProvider>
             <Toaster />
-            <Router />
+            {isClerkAvailable ? (
+              <>
+                <SignedIn>
+                  <Router />
+                </SignedIn>
+                <SignedOut>
+                  <LandingPage />
+                </SignedOut>
+              </>
+            ) : (
+              <Router />
+            )}
           </LeadProvider>
         </EmailBuilderProvider>
       </TooltipProvider>

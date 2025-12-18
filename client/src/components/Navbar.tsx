@@ -17,7 +17,10 @@ import {
   DropdownMenuTrigger,
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { SignedIn, SignedOut, SignInButton, UserButton } from "@clerk/clerk-react";
+
+const isClerkAvailable = !!import.meta.env.VITE_CLERK_PUBLISHABLE_KEY;
 
 interface Notebook {
   id: string;
@@ -130,29 +133,33 @@ export default function Navbar({
           {isDarkMode ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
         </Button>
 
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon" className="rounded-full" data-testid="button-user-menu">
-              <Avatar className="w-7 h-7">
-                <AvatarFallback className="text-xs">U</AvatarFallback>
-              </Avatar>
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="rounded-xl">
-            <DropdownMenuItem className="rounded-lg" data-testid="menu-item-profile">
-              <User className="w-4 h-4 mr-2" />
-              Profile
-            </DropdownMenuItem>
-            <DropdownMenuItem className="rounded-lg" data-testid="menu-item-settings">
-              <Settings className="w-4 h-4 mr-2" />
-              Settings
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem className="rounded-lg" data-testid="menu-item-logout">
-              Log out
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+        {/* User menu - Clerk integration */}
+        {isClerkAvailable ? (
+          <>
+            <SignedIn>
+              <UserButton 
+                afterSignOutUrl="/"
+                appearance={{
+                  elements: {
+                    avatarBox: "w-8 h-8"
+                  }
+                }}
+              />
+            </SignedIn>
+            <SignedOut>
+              <SignInButton mode="modal">
+                <Button variant="ghost" size="sm" className="gap-2 text-xs rounded-lg">
+                  <User className="w-4 h-4" />
+                  Sign In
+                </Button>
+              </SignInButton>
+            </SignedOut>
+          </>
+        ) : (
+          <Avatar className="w-8 h-8">
+            <AvatarFallback className="text-xs">U</AvatarFallback>
+          </Avatar>
+        )}
       </div>
     </header>
   );

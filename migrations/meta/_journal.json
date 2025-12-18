@@ -1,0 +1,13 @@
+{
+  "version": "7",
+  "dialect": "postgresql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "7",
+      "when": 1766069073006,
+      "tag": "0000_add-user-id-to-notebooks",
+      "breakpoints": true
+    }
+  ]
+}

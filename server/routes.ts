@@ -11,6 +11,7 @@ import { db } from "./db";
 import { eq, and } from "drizzle-orm";
 import { getWorkflowByTrigger } from "./workflows";
 import Papa from "papaparse";
+import { getUserId, authRequired } from "./auth";
 
 // Auto-detect column types from headers
 function detectColumns(headers: string[]): SpreadsheetContent['detectedColumns'] {
@@ -58,7 +59,8 @@ export async function registerRoutes(
   // Notebooks endpoints
   app.get("/api/notebooks", async (req: Request, res: Response) => {
     try {
-      const notebooks = await storage.getNotebooks();
+      const userId = getUserId(req);
+      const notebooks = await storage.getNotebooks(userId);
       res.json(notebooks);
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch notebooks" });
@@ -67,7 +69,8 @@ export async function registerRoutes(
 
   app.get("/api/notebooks/:id", async (req: Request, res: Response) => {
     try {
-      const notebook = await storage.getNotebook(req.params.id);
+      const userId = getUserId(req);
+      const notebook = await storage.getNotebook(req.params.id, userId);
       if (!notebook) {
         return res.status(404).json({ error: "Notebook not found" });
       }
@@ -79,8 +82,9 @@ export async function registerRoutes(
 
   app.post("/api/notebooks", async (req: Request, res: Response) => {
     try {
+      const userId = getUserId(req);
       const validated = insertNotebookSchema.parse(req.body);
-      const notebook = await storage.createNotebook(validated);
+      const notebook = await storage.createNotebook(validated, userId);
       res.status(201).json(notebook);
     } catch (error) {
       if (error instanceof z.ZodError) {
@@ -92,7 +96,8 @@ export async function registerRoutes(
 
   app.patch("/api/notebooks/:id", async (req: Request, res: Response) => {
     try {
-      const notebook = await storage.updateNotebook(req.params.id, req.body);
+      const userId = getUserId(req);
+      const notebook = await storage.updateNotebook(req.params.id, req.body, userId);
       if (!notebook) {
         return res.status(404).json({ error: "Notebook not found" });
       }
@@ -104,10 +109,25 @@ export async function registerRoutes(
 
   app.delete("/api/notebooks/:id", async (req: Request, res: Response) => {
     try {
-      await storage.deleteNotebook(req.params.id);
+      const userId = getUserId(req);
+      await storage.deleteNotebook(req.params.id, userId);
       res.status(204).send();
     } catch (error) {
       res.status(500).json({ error: "Failed to delete notebook" });
+    }
+  });
+
+  // Claim unclaimed notebooks (migrate notebooks with null userId to current user)
+  app.post("/api/notebooks/claim", async (req: Request, res: Response) => {
+    try {
+      const userId = getUserId(req);
+      if (!userId || userId === 'dev-user') {
+        return res.status(401).json({ error: "Must be signed in to claim notebooks" });
+      }
+      const claimed = await storage.claimUnclaimedNotebooks(userId);
+      res.json({ claimed });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to claim notebooks" });
     }
   });
 

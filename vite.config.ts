@@ -22,4 +22,6 @@ export default defineConfig({
       deny: ["**/.*"],
     },
   },
+  // Vite automatically exposes VITE_* env vars from .env files
+  envDir: path.resolve(import.meta.dirname),
 });

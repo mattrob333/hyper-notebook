@@ -1,4 +1,4 @@
-import { eq, desc, sql } from "drizzle-orm";
+import { eq, desc, sql, and, or, isNull } from "drizzle-orm";
 import { db } from "./db";
 import {
   users, sources, notes, conversations, messages, workflows, generatedContent, notebooks, feeds,
@@ -19,11 +19,12 @@ export interface IStorage {
   createUser(user: InsertUser): Promise<User>;
 
   // Notebooks
-  getNotebooks(): Promise<Notebook[]>;
-  getNotebook(id: string): Promise<Notebook | undefined>;
-  createNotebook(notebook: InsertNotebook): Promise<Notebook>;
-  updateNotebook(id: string, notebook: Partial<InsertNotebook>): Promise<Notebook | undefined>;
-  deleteNotebook(id: string): Promise<boolean>;
+  getNotebooks(userId?: string | null): Promise<Notebook[]>;
+  getNotebook(id: string, userId?: string | null): Promise<Notebook | undefined>;
+  createNotebook(notebook: InsertNotebook, userId?: string | null): Promise<Notebook>;
+  updateNotebook(id: string, notebook: Partial<InsertNotebook>, userId?: string | null): Promise<Notebook | undefined>;
+  deleteNotebook(id: string, userId?: string | null): Promise<boolean>;
+  claimUnclaimedNotebooks(userId: string): Promise<number>;
 
   getSources(notebookId?: string): Promise<Source[]>;
   getSource(id: string): Promise<Source | undefined>;
@@ -81,31 +82,58 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Notebooks
-  async getNotebooks(): Promise<Notebook[]> {
+  async getNotebooks(userId?: string | null): Promise<Notebook[]> {
+    // If userId provided, get user's notebooks + shared notebooks (null userId)
+    // If no userId (dev mode), get all notebooks
+    if (userId) {
+      return db.select().from(notebooks)
+        .where(or(eq(notebooks.userId, userId), isNull(notebooks.userId)))
+        .orderBy(desc(notebooks.updatedAt));
+    }
     return db.select().from(notebooks).orderBy(desc(notebooks.updatedAt));
   }
 
-  async getNotebook(id: string): Promise<Notebook | undefined> {
+  async getNotebook(id: string, userId?: string | null): Promise<Notebook | undefined> {
+    if (userId) {
+      const [notebook] = await db.select().from(notebooks)
+        .where(and(eq(notebooks.id, id), or(eq(notebooks.userId, userId), isNull(notebooks.userId))));
+      return notebook;
+    }
     const [notebook] = await db.select().from(notebooks).where(eq(notebooks.id, id));
     return notebook;
   }
 
-  async createNotebook(notebook: InsertNotebook): Promise<Notebook> {
-    const [created] = await db.insert(notebooks).values(notebook).returning();
+  async createNotebook(notebook: InsertNotebook, userId?: string | null): Promise<Notebook> {
+    const [created] = await db.insert(notebooks).values({ ...notebook, userId: userId || null } as any).returning();
     return created;
   }
 
-  async updateNotebook(id: string, notebook: Partial<InsertNotebook>): Promise<Notebook | undefined> {
+  async updateNotebook(id: string, notebook: Partial<InsertNotebook>, userId?: string | null): Promise<Notebook | undefined> {
+    const whereClause = userId 
+      ? and(eq(notebooks.id, id), or(eq(notebooks.userId, userId), isNull(notebooks.userId)))
+      : eq(notebooks.id, id);
     const [updated] = await db.update(notebooks)
-      .set({ ...notebook, updatedAt: new Date() })
-      .where(eq(notebooks.id, id))
+      .set({ ...notebook, updatedAt: new Date() } as any)
+      .where(whereClause)
       .returning();
     return updated;
   }
 
-  async deleteNotebook(id: string): Promise<boolean> {
-    await db.delete(notebooks).where(eq(notebooks.id, id));
+  async deleteNotebook(id: string, userId?: string | null): Promise<boolean> {
+    const whereClause = userId 
+      ? and(eq(notebooks.id, id), eq(notebooks.userId, userId)) // Can only delete own notebooks
+      : eq(notebooks.id, id);
+    await db.delete(notebooks).where(whereClause);
     return true;
+  }
+
+  async claimUnclaimedNotebooks(userId: string): Promise<number> {
+    // Update all notebooks with null userId to belong to this user
+    const result = await db.update(notebooks)
+      .set({ userId, updatedAt: new Date() })
+      .where(isNull(notebooks.userId))
+      .returning();
+    return result.length;
   }
 
   async updateNotebookSourceCount(notebookId: string): Promise<void> {

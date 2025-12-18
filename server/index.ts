@@ -1,5 +1,6 @@
 import "dotenv/config";
 import express, { type Request, Response, NextFunction } from "express";
+import { clerkMiddleware } from "@clerk/express";
 import { registerRoutes } from "./routes";
 import { serveStatic } from "./static";
 import { createServer } from "http";
@@ -23,6 +24,14 @@ app.use(
 );
 
 app.use(express.urlencoded({ extended: false, limit: '10mb' }));
+
+// Clerk authentication middleware (optional - only active if CLERK_SECRET_KEY is set)
+if (process.env.CLERK_SECRET_KEY) {
+  app.use(clerkMiddleware());
+  console.log("Clerk authentication enabled");
+} else {
+  console.log("Clerk authentication disabled (no CLERK_SECRET_KEY)");
+}
 
 export function log(message: string, source = "express") {
   const formattedTime = new Date().toLocaleTimeString("en-US", {
