@@ -109,6 +109,16 @@ export const availableModels: ModelInfo[] = [
     supportsStreaming: true,
     supportsImageGeneration: true,
   },
+  // xAI Models
+  {
+    id: "x-ai/grok-4.1-fast",
+    name: "Grok 4.1 Fast",
+    provider: "xAI",
+    contextLength: 131072,
+    description: "xAI's fastest Grok model optimized for speed with strong reasoning capabilities",
+    supportsImages: true,
+    supportsStreaming: true,
+  },
 ];
 
 // Type for model IDs
