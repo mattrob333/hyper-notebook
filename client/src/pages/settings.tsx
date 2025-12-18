@@ -171,7 +171,7 @@ export default function SettingsPage() {
               </Button>
               <div>
                 <h1 className="text-lg sm:text-xl font-bold">Settings</h1>
-                <p className="text-xs sm:text-sm text-muted-foreground hidden sm:block">Configure your Hyper Notebook</p>
+                <p className="text-xs sm:text-sm text-muted-foreground hidden sm:block">Configure your Smart Notebook</p>
               </div>
             </div>
             <Button size="sm" className="sm:size-default" onClick={handleSaveSettings}>
@@ -308,7 +308,7 @@ export default function SettingsPage() {
                   Appearance
                 </CardTitle>
                 <CardDescription className="text-xs sm:text-sm">
-                  Customize how Hyper Notebook looks and feels.
+                  Customize how Smart Notebook looks and feels.
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4 sm:space-y-6 px-4 sm:px-6">

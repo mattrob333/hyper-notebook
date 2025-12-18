@@ -96,7 +96,7 @@ export default function Navbar({
             </DropdownMenu>
           </div>
         ) : (
-          <span className="font-medium text-xs sm:text-sm">Hyper-Notebook</span>
+          <span className="font-medium text-xs sm:text-sm">Smart Notebook</span>
         )}
       </div>
 

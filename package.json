@@ -1,7 +1,7 @@
 {
-  "name": "hyper-notebook",
+  "name": "smart-notebook",
   "version": "1.0.0",
-  "description": "AI-powered research assistant inspired by Google NotebookLM",
+  "description": "Smart Notebook - AI-powered research assistant with deep web research and document generation",
   "type": "module",
   "license": "MIT",
   "scripts": {

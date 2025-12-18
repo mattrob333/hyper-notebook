@@ -109,8 +109,8 @@ export default function NotebooksDashboard() {
       {/* Header */}
       <header className="h-14 border-b flex items-center justify-between px-4 sm:px-6 bg-background">
         <div className="flex items-center gap-2 sm:gap-3">
-          <img src="/favicon.png" alt="Tier 4 Logo" className="w-7 h-7 sm:w-8 sm:h-8 object-contain" />
-          <span className="font-semibold text-base sm:text-lg hidden xs:inline">Tier 4 Notebook</span>
+          <img src="/favicon.png" alt="Smart Notebook" className="w-7 h-7 sm:w-8 sm:h-8 object-contain" />
+          <span className="font-semibold text-base sm:text-lg hidden xs:inline">Smart Notebook</span>
         </div>
         <div className="flex items-center gap-1 sm:gap-2">
           <Button 
