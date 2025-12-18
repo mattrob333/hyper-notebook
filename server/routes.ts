@@ -809,6 +809,119 @@ Write ONLY the script text, no stage directions or speaker labels.`;
     }
   });
 
+  // Firecrawl Deep Research endpoint - AI-powered research on any topic
+  app.post("/api/firecrawl-deep-research", async (req: Request, res: Response) => {
+    try {
+      const { query, maxDepth = 5, timeLimit = 180, maxUrls = 15, notebookId } = req.body;
+      
+      if (!query) {
+        return res.status(400).json({ error: "Query is required" });
+      }
+
+      const apiKey = process.env.FIRECRAWL_API_KEY;
+      
+      if (!apiKey) {
+        return res.status(400).json({ error: "Firecrawl API key not configured" });
+      }
+
+      console.log('[Firecrawl Deep Research] Starting research:', query);
+      
+      const response = await fetch('https://api.firecrawl.dev/v1/deep-research', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify({
+          query,
+          maxDepth: Math.min(Math.max(maxDepth, 1), 10),
+          timeLimit: Math.min(Math.max(timeLimit, 30), 300),
+          maxUrls: Math.min(Math.max(maxUrls, 1), 1000),
+        }),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('[Firecrawl Deep Research] API error:', response.status, errorText);
+        throw new Error(`Firecrawl API error: ${response.status}`);
+      }
+
+      const result = await response.json();
+      
+      if (!result.success) {
+        throw new Error(result.error || 'Deep research failed');
+      }
+
+      console.log('[Firecrawl Deep Research] Completed:', {
+        sourcesCount: result.data?.sources?.length || 0,
+        status: result.status,
+      });
+
+      // Create sources from the research results
+      const createdSources = [];
+      
+      // Create the main research report as a source
+      if (result.data?.finalAnalysis) {
+        const reportSource = await storage.createSource({
+          type: 'text',
+          name: `Research Report: ${query.slice(0, 50)}${query.length > 50 ? '...' : ''}`,
+          content: result.data.finalAnalysis,
+          notebookId: notebookId || null,
+          category: 'reference',
+          metadata: {
+            type: 'deep-research',
+            query,
+            completedAt: new Date().toISOString(),
+            sourcesCount: result.data.sources?.length || 0,
+          },
+        });
+        createdSources.push(reportSource);
+      }
+
+      // Create sources from each researched URL
+      if (result.data?.sources && Array.isArray(result.data.sources)) {
+        for (const source of result.data.sources.slice(0, 10)) { // Limit to 10 sources
+          try {
+            const urlSource = await storage.createSource({
+              type: 'url',
+              name: source.title || new URL(source.url).hostname,
+              content: source.url,
+              notebookId: notebookId || null,
+              category: 'reference',
+              summary: source.description || null,
+              metadata: {
+                url: source.url,
+                sourceUrl: source.url,
+                fromDeepResearch: true,
+                researchQuery: query,
+              },
+            });
+            createdSources.push(urlSource);
+          } catch (err) {
+            console.error('[Firecrawl Deep Research] Error creating source:', err);
+          }
+        }
+      }
+
+      // Update notebook source count if applicable
+      if (notebookId) {
+        await storage.updateNotebookSourceCount(notebookId);
+      }
+
+      res.json({
+        success: true,
+        data: result.data,
+        createdSources: createdSources.length,
+        status: result.status,
+      });
+    } catch (error) {
+      console.error("[Firecrawl Deep Research] Error:", error);
+      res.status(500).json({
+        error: error instanceof Error ? error.message : "Unknown error occurred",
+      });
+    }
+  });
+
   // RSS Feed Discovery endpoint - extracts RSS feed links from a website
   app.post("/api/discover-rss", async (req: Request, res: Response) => {
     try {

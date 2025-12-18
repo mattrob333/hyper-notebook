@@ -219,17 +219,24 @@ export default function SourcesPanel({
 
   const deepResearchMutation = useMutation({
     mutationFn: async (topic: string) => {
-      const res = await apiRequest('POST', '/api/chat/simple', {
-        messages: [{ role: 'user', content: `Research the following topic thoroughly and provide a comprehensive summary with key facts, recent developments, and important context: ${topic}` }],
-        systemPrompt: 'You are a research assistant. Provide comprehensive, well-structured research summaries with factual information.',
+      const res = await apiRequest('POST', '/api/firecrawl-deep-research', {
+        query: topic,
+        maxDepth: 5,
+        timeLimit: 180,
+        maxUrls: 15,
+        notebookId,
       });
       return res.json();
     },
-    onSuccess: async (data, topic) => {
-      await createSourceMutation.mutateAsync({
-        type: 'text',
-        name: `Research: ${topic.slice(0, 50)}${topic.length > 50 ? '...' : ''}`,
-        content: data.content,
+    onSuccess: async (data) => {
+      // Sources are automatically created by the server endpoint
+      queryClient.invalidateQueries({ queryKey: notebookId ? [`/api/notebooks/${notebookId}/sources`] : ['/api/sources'] });
+      if (notebookId) {
+        queryClient.invalidateQueries({ queryKey: ['/api/notebooks'] });
+      }
+      toast({ 
+        title: "Deep Research Complete", 
+        description: `Created ${data.createdSources || 0} sources from research` 
       });
       setDeepResearchDialogOpen(false);
       setResearchTopic('');
@@ -1071,17 +1078,23 @@ export default function SourcesPanel({
               Deep Research
             </DialogTitle>
             <DialogDescription>
-              Enter a topic to research. AI will gather comprehensive information and create a new source.
+              AI will autonomously explore the web, gather relevant sources, and create a comprehensive research report with source attribution.
             </DialogDescription>
           </DialogHeader>
           <Input 
-            placeholder="Enter research topic..."
+            placeholder="What would you like to research?"
             value={researchTopic}
             onChange={(e) => setResearchTopic(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && !deepResearchMutation.isPending && handleDeepResearch()}
             className="rounded-xl"
             data-testid="input-research-topic"
           />
+          {deepResearchMutation.isPending && (
+            <div className="flex items-center gap-2 text-sm text-muted-foreground bg-muted/50 p-3 rounded-lg">
+              <Loader2 className="w-4 h-4 animate-spin" />
+              <span>Researching... This may take 2-3 minutes.</span>
+            </div>
+          )}
           <DialogFooter>
             <Button variant="outline" onClick={() => setDeepResearchDialogOpen(false)} className="rounded-xl" data-testid="button-cancel-research">
               Cancel
