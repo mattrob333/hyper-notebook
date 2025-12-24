@@ -229,6 +229,9 @@ export default function StudioPanel({
   const [audioInstructions, setAudioInstructions] = useState('');
   const [audioSelectedSources, setAudioSelectedSources] = useState<string[]>([]);
   const [audioFormat, setAudioFormat] = useState<'podcast' | 'lecture'>('podcast');
+  
+  // Generating audio state - shows skeleton in sidebar immediately
+  const [generatingAudioType, setGeneratingAudioType] = useState<'audio_overview' | 'audio_lecture' | null>(null);
 
   // UI Workflows - removed full-page runner, workflows run in chat now
 
@@ -276,9 +279,16 @@ export default function StudioPanel({
     },
     onSuccess: (data: GeneratedContent) => {
       setGeneratedContent(data);
-      setActiveView('canvas');
       setLoadingType(null);
+      setGeneratingAudioType(null);
       queryClient.invalidateQueries({ queryKey: ['/api/generated'] });
+      
+      // For audio types, don't auto-open canvas - just show in list with play button
+      const isAudioType = data.type === 'audio_overview' || data.type === 'audio_lecture';
+      if (!isAudioType) {
+        setActiveView('canvas');
+      }
+      
       toast({
         title: 'Content Generated',
         description: `Your ${data.type.replace(/_/g, ' ')} has been created successfully.`
@@ -286,6 +296,7 @@ export default function StudioPanel({
     },
     onError: (error: Error) => {
       setLoadingType(null);
+      setGeneratingAudioType(null);
       toast({
         title: 'Generation Failed',
         description: error.message,
@@ -943,66 +954,112 @@ export default function StudioPanel({
                   <p className="text-xs mt-1">Generate content to create notes</p>
                 </div>
               ) : (
-                savedContent.map((content) => (
-                  <Card 
-                    key={content.id} 
-                    className="p-3 rounded-xl hover-elevate cursor-pointer bg-card"
-                    data-testid={`content-item-${content.id}`}
-                    onClick={() => {
-                      setGeneratedContent(content);
-                      setActiveView('canvas');
-                    }}
-                  >
-                    <div className="flex items-start gap-3">
-                      <div className="p-2 rounded-lg bg-muted shrink-0">
-                        {CONTENT_TYPES.find(t => t.type === content.type)?.icon ? (
-                          (() => {
-                            const Icon = CONTENT_TYPES.find(t => t.type === content.type)!.icon;
-                            return <Icon className="w-4 h-4 text-muted-foreground" />;
-                          })()
-                        ) : (
-                          <FileText className="w-4 h-4 text-muted-foreground" />
-                        )}
+                <>
+                  {/* Generating Audio Skeleton Placeholder */}
+                  {generatingAudioType && (
+                    <Card className="p-3 rounded-xl bg-purple-500/10 border-purple-500/30 animate-pulse">
+                      <div className="flex items-start gap-3">
+                        <div className="p-2 rounded-lg bg-purple-500/20 shrink-0">
+                          <Loader2 className="w-4 h-4 text-purple-400 animate-spin" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-purple-300">
+                            {generatingAudioType === 'audio_lecture' ? 'Generating Lecture...' : 'Generating Podcast...'}
+                          </p>
+                          <p className="text-xs text-purple-400/70 mt-0.5">
+                            Creating audio with ElevenLabs
+                          </p>
+                        </div>
                       </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium truncate">{content.title}</p>
-                        <p className="text-xs text-muted-foreground mt-0.5">
-                          {content.sourceIds?.length || 0} sources · {formatTimeAgo(new Date(content.createdAt))}
-                        </p>
-                      </div>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" data-testid={`button-content-menu-${content.id}`}>
-                            <MoreVertical className="w-4 h-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" className="rounded-xl">
-                          <DropdownMenuItem 
-                            className="rounded-lg"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              console.log('Download', content.id);
-                            }}
-                          >
-                            <FileBarChart className="w-4 h-4 mr-2" />
-                            Download
-                          </DropdownMenuItem>
-                          <DropdownMenuItem 
-                            className="rounded-lg text-destructive"
-                            onClick={async (e) => {
-                              e.stopPropagation();
-                              await apiRequest('DELETE', `/api/generated/${content.id}`);
-                              queryClient.invalidateQueries({ queryKey: ['/api/generated'] });
-                            }}
-                          >
-                            <Trash2 className="w-4 h-4 mr-2" />
-                            Delete
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </div>
-                  </Card>
-                ))
+                    </Card>
+                  )}
+                  
+                  {savedContent.map((content) => {
+                    const isAudio = content.type === 'audio_overview' || content.type === 'audio_lecture';
+                    const hasAudio = isAudio && content.content?.audioUrl;
+                    
+                    return (
+                      <Card 
+                        key={content.id} 
+                        className={`p-3 rounded-xl hover-elevate cursor-pointer bg-card ${isAudio ? 'border-purple-500/20' : ''}`}
+                        data-testid={`content-item-${content.id}`}
+                        onClick={() => {
+                          setGeneratedContent(content);
+                          setActiveView('canvas');
+                        }}
+                      >
+                        <div className="flex items-start gap-3">
+                          <div className={`p-2 rounded-lg shrink-0 ${isAudio ? 'bg-purple-500/20' : 'bg-muted'}`}>
+                            {CONTENT_TYPES.find(t => t.type === content.type)?.icon ? (
+                              (() => {
+                                const Icon = CONTENT_TYPES.find(t => t.type === content.type)!.icon;
+                                return <Icon className={`w-4 h-4 ${isAudio ? 'text-purple-400' : 'text-muted-foreground'}`} />;
+                              })()
+                            ) : (
+                              <FileText className="w-4 h-4 text-muted-foreground" />
+                            )}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium truncate">{content.title}</p>
+                            <p className="text-xs text-muted-foreground mt-0.5">
+                              {content.sourceIds?.length || 0} sources · {formatTimeAgo(new Date(content.createdAt))}
+                            </p>
+                          </div>
+                          
+                          {/* Play button for audio content */}
+                          {hasAudio && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 shrink-0 bg-green-500/20 hover:bg-green-500/30 text-green-400"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                // Play audio directly
+                                const audio = new Audio(content.content.audioUrl);
+                                audio.play();
+                              }}
+                            >
+                              <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
+                                <path d="M8 5v14l11-7z"/>
+                              </svg>
+                            </Button>
+                          )}
+                          
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" data-testid={`button-content-menu-${content.id}`}>
+                                <MoreVertical className="w-4 h-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" className="rounded-xl">
+                              <DropdownMenuItem 
+                                className="rounded-lg"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  console.log('Download', content.id);
+                                }}
+                              >
+                                <FileBarChart className="w-4 h-4 mr-2" />
+                                Download
+                              </DropdownMenuItem>
+                              <DropdownMenuItem 
+                                className="rounded-lg text-destructive"
+                                onClick={async (e) => {
+                                  e.stopPropagation();
+                                  await apiRequest('DELETE', `/api/generated/${content.id}`);
+                                  queryClient.invalidateQueries({ queryKey: ['/api/generated'] });
+                                }}
+                              >
+                                <Trash2 className="w-4 h-4 mr-2" />
+                                Delete
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </div>
+                      </Card>
+                    );
+                  })}
+                </>
               )}
             </div>
           </ScrollArea>
@@ -1196,6 +1253,7 @@ export default function StudioPanel({
                 const contentType = audioFormat === 'lecture' ? 'audio_lecture' : 'audio_overview';
                 setAudioModalOpen(false);
                 setLoadingType(contentType);
+                setGeneratingAudioType(contentType); // Show skeleton in sidebar immediately
                 generateMutation.mutate({
                   type: contentType,
                   sourceIds: audioSelectedSources,
