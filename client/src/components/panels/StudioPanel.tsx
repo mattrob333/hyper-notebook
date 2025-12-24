@@ -27,7 +27,8 @@ import {
   ArrowLeft,
   Maximize2,
   Minimize2,
-  Table2
+  Table2,
+  ChevronRight
 } from "lucide-react";
 import A2Spreadsheet from "../a2ui/A2Spreadsheet";
 import { useLeadContext } from "@/contexts/LeadContext";
@@ -593,12 +594,14 @@ export default function StudioPanel({
     const Icon = contentTypeInfo?.icon || FileText;
     
     // Render specialized viewers based on content type
-    // Audio Overview/Lecture - show transcript with audio player
+    // Audio Overview/Lecture - show audio player with summary
     if (generatedContent.type === 'audio_overview' || generatedContent.type === 'audio_lecture') {
       const content = generatedContent.content;
       const segments = content?.segments || [];
       const audioUrl = content?.audioUrl;
       const isLecture = generatedContent.type === 'audio_lecture';
+      const lectureTitle = content?.title || generatedContent.title;
+      const lectureSummary = content?.summary;
       
       return (
         <div className={`flex flex-col h-full ${isFullscreen ? 'fixed inset-0 z-50 bg-background' : ''}`}>
@@ -618,7 +621,7 @@ export default function StudioPanel({
                 <Mic className="w-4 h-4 text-purple-500" />
               </div>
               <div className="min-w-0">
-                <h3 className="font-medium text-sm truncate">{generatedContent.title}</h3>
+                <h3 className="font-medium text-sm truncate">{lectureTitle}</h3>
                 <p className="text-xs text-muted-foreground">
                   {isLecture ? '🎓 Lecture' : '🎙️ Podcast'} • {generatedContent.sourceIds?.length || 0} sources
                 </p>
@@ -633,51 +636,65 @@ export default function StudioPanel({
             </Button>
           </div>
           <ScrollArea className="flex-1">
-            <div className="p-4 space-y-4">
-              {/* Audio Player */}
-              <div className="p-4 rounded-lg bg-purple-500/10 border border-purple-500/20">
+            <div className="p-6 space-y-6">
+              {/* Main Audio Player Card */}
+              <div className="p-6 rounded-xl bg-gradient-to-br from-purple-500/20 to-purple-600/10 border border-purple-500/30">
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="p-3 rounded-full bg-purple-500/20">
+                    <Mic className="w-6 h-6 text-purple-400" />
+                  </div>
+                  <div>
+                    <h2 className="font-semibold text-lg">{isLecture ? 'Audio Lecture' : 'Audio Overview'}</h2>
+                    <p className="text-sm text-muted-foreground">
+                      {segments.length > 0 ? `${segments.length} segments` : 'Ready to play'}
+                    </p>
+                  </div>
+                </div>
+                
                 {audioUrl ? (
-                  <div className="space-y-2">
-                    <p className="text-sm font-medium text-purple-400">🎧 Audio Ready</p>
-                    <audio controls className="w-full" src={audioUrl}>
+                  <div className="space-y-3">
+                    <audio controls className="w-full h-12" src={audioUrl}>
                       Your browser does not support the audio element.
                     </audio>
                   </div>
                 ) : (
-                  <div className="flex items-center gap-3 text-muted-foreground">
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    <span className="text-sm">Audio generation requires ElevenLabs API key</span>
+                  <div className="flex items-center justify-center gap-3 py-8 text-muted-foreground">
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                    <span>Generating audio... This may take a moment.</span>
                   </div>
                 )}
               </div>
               
-              {/* Transcript */}
-              {segments.length > 0 ? (
-                <div className="space-y-3">
-                  <h4 className="text-sm font-medium">Transcript</h4>
-                  {segments.map((segment: any, idx: number) => (
-                    <div key={idx} className="p-3 rounded-lg bg-muted/50 border border-border/50">
-                      <div className="flex items-center gap-2 mb-1.5">
-                        <span className="font-medium text-sm text-primary">{segment.speaker || 'Speaker'}</span>
-                        {segment.timing && (
-                          <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded">
-                            {segment.timing}
-                          </span>
-                        )}
+              {/* Summary */}
+              {lectureSummary && (
+                <div className="space-y-2">
+                  <h4 className="text-sm font-medium text-muted-foreground">What You'll Learn</h4>
+                  <p className="text-sm leading-relaxed">{lectureSummary}</p>
+                </div>
+              )}
+              
+              {/* Collapsible Transcript */}
+              {segments.length > 0 && (
+                <details className="group">
+                  <summary className="flex items-center gap-2 cursor-pointer text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
+                    <ChevronRight className="w-4 h-4 transition-transform group-open:rotate-90" />
+                    View Transcript ({segments.length} segments)
+                  </summary>
+                  <div className="mt-3 space-y-2 pl-6">
+                    {segments.map((segment: any, idx: number) => (
+                      <div key={idx} className="p-3 rounded-lg bg-muted/30 border border-border/30">
+                        <div className="flex items-center gap-2 mb-1">
+                          {segment.timing && (
+                            <span className="text-xs text-muted-foreground font-mono">
+                              {segment.timing}
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-sm leading-relaxed">{segment.text}</p>
                       </div>
-                      <p className="text-sm leading-relaxed">{segment.text}</p>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  <h4 className="text-sm font-medium">Generated Content</h4>
-                  <div className="p-4 rounded-lg bg-muted/30 border">
-                    <pre className="text-sm whitespace-pre-wrap overflow-auto max-h-[500px]">
-                      {typeof content === 'string' ? content : JSON.stringify(content, null, 2)}
-                    </pre>
+                    ))}
                   </div>
-                </div>
+                </details>
               )}
             </div>
           </ScrollArea>

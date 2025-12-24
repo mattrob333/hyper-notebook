@@ -315,26 +315,41 @@ You MUST return this EXACT JSON structure:
 
 Return ONLY the JSON object with a "segments" array. Each segment must have speaker (Host A or Host B), text, and timing fields.`,
 
-  audio_lecture: `Create an educational lecture script for a single instructor teaching about the provided sources.
+  audio_lecture: `You are an expert educator creating an audio lecture. Your goal is to synthesize the provided sources into a compelling, insightful narrative that teaches the listener something valuable.
 
-Requirements:
-- Engaging introduction that hooks the listener
-- Clear explanation of key concepts with examples
-- Logical flow from foundational ideas to advanced insights
-- Practical applications and real-world connections
-- Summary of key takeaways and action items
-- Conversational but authoritative tone, as if speaking to students
-- Each segment should be 2-4 sentences of natural speech
+EDUCATIONAL OBJECTIVES:
+- Help the listener understand complex concepts through clear explanations
+- Draw unexpected connections between ideas from different sources
+- Provide concrete examples and analogies that make abstract concepts tangible
+- Offer strategic insights and actionable takeaways
+- Create "aha moments" where the listener gains new understanding
 
-You MUST return this EXACT JSON structure:
+LECTURE STRUCTURE:
+1. HOOK (30 seconds): Start with a provocative insight or question that captures attention
+2. CONTEXT (1 minute): Set the stage - why does this matter now? What's the bigger picture?
+3. CORE CONCEPTS (3-4 minutes): Explain the key ideas, using examples and analogies
+4. CONNECTIONS (1-2 minutes): Show how these ideas connect to each other and to broader trends
+5. IMPLICATIONS (1 minute): What does this mean for the listener? What should they do differently?
+6. CLOSING (30 seconds): End with a memorable takeaway or call to action
+
+TONE:
+- Speak like a brilliant professor who makes complex topics accessible
+- Be conversational but authoritative - like explaining to a smart friend
+- Use "you" to address the listener directly
+- Include rhetorical questions to engage the listener's thinking
+
+If the user provided a specific topic focus, make sure to address their question directly while drawing from the sources.
+
+Create 15-25 segments of natural speech (2-4 sentences each).
+
+Return ONLY this JSON structure:
 {
+  "title": "A compelling title for this lecture",
+  "summary": "A 2-3 sentence summary of what the listener will learn",
   "segments": [
-    {"speaker": "Instructor", "text": "Welcome to today's lecture...", "timing": "0:00"},
-    {"speaker": "Instructor", "text": "Let's start by understanding...", "timing": "0:30"}
+    {"speaker": "Instructor", "text": "Your opening hook here...", "timing": "0:00"}
   ]
-}
-
-Return ONLY the JSON object with a "segments" array. Each segment must have speaker (always "Instructor"), text, and timing fields.`,
+}`,
 
   email: `Draft a professional email based on the provided sources and context. Include:
 - Subject line

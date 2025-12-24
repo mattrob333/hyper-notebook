@@ -1590,6 +1590,10 @@ Available report formats: Briefing Doc, Blog Post, LinkedIn Article, Twitter Thr
             // Content IS the segments array directly
             console.log('[Audio] Content is array, wrapping in segments');
             content = { segments: content };
+          } else if (content?.segments && Array.isArray(content.segments) && content.segments.length > 0) {
+            // Already has proper segments - preserve title/summary if present
+            console.log('[Audio] Content already has', content.segments.length, 'segments');
+            // Just ensure we have the structure we need
           } else if (!content?.segments || content.segments.length === 0) {
             // AI returned non-standard format - convert to segments
             console.log('[Audio] Converting non-standard format to segments...');
