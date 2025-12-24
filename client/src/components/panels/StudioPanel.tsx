@@ -593,6 +593,98 @@ export default function StudioPanel({
     const Icon = contentTypeInfo?.icon || FileText;
     
     // Render specialized viewers based on content type
+    // Audio Overview/Lecture - show transcript with audio player
+    if (generatedContent.type === 'audio_overview' || generatedContent.type === 'audio_lecture') {
+      const content = generatedContent.content;
+      const segments = content?.segments || [];
+      const audioUrl = content?.audioUrl;
+      const isLecture = generatedContent.type === 'audio_lecture';
+      
+      return (
+        <div className={`flex flex-col h-full ${isFullscreen ? 'fixed inset-0 z-50 bg-background' : ''}`}>
+          <div className="flex items-center justify-between gap-2 p-3 border-b border-border/50 shrink-0">
+            <div className="flex items-center gap-2">
+              <Button 
+                variant="ghost" 
+                size="icon"
+                onClick={() => {
+                  setActiveView('main');
+                  setIsFullscreen(false);
+                }}
+              >
+                <ArrowLeft className="w-4 h-4" />
+              </Button>
+              <div className="p-1.5 rounded-lg bg-purple-500/10">
+                <Mic className="w-4 h-4 text-purple-500" />
+              </div>
+              <div className="min-w-0">
+                <h3 className="font-medium text-sm truncate">{generatedContent.title}</h3>
+                <p className="text-xs text-muted-foreground">
+                  {isLecture ? '🎓 Lecture' : '🎙️ Podcast'} • {generatedContent.sourceIds?.length || 0} sources
+                </p>
+              </div>
+            </div>
+            <Button 
+              variant="ghost" 
+              size="icon"
+              onClick={() => setIsFullscreen(!isFullscreen)}
+            >
+              {isFullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
+            </Button>
+          </div>
+          <ScrollArea className="flex-1">
+            <div className="p-4 space-y-4">
+              {/* Audio Player */}
+              <div className="p-4 rounded-lg bg-purple-500/10 border border-purple-500/20">
+                {audioUrl ? (
+                  <div className="space-y-2">
+                    <p className="text-sm font-medium text-purple-400">🎧 Audio Ready</p>
+                    <audio controls className="w-full" src={audioUrl}>
+                      Your browser does not support the audio element.
+                    </audio>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-3 text-muted-foreground">
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <span className="text-sm">Audio generation requires ElevenLabs API key</span>
+                  </div>
+                )}
+              </div>
+              
+              {/* Transcript */}
+              {segments.length > 0 ? (
+                <div className="space-y-3">
+                  <h4 className="text-sm font-medium">Transcript</h4>
+                  {segments.map((segment: any, idx: number) => (
+                    <div key={idx} className="p-3 rounded-lg bg-muted/50 border border-border/50">
+                      <div className="flex items-center gap-2 mb-1.5">
+                        <span className="font-medium text-sm text-primary">{segment.speaker || 'Speaker'}</span>
+                        {segment.timing && (
+                          <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded">
+                            {segment.timing}
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-sm leading-relaxed">{segment.text}</p>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  <h4 className="text-sm font-medium">Generated Content</h4>
+                  <div className="p-4 rounded-lg bg-muted/30 border">
+                    <pre className="text-sm whitespace-pre-wrap overflow-auto max-h-[500px]">
+                      {typeof content === 'string' ? content : JSON.stringify(content, null, 2)}
+                    </pre>
+                  </div>
+                </div>
+              )}
+            </div>
+          </ScrollArea>
+        </div>
+      );
+    }
+
     if (generatedContent.type === 'slides') {
       const slidesData = generatedContent.content?.slides || generatedContent.content || [];
       return (

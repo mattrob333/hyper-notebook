@@ -1579,16 +1579,60 @@ Available report formats: Briefing Doc, Blog Post, LinkedIn Article, Twitter Thr
 
       console.log('[Generate] Type:', type, 'Content keys:', Object.keys(content || {}));
 
-      // For audio_overview or audio_lecture, also generate actual audio via ElevenLabs
+      // For audio_overview or audio_lecture, normalize content and generate audio
       if (type === 'audio_overview' || type === 'audio_lecture') {
-        console.log('[Audio] Content has segments:', !!content?.segments, 'Is array:', Array.isArray(content));
-        // Handle case where content IS the segments array directly
+        console.log('[Audio] Raw content structure:', Object.keys(content || {}));
+        
+        // Normalize content to have segments array
         if (Array.isArray(content)) {
+          // Content IS the segments array directly
           content = { segments: content };
+        } else if (!content?.segments) {
+          // AI returned non-standard format - convert to segments
+          console.log('[Audio] Converting non-standard format to segments...');
+          const speakerName = type === 'audio_lecture' ? 'Instructor' : 'Host A';
+          
+          // Extract text from whatever structure was returned
+          let textContent = '';
+          if (typeof content === 'string') {
+            textContent = content;
+          } else if (content?.raw) {
+            textContent = content.raw;
+          } else {
+            // Convert object values to readable text
+            const extractText = (obj: any, prefix = ''): string => {
+              if (typeof obj === 'string') return obj;
+              if (Array.isArray(obj)) return obj.map(item => extractText(item)).join('\n');
+              if (typeof obj === 'object' && obj !== null) {
+                return Object.entries(obj)
+                  .map(([key, value]) => {
+                    const label = key.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+                    const text = extractText(value);
+                    return text ? `${label}: ${text}` : '';
+                  })
+                  .filter(Boolean)
+                  .join('\n\n');
+              }
+              return String(obj || '');
+            };
+            textContent = extractText(content);
+          }
+          
+          // Split into segments (roughly by paragraphs or logical breaks)
+          const paragraphs = textContent.split(/\n\n+/).filter(p => p.trim().length > 20);
+          const segments = paragraphs.slice(0, 15).map((text, idx) => ({
+            speaker: speakerName,
+            text: text.trim().slice(0, 500), // Limit each segment
+            timing: `${Math.floor(idx * 30 / 60)}:${String((idx * 30) % 60).padStart(2, '0')}`
+          }));
+          
+          content = { segments, originalContent: content };
+          console.log('[Audio] Created', segments.length, 'segments from content');
         }
       }
       
-      if ((type === 'audio_overview' || type === 'audio_lecture') && content.segments) {
+      // Generate audio via ElevenLabs if we have segments
+      if ((type === 'audio_overview' || type === 'audio_lecture') && content?.segments?.length > 0) {
         const apiKey = process.env.ELEVENLABS_API_KEY;
         console.log('[Audio] Checking ElevenLabs - API key exists:', !!apiKey, 'Segments:', content.segments?.length);
         
