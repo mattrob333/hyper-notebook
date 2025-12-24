@@ -1581,103 +1581,73 @@ Available report formats: Briefing Doc, Blog Post, LinkedIn Article, Twitter Thr
 
       // For audio_overview or audio_lecture, normalize content and generate audio
       if (type === 'audio_overview' || type === 'audio_lecture') {
-        console.log('[Audio] Raw content structure:', JSON.stringify(Object.keys(content || {})));
-        console.log('[Audio] Content type:', typeof content);
+        console.log('[Audio] Processing audio content...');
         
         try {
-          // Normalize content to have segments array
+          const speakerName = type === 'audio_lecture' ? 'Instructor' : 'Host A';
+          
+          // Check if we already have valid segments
           const hasValidSegments = content?.segments && 
             Array.isArray(content.segments) && 
             content.segments.length > 0 &&
             content.segments[0]?.text;
           
-          console.log('[Audio] Has valid segments:', hasValidSegments, 'Raw segments type:', typeof content?.segments);
-          
-          if (Array.isArray(content)) {
-            // Content IS the segments array directly
-            console.log('[Audio] Content is array, wrapping in segments');
-            content = { segments: content };
-          } else if (hasValidSegments) {
-            // Already has proper segments - preserve title/summary if present
-            console.log('[Audio] Content already has', content.segments.length, 'valid segments');
-          } else {
-            // AI returned non-standard format - convert to segments
-            console.log('[Audio] Converting non-standard format to segments...');
-            const speakerName = type === 'audio_lecture' ? 'Instructor' : 'Host A';
+          if (!hasValidSegments) {
+            console.log('[Audio] No valid segments found, extracting text from content...');
             
-            // Extract text from whatever structure was returned
-            let textContent = '';
-            if (typeof content === 'string') {
-              textContent = content;
-            } else if (content?.raw) {
-              textContent = content.raw;
-            } else if (content && typeof content === 'object') {
-              // Convert object values to readable text - flatten everything
-              const extractText = (obj: any): string => {
-                if (typeof obj === 'string') return obj;
-                if (typeof obj === 'number' || typeof obj === 'boolean') return String(obj);
-                if (Array.isArray(obj)) return obj.map(item => extractText(item)).join(' ');
-                if (typeof obj === 'object' && obj !== null) {
-                  return Object.values(obj)
-                    .map(value => extractText(value))
-                    .filter(Boolean)
-                    .join(' ');
+            // Get all string values from the content object
+            const getAllStrings = (obj: any): string[] => {
+              const strings: string[] = [];
+              const extract = (item: any) => {
+                if (typeof item === 'string' && item.length > 20) {
+                  strings.push(item);
+                } else if (Array.isArray(item)) {
+                  item.forEach(extract);
+                } else if (typeof item === 'object' && item !== null) {
+                  Object.values(item).forEach(extract);
                 }
-                return '';
               };
-              textContent = extractText(content);
-            }
+              extract(obj);
+              return strings;
+            };
             
-            console.log('[Audio] Extracted text length:', textContent.length, 'First 200 chars:', textContent.slice(0, 200));
+            const textParts = getAllStrings(content);
+            console.log('[Audio] Found', textParts.length, 'text parts');
             
-            // If we have text, create segments
-            if (textContent.length > 50) {
-              // Split into sentences for better segments
-              const sentences = textContent
-                .replace(/([.!?])\s+/g, '$1\n')
-                .split('\n')
-                .map(s => s.trim())
-                .filter(s => s.length > 15 && !s.startsWith('{') && !s.includes('":"'));
+            // Create segments from text parts
+            const segments = textParts.slice(0, 20).map((text, idx) => ({
+              speaker: speakerName,
+              text: text.slice(0, 500),
+              timing: `${Math.floor(idx * 20 / 60)}:${String((idx * 20) % 60).padStart(2, '0')}`
+            }));
+            
+            // Ultimate fallback - stringify and clean up
+            if (segments.length === 0) {
+              console.log('[Audio] Using stringify fallback');
+              const rawText = JSON.stringify(content)
+                .replace(/[{}\[\]"]/g, ' ')
+                .replace(/,/g, '. ')
+                .replace(/:/g, ': ')
+                .replace(/\s+/g, ' ')
+                .trim();
               
-              console.log('[Audio] Found', sentences.length, 'sentences');
-              
-              // Group sentences into segments (3-4 sentences each)
-              const segments = [];
-              for (let i = 0; i < Math.min(sentences.length, 45); i += 3) {
-                const segmentText = sentences.slice(i, i + 3).join(' ').trim();
-                if (segmentText.length > 20) {
-                  segments.push({
-                    speaker: speakerName,
-                    text: segmentText.slice(0, 600),
-                    timing: `${Math.floor(segments.length * 20 / 60)}:${String((segments.length * 20) % 60).padStart(2, '0')}`
-                  });
-                }
-              }
-              
-              // Fallback: if no segments created but we have text, create one big segment
-              if (segments.length === 0 && textContent.length > 100) {
-                console.log('[Audio] Using fallback - creating single segment from text');
+              if (rawText.length > 50) {
                 segments.push({
                   speaker: speakerName,
-                  text: textContent.slice(0, 4500), // ElevenLabs limit
+                  text: rawText.slice(0, 4500),
                   timing: '0:00'
                 });
               }
-              
-              if (segments.length > 0) {
-                // Preserve any title/summary from original content
-                const title = content?.title || content?.lecture?.title;
-                const summary = content?.summary || content?.lecture?.abstract;
-                content = { segments, title, summary, originalContent: content };
-                console.log('[Audio] Created', segments.length, 'segments from content');
-              } else {
-                console.log('[Audio] Could not create segments from content');
-              }
-            } else {
-              console.log('[Audio] Not enough text to create segments, text:', textContent);
+            }
+            
+            if (segments.length > 0) {
+              const title = content?.title || content?.lecture?.title || `Audio ${type === 'audio_lecture' ? 'Lecture' : 'Overview'}`;
+              const summary = content?.summary || content?.lecture?.abstract;
+              content = { segments, title, summary, originalContent: content };
+              console.log('[Audio] Created', segments.length, 'segments');
             }
           } else {
-            console.log('[Audio] Content already has segments:', content.segments?.length);
+            console.log('[Audio] Content already has', content.segments.length, 'valid segments');
           }
         } catch (normalizeError) {
           console.error('[Audio] Error normalizing content:', normalizeError);
