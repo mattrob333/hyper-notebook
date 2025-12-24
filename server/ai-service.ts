@@ -302,6 +302,17 @@ Return ONLY valid JSON matching this EXACT structure:
 - Conclusion and takeaways
 Format as JSON with segments array, each with speaker, text, and timing.`,
 
+  audio_lecture: `Create an educational lecture script for a single instructor teaching about the provided sources. Include:
+- Engaging introduction that hooks the listener
+- Clear explanation of key concepts with examples
+- Logical flow from foundational ideas to advanced insights
+- Practical applications and real-world connections
+- Summary of key takeaways and action items
+- Conversational but authoritative tone, as if speaking to students
+
+The speaker should be named "Instructor" or "Professor".
+Format as JSON with segments array, each with speaker (always "Instructor"), text, and timing.`,
+
   email: `Draft a professional email based on the provided sources and context. Include:
 - Subject line
 - Greeting

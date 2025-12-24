@@ -1579,8 +1579,8 @@ Available report formats: Briefing Doc, Blog Post, LinkedIn Article, Twitter Thr
 
       console.log('[Generate] Type:', type, 'Content keys:', Object.keys(content || {}));
 
-      // For audio_overview, also generate actual audio via ElevenLabs
-      if (type === 'audio_overview') {
+      // For audio_overview or audio_lecture, also generate actual audio via ElevenLabs
+      if (type === 'audio_overview' || type === 'audio_lecture') {
         console.log('[Audio] Content has segments:', !!content?.segments, 'Is array:', Array.isArray(content));
         // Handle case where content IS the segments array directly
         if (Array.isArray(content)) {
@@ -1588,7 +1588,7 @@ Available report formats: Briefing Doc, Blog Post, LinkedIn Article, Twitter Thr
         }
       }
       
-      if (type === 'audio_overview' && content.segments) {
+      if ((type === 'audio_overview' || type === 'audio_lecture') && content.segments) {
         const apiKey = process.env.ELEVENLABS_API_KEY;
         console.log('[Audio] Checking ElevenLabs - API key exists:', !!apiKey, 'Segments:', content.segments?.length);
         
@@ -1596,17 +1596,19 @@ Available report formats: Briefing Doc, Blog Post, LinkedIn Article, Twitter Thr
           try {
             console.log('[Audio] Starting ElevenLabs audio generation...');
             // Combine all segment text for TTS
-            const fullScript = content.segments
-              .map((seg: any) => `${seg.speaker}: ${seg.text}`)
-              .join('\n\n');
+            // For lecture mode, just use the text without speaker labels
+            const fullScript = type === 'audio_lecture'
+              ? content.segments.map((seg: any) => seg.text).join('\n\n')
+              : content.segments.map((seg: any) => `${seg.speaker}: ${seg.text}`).join('\n\n');
             
-            // Use two different voices for the two hosts
+            // Use different voice for lecture (professional male voice) vs podcast (female voices)
+            const lectureVoiceId = 'onwK4e9ZLuTAKqWW03F9'; // Daniel - authoritative male voice
             const voice1Id = 'EXAVITQu4vr4xnSDxMaL'; // Sarah
-            const voice2Id = '21m00Tcm4TlvDq8ikWAM'; // Rachel
+            const selectedVoice = type === 'audio_lecture' ? lectureVoiceId : voice1Id;
             
-            // Generate audio for each segment or use a single voice for simplicity
+            // Generate audio
             const elevenLabsResponse = await fetch(
-              `https://api.elevenlabs.io/v1/text-to-speech/${voice1Id}`,
+              `https://api.elevenlabs.io/v1/text-to-speech/${selectedVoice}`,
               {
                 method: 'POST',
                 headers: {
@@ -1629,7 +1631,7 @@ Available report formats: Briefing Doc, Blog Post, LinkedIn Article, Twitter Thr
               const audioBuffer = await elevenLabsResponse.arrayBuffer();
               const base64Audio = Buffer.from(audioBuffer).toString('base64');
               content.audioUrl = `data:audio/mpeg;base64,${base64Audio}`;
-              console.log('[Audio] Generated audio for audio_overview');
+              console.log(`[Audio] Generated audio for ${type}`);
             } else {
               console.error('[Audio] ElevenLabs error:', await elevenLabsResponse.text());
             }

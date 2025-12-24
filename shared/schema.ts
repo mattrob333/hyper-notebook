@@ -281,4 +281,4 @@ export interface ChatMessage {
   timestamp: Date;
 }
 
-export type ContentType = 'study_guide' | 'briefing_doc' | 'faq' | 'timeline' | 'mindmap' | 'infographic' | 'slides' | 'audio_overview' | 'email';
+export type ContentType = 'study_guide' | 'briefing_doc' | 'faq' | 'timeline' | 'mindmap' | 'infographic' | 'slides' | 'audio_overview' | 'audio_lecture' | 'email';

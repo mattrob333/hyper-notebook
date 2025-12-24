@@ -227,6 +227,7 @@ export default function StudioPanel({
   const [audioModalOpen, setAudioModalOpen] = useState(false);
   const [audioInstructions, setAudioInstructions] = useState('');
   const [audioSelectedSources, setAudioSelectedSources] = useState<string[]>([]);
+  const [audioFormat, setAudioFormat] = useState<'podcast' | 'lecture'>('podcast');
 
   // UI Workflows - removed full-page runner, workflows run in chat now
 
@@ -973,11 +974,43 @@ export default function StudioPanel({
               Generate Audio Overview
             </DialogTitle>
             <DialogDescription className="text-sm">
-              Create a podcast-style audio discussion of your selected sources
+              {audioFormat === 'podcast' 
+                ? 'Create a podcast-style discussion between two hosts'
+                : 'Create an educational lecture from a single instructor'}
             </DialogDescription>
           </DialogHeader>
 
           <div className="py-4 space-y-5">
+            {/* Format Toggle */}
+            <div className="space-y-2">
+              <Label className="text-sm font-medium">Format</Label>
+              <div className="flex gap-2">
+                <Button
+                  type="button"
+                  variant={audioFormat === 'podcast' ? 'default' : 'outline'}
+                  size="sm"
+                  className="flex-1"
+                  onClick={() => setAudioFormat('podcast')}
+                >
+                  🎙️ Podcast
+                </Button>
+                <Button
+                  type="button"
+                  variant={audioFormat === 'lecture' ? 'default' : 'outline'}
+                  size="sm"
+                  className="flex-1"
+                  onClick={() => setAudioFormat('lecture')}
+                >
+                  🎓 Lecture
+                </Button>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                {audioFormat === 'podcast' 
+                  ? 'Two hosts discuss the topic in a conversational style'
+                  : 'Single instructor teaches the material in an educational format'}
+              </p>
+            </div>
+
             <div className="space-y-3">
               <div className="flex items-center justify-between">
                 <Label className="text-sm font-medium">Sources to Include</Label>
@@ -1026,7 +1059,9 @@ export default function StudioPanel({
               </Label>
               <Textarea
                 id="audio-instructions"
-                placeholder="What should the hosts discuss? e.g., Focus on key insights and actionable takeaways..."
+                placeholder={audioFormat === 'podcast' 
+                  ? "What should the hosts discuss? e.g., Focus on key insights and actionable takeaways..."
+                  : "What should the instructor teach? e.g., Explain the core concepts and provide practical examples..."}
                 value={audioInstructions}
                 onChange={(e) => setAudioInstructions(e.target.value)}
                 rows={3}
@@ -1049,10 +1084,11 @@ export default function StudioPanel({
                   });
                   return;
                 }
+                const contentType = audioFormat === 'lecture' ? 'audio_lecture' : 'audio_overview';
                 setAudioModalOpen(false);
-                setLoadingType('audio_overview');
+                setLoadingType(contentType);
                 generateMutation.mutate({
-                  type: 'audio_overview',
+                  type: contentType,
                   sourceIds: audioSelectedSources,
                   model: 'google/gemini-3-flash-preview',
                   customPrompt: audioInstructions || undefined
@@ -1062,7 +1098,7 @@ export default function StudioPanel({
               className="gap-2 bg-purple-600 hover:bg-purple-700"
             >
               <Mic className="w-4 h-4" />
-              Generate Audio
+              Generate {audioFormat === 'podcast' ? 'Podcast' : 'Lecture'}
             </Button>
           </DialogFooter>
         </DialogContent>
