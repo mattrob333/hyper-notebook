@@ -295,23 +295,46 @@ Return ONLY valid JSON matching this EXACT structure:
   ]
 }`,
 
-  audio_overview: `Create a podcast script for two hosts discussing the provided sources. Include:
-- Introduction and hook
-- Main discussion points
-- Back-and-forth dialogue
-- Conclusion and takeaways
-Format as JSON with segments array, each with speaker, text, and timing.`,
+  audio_overview: `Create a podcast script for two hosts (Host A and Host B) discussing the provided sources.
 
-  audio_lecture: `Create an educational lecture script for a single instructor teaching about the provided sources. Include:
+Requirements:
+- Engaging introduction and hook
+- Main discussion points with back-and-forth dialogue
+- Natural conversational flow between the two hosts
+- Conclusion and key takeaways
+- Each segment should be 2-4 sentences of natural speech
+
+You MUST return this EXACT JSON structure:
+{
+  "segments": [
+    {"speaker": "Host A", "text": "Welcome to our podcast...", "timing": "0:00"},
+    {"speaker": "Host B", "text": "Thanks for having me...", "timing": "0:15"},
+    {"speaker": "Host A", "text": "Today we're discussing...", "timing": "0:30"}
+  ]
+}
+
+Return ONLY the JSON object with a "segments" array. Each segment must have speaker (Host A or Host B), text, and timing fields.`,
+
+  audio_lecture: `Create an educational lecture script for a single instructor teaching about the provided sources.
+
+Requirements:
 - Engaging introduction that hooks the listener
 - Clear explanation of key concepts with examples
 - Logical flow from foundational ideas to advanced insights
 - Practical applications and real-world connections
 - Summary of key takeaways and action items
 - Conversational but authoritative tone, as if speaking to students
+- Each segment should be 2-4 sentences of natural speech
 
-The speaker should be named "Instructor" or "Professor".
-Format as JSON with segments array, each with speaker (always "Instructor"), text, and timing.`,
+You MUST return this EXACT JSON structure:
+{
+  "segments": [
+    {"speaker": "Instructor", "text": "Welcome to today's lecture...", "timing": "0:00"},
+    {"speaker": "Instructor", "text": "Let's start by understanding...", "timing": "0:30"}
+  ]
+}
+
+Return ONLY the JSON object with a "segments" array. Each segment must have speaker (always "Instructor"), text, and timing fields.`,
 
   email: `Draft a professional email based on the provided sources and context. Include:
 - Subject line
