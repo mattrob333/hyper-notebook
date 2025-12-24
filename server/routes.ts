@@ -1586,15 +1586,21 @@ Available report formats: Briefing Doc, Blog Post, LinkedIn Article, Twitter Thr
         
         try {
           // Normalize content to have segments array
+          const hasValidSegments = content?.segments && 
+            Array.isArray(content.segments) && 
+            content.segments.length > 0 &&
+            content.segments[0]?.text;
+          
+          console.log('[Audio] Has valid segments:', hasValidSegments, 'Raw segments type:', typeof content?.segments);
+          
           if (Array.isArray(content)) {
             // Content IS the segments array directly
             console.log('[Audio] Content is array, wrapping in segments');
             content = { segments: content };
-          } else if (content?.segments && Array.isArray(content.segments) && content.segments.length > 0) {
+          } else if (hasValidSegments) {
             // Already has proper segments - preserve title/summary if present
-            console.log('[Audio] Content already has', content.segments.length, 'segments');
-            // Just ensure we have the structure we need
-          } else if (!content?.segments || content.segments.length === 0) {
+            console.log('[Audio] Content already has', content.segments.length, 'valid segments');
+          } else {
             // AI returned non-standard format - convert to segments
             console.log('[Audio] Converting non-standard format to segments...');
             const speakerName = type === 'audio_lecture' ? 'Instructor' : 'Host A';
