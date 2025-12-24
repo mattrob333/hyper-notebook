@@ -1628,7 +1628,7 @@ Available report formats: Briefing Doc, Blog Post, LinkedIn Article, Twitter Thr
               textContent = extractText(content);
             }
             
-            console.log('[Audio] Extracted text length:', textContent.length);
+            console.log('[Audio] Extracted text length:', textContent.length, 'First 200 chars:', textContent.slice(0, 200));
             
             // If we have text, create segments
             if (textContent.length > 50) {
@@ -1636,7 +1636,10 @@ Available report formats: Briefing Doc, Blog Post, LinkedIn Article, Twitter Thr
               const sentences = textContent
                 .replace(/([.!?])\s+/g, '$1\n')
                 .split('\n')
-                .filter(s => s.trim().length > 10);
+                .map(s => s.trim())
+                .filter(s => s.length > 15 && !s.startsWith('{') && !s.includes('":"'));
+              
+              console.log('[Audio] Found', sentences.length, 'sentences');
               
               // Group sentences into segments (3-4 sentences each)
               const segments = [];
@@ -1651,14 +1654,27 @@ Available report formats: Briefing Doc, Blog Post, LinkedIn Article, Twitter Thr
                 }
               }
               
+              // Fallback: if no segments created but we have text, create one big segment
+              if (segments.length === 0 && textContent.length > 100) {
+                console.log('[Audio] Using fallback - creating single segment from text');
+                segments.push({
+                  speaker: speakerName,
+                  text: textContent.slice(0, 4500), // ElevenLabs limit
+                  timing: '0:00'
+                });
+              }
+              
               if (segments.length > 0) {
-                content = { segments, originalContent: content };
+                // Preserve any title/summary from original content
+                const title = content?.title || content?.lecture?.title;
+                const summary = content?.summary || content?.lecture?.abstract;
+                content = { segments, title, summary, originalContent: content };
                 console.log('[Audio] Created', segments.length, 'segments from content');
               } else {
                 console.log('[Audio] Could not create segments from content');
               }
             } else {
-              console.log('[Audio] Not enough text to create segments');
+              console.log('[Audio] Not enough text to create segments, text:', textContent);
             }
           } else {
             console.log('[Audio] Content already has segments:', content.segments?.length);
