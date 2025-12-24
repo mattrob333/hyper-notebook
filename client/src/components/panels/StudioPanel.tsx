@@ -965,7 +965,7 @@ export default function StudioPanel({
 
       {/* Audio Overview Modal */}
       <Dialog open={audioModalOpen} onOpenChange={setAudioModalOpen}>
-        <DialogContent className="sm:max-w-[560px] max-h-[85vh] overflow-y-auto">
+        <DialogContent className="sm:max-w-[640px] max-h-[85vh] overflow-y-auto">
           <DialogHeader className="pb-4 border-b">
             <DialogTitle className="flex items-center gap-3 text-lg">
               <div className="p-2 rounded-lg bg-purple-500/10">
