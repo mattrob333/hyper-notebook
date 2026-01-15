@@ -75,10 +75,10 @@
     - Action: Created RightPanel with collapsible Agents, Tools, Tasks sections
     - Files: `client/src/components/panels/RightPanel.tsx`
 
-- [ ] **Build A2UI component library**
+- [x] **Build A2UI component library**
     - Ref: `specs/features/a2ui.md`
-    - Action: Create ButtonGroup, Slider, CheckboxGroup, Dropdown, ChipGroup, ConfirmButton
-    - Files: `client/src/components/a2ui/`
+    - Action: Created ButtonGroup, Slider, CheckboxGroup, ChipGroup, ConfirmButton components
+    - Files: `client/src/components/a2ui/catalog/`
 
 - [ ] **Add Synergize button**
     - Ref: `systemprompt.md` (synergize_thread section)

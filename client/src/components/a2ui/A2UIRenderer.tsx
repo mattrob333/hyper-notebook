@@ -34,6 +34,11 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { A2ButtonGroup } from './catalog/A2ButtonGroup';
+import { A2CheckboxGroup } from './catalog/A2CheckboxGroup';
+import { A2ChipGroup } from './catalog/A2ChipGroup';
+import { A2ConfirmButton } from './catalog/A2ConfirmButton';
+import { A2Slider } from './catalog/A2Slider';
 
 interface A2UIRendererProps {
   components: A2UIComponent[];
@@ -1087,8 +1092,53 @@ function renderA2UIComponent(
 
       case 'report_suggestion':
         return (
-          <A2ReportSuggestion 
-            {...properties} 
+          <A2ReportSuggestion
+            {...properties}
+            onAction={onAction}
+          />
+        );
+
+      case 'button_group':
+        return (
+          <A2ButtonGroup
+            {...properties}
+            options={data?.options || properties.options}
+            onAction={onAction}
+          />
+        );
+
+      case 'checkbox_group':
+        return (
+          <A2CheckboxGroup
+            {...properties}
+            options={data?.options || properties.options}
+            onAction={onAction}
+          />
+        );
+
+      case 'chip_group':
+        return (
+          <A2ChipGroup
+            {...properties}
+            options={data?.options || properties.options}
+            onAction={onAction}
+          />
+        );
+
+      case 'confirm_button':
+        return (
+          <A2ConfirmButton
+            label={properties.label || 'Confirm'}
+            {...properties}
+            onAction={onAction}
+          />
+        );
+
+      case 'slider':
+        return (
+          <A2Slider
+            {...properties}
+            marks={data?.marks || properties.marks}
             onAction={onAction}
           />
         );
@@ -1162,21 +1212,26 @@ export default function A2UIRenderer({ components, onAction }: A2UIRendererProps
   );
 }
 
-export { 
-  A2Card, 
-  A2Chart, 
-  A2Table, 
-  A2List, 
-  A2Code, 
-  A2Quote, 
-  A2Image, 
-  A2Accordion, 
-  A2Tabs, 
-  A2Progress, 
-  A2Badge, 
-  A2Button, 
-  A2Link, 
-  A2Mindmap, 
-  A2Timeline, 
-  A2Slides 
+export {
+  A2Card,
+  A2Chart,
+  A2Table,
+  A2List,
+  A2Code,
+  A2Quote,
+  A2Image,
+  A2Accordion,
+  A2Tabs,
+  A2Progress,
+  A2Badge,
+  A2Button,
+  A2Link,
+  A2Mindmap,
+  A2Timeline,
+  A2Slides,
+  A2ButtonGroup,
+  A2CheckboxGroup,
+  A2ChipGroup,
+  A2ConfirmButton,
+  A2Slider,
 };
