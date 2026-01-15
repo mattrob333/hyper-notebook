@@ -1,9 +1,9 @@
 import { useState, useEffect, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useParams, useLocation } from "wouter";
-import { 
-  ResizablePanelGroup, 
-  ResizablePanel, 
+import {
+  ResizablePanelGroup,
+  ResizablePanel,
   ResizableHandle,
   type ImperativePanelHandle
 } from "@/components/ui/resizable";
@@ -15,7 +15,9 @@ import ChatPanel from "@/components/panels/ChatPanel";
 import StudioPanel from "@/components/panels/StudioPanel";
 import SourceDetailView from "@/components/panels/SourceDetailView";
 import BrowserAgentMonitor from "@/components/browser/BrowserAgentMonitor";
+import { TipTapSlidePanel } from "@/components/editor";
 import { DocumentPanelProvider, useDocumentPanel } from "@/contexts/DocumentPanelContext";
+import { useNextMethodStore } from "@/lib/store";
 import type { Source, ChatMessage, A2UIComponent, Notebook } from "@/lib/types";
 import type { DocumentType } from "@/components/studio/DocumentPanel";
 
@@ -38,7 +40,7 @@ function HomeContent() {
   const [, navigate] = useLocation();
   const notebookId = params.id;
   const isMobile = useIsMobile();
-  
+
   const [isDarkMode, setIsDarkMode] = useState(true);
   const [selectedSourceId, setSelectedSourceId] = useState<string>();
   const [selectedSourceIds, setSelectedSourceIds] = useState<string[]>([]);
@@ -52,9 +54,15 @@ function HomeContent() {
   const [browserTotalSteps, setBrowserTotalSteps] = useState(0);
   const [browserUrl, setBrowserUrl] = useState('about:blank');
   const [messages, setMessages] = useState<ChatMessage[]>([]);
-  
+
   // Document panel context
   const documentPanel = useDocumentPanel();
+
+  // NextMethod store integration for TipTap editor
+  const tiptapState = useNextMethodStore((state) => state.tiptap);
+  const openTipTap = useNextMethodStore((state) => state.openTipTap);
+  const closeTipTap = useNextMethodStore((state) => state.closeTipTap);
+  const setTipTapContent = useNextMethodStore((state) => state.setTipTapContent);
   
   // Track if sources panel is collapsed (when document is open)
   const [sourcesCollapsed, setSourcesCollapsed] = useState(false);
@@ -383,6 +391,18 @@ function HomeContent() {
           '> Connected to Hyperbrowser SDK',
           '> Starting workflow execution...'
         ]}
+      />
+
+      {/* TipTap Slide-in Editor Panel */}
+      <TipTapSlidePanel
+        open={tiptapState.isOpen}
+        onOpenChange={(open) => (open ? openTipTap() : closeTipTap())}
+        initialContent={tiptapState.content}
+        mode={tiptapState.template === 'email' ? 'email' : 'document'}
+        onSave={(content) => {
+          setTipTapContent(content);
+          closeTipTap();
+        }}
       />
     </div>
   );
