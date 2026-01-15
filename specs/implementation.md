@@ -51,9 +51,9 @@
     - Action: Created PersonaAgentRunner with character injection
     - Files: `server/personas/PersonaAgent.ts`
 
-- [ ] **Build DebateOrchestrator** ← YOU ARE HERE
+- [x] **Build DebateOrchestrator**
     - Ref: `specs/features/personas.md` (Section: Orchestrator)
-    - Action: Implement multi-persona debate management
+    - Action: Implemented multi-persona debate management with turn-taking, tool detection, consensus detection, and synthesis
     - Files: `server/personas/Orchestrator.ts`
 
 - [ ] **Create agent selection UI components**
