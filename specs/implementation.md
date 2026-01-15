@@ -32,16 +32,16 @@
     - Action: Created MCP server with web_search, web_fetch, ask_user, todo_write tools
     - Files: `server/agent/tools/index.ts`
 
-- [ ] **Create Zustand store structure** ← YOU ARE HERE
+- [x] **Create Zustand store structure**
     - Ref: `specs/features/state-management.md`
-    - Action: Set up Zustand with slices for mode, personas, tasks, tiptap
+    - Action: Created store with mode, persona, task, todo, tiptap slices
     - Files: `client/src/lib/store/index.ts`
 
 ---
 
 ### Phase 2: Persona System
 
-- [ ] **Create persona database schema**
+- [ ] **Create persona database schema** ← YOU ARE HERE
     - Ref: `specs/features/personas.md` (Section: Data Model)
     - Action: Add persona_agents and persona_hierarchy tables
     - Files: `shared/schema.ts`, run `npm run db:push`
