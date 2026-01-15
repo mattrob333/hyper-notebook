@@ -5,3 +5,4 @@
  */
 
 export { PersonaMessage } from './PersonaMessage';
+export { SynergizeButton, SynergizeResult } from './SynergizeButton';

@@ -80,9 +80,9 @@
     - Action: Created ButtonGroup, Slider, CheckboxGroup, ChipGroup, ConfirmButton components
     - Files: `client/src/components/a2ui/catalog/`
 
-- [ ] **Add Synergize button**
+- [x] **Add Synergize button**
     - Ref: `systemprompt.md` (synergize_thread section)
-    - Action: Add button above chat input that triggers thread synthesis
+    - Action: Created SynergizeButton and SynergizeResult components for thread/debate synthesis
     - Files: `client/src/components/chat/SynergizeButton.tsx`
 
 - [ ] **Implement TipTap slide-in behavior**
