@@ -27,12 +27,12 @@
     - Action: Included in instance.ts with caching
     - Files: `server/agent/instance.ts`
 
-- [ ] **Set up tool registration framework** ← YOU ARE HERE
+- [x] **Set up tool registration framework**
     - Ref: `specs/features/agent-sdk.md` (Section: Tools)
-    - Action: Create tool registration pattern for Claude Agent SDK
+    - Action: Created MCP server with web_search, web_fetch, ask_user, todo_write tools
     - Files: `server/agent/tools/index.ts`
 
-- [ ] **Create Zustand store structure**
+- [ ] **Create Zustand store structure** ← YOU ARE HERE
     - Ref: `specs/features/state-management.md`
     - Action: Set up Zustand with slices for mode, personas, tasks, tiptap
     - Files: `client/src/lib/store/index.ts`
