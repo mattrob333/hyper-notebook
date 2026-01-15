@@ -46,12 +46,12 @@
     - Action: Added persona_agents, persona_hierarchy, debate_sessions tables
     - Files: `shared/schema.ts`, ran `npm run db:push`
 
-- [ ] **Implement PersonaAgent class** ← YOU ARE HERE
+- [x] **Implement PersonaAgent class**
     - Ref: `specs/features/personas.md` (Section: Agent Class)
-    - Action: Create class for running persona-flavored agent responses
+    - Action: Created PersonaAgentRunner with character injection
     - Files: `server/personas/PersonaAgent.ts`
 
-- [ ] **Build DebateOrchestrator**
+- [ ] **Build DebateOrchestrator** ← YOU ARE HERE
     - Ref: `specs/features/personas.md` (Section: Orchestrator)
     - Action: Implement multi-persona debate management
     - Files: `server/personas/Orchestrator.ts`
