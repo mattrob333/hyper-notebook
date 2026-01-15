@@ -56,9 +56,9 @@
     - Action: Implemented multi-persona debate management with turn-taking, tool detection, consensus detection, and synthesis
     - Files: `server/personas/Orchestrator.ts`
 
-- [ ] **Create agent selection UI components**
+- [x] **Create agent selection UI components**
     - Ref: `specs/features/personas.md` (Section: UI)
-    - Action: Build AgentPanel, AgentCheckbox, PersonaChip components
+    - Action: Built AgentPanel, AgentCheckbox, PersonaChip components with Zustand integration
     - Files: `client/src/components/agents/`
 
 - [ ] **Add persona message rendering**
