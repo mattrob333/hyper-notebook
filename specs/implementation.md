@@ -17,17 +17,17 @@
     - Action: Created config with Options and SDKSessionOptions support
     - Files: `server/agent/config.ts`
 
-- [ ] **Create agent singleton pattern** ← YOU ARE HERE
+- [x] **Create agent singleton pattern**
     - Ref: `specs/features/agent-sdk.md` (Section: Instance Management)
-    - Action: Implement singleton for agent instance management
+    - Action: Created query-based agent with system prompt loading
     - Files: `server/agent/instance.ts`
 
-- [ ] **Load system prompt from file**
+- [x] **Load system prompt from file**
     - Ref: `systemprompt.md`
-    - Action: Create system prompt loader that reads from markdown file
-    - Files: `server/agent/system-prompt.ts`
+    - Action: Included in instance.ts with caching
+    - Files: `server/agent/instance.ts`
 
-- [ ] **Set up tool registration framework**
+- [ ] **Set up tool registration framework** ← YOU ARE HERE
     - Ref: `specs/features/agent-sdk.md` (Section: Tools)
     - Action: Create tool registration pattern for Claude Agent SDK
     - Files: `server/agent/tools/index.ts`
