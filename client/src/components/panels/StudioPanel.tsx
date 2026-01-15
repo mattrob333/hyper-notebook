@@ -399,41 +399,62 @@ export default function StudioPanel({
 
   const parseA2UIComponents = (content: any): A2UIComponent[] => {
     if (!content) return [];
-    
+
+    // Helper function to try parsing raw content
+    const tryParseRaw = (obj: any): any => {
+      if (obj && typeof obj.raw === 'string') {
+        try {
+          // Try to extract JSON from the raw string (might have markdown code blocks)
+          const jsonMatch = obj.raw.match(/```(?:json)?\s*([\s\S]*?)```/);
+          if (jsonMatch) {
+            return JSON.parse(jsonMatch[1].trim());
+          }
+          // Try parsing directly
+          return JSON.parse(obj.raw);
+        } catch {
+          return obj;
+        }
+      }
+      return obj;
+    };
+
+    // Try to parse raw content first
+    let parsedContent = tryParseRaw(content);
+
     // Check if it's audio overview content (has segments array with speaker/timing/text)
-    if (content.segments && Array.isArray(content.segments)) {
+    if (parsedContent.segments && Array.isArray(parsedContent.segments)) {
       return [{
         id: 'audio-overview',
         type: 'audio_transcript',
         properties: {
-          title: content.title || 'Audio Overview',
-          audioUrl: content.audioUrl
+          title: parsedContent.title || 'Audio Overview',
+          audioUrl: parsedContent.audioUrl
         },
-        data: { segments: content.segments }
+        data: { segments: parsedContent.segments }
       }];
     }
-    
+
     // Check if it's an array of segments directly (audio overview format)
-    if (Array.isArray(content) && content.length > 0 && content[0].speaker && content[0].text) {
+    if (Array.isArray(parsedContent) && parsedContent.length > 0 && parsedContent[0].speaker && parsedContent[0].text) {
       return [{
         id: 'audio-overview',
         type: 'audio_transcript',
         properties: {
           title: 'Audio Overview'
         },
-        data: { segments: content }
+        data: { segments: parsedContent }
       }];
     }
-    
+
     // Check if it's an array of slides (has slideType property)
-    if (Array.isArray(content) && content.length > 0 && content[0].slideType) {
-      const transformedSlides = content.map((slide: any) => ({
+    if (Array.isArray(parsedContent) && parsedContent.length > 0 && parsedContent[0].slideType) {
+      const transformedSlides = parsedContent.map((slide: any) => ({
         title: slide.title,
-        content: slide.bullets?.length > 0 
-          ? slide.bullets.join('\n\n') 
+        content: slide.bullets?.length > 0
+          ? slide.bullets.join('\n\n')
           : slide.notes || '',
       }));
-      
+
       return [{
         id: 'slides-content',
         type: 'slides',
@@ -441,57 +462,57 @@ export default function StudioPanel({
         data: { slides: transformedSlides }
       }];
     }
-    
+
     // Check if it's mind map data (has nodes and edges arrays - React Flow format)
-    if (!Array.isArray(content) && content.nodes && content.edges && Array.isArray(content.nodes)) {
+    if (!Array.isArray(parsedContent) && parsedContent.nodes && parsedContent.edges && Array.isArray(parsedContent.nodes)) {
       return [{
         id: 'mindmap-content',
         type: 'mindmap',
         properties: {},
-        data: { 
-          nodes: content.nodes, 
-          edges: content.edges,
+        data: {
+          nodes: parsedContent.nodes,
+          edges: parsedContent.edges,
           format: 'reactflow'
         }
       }];
     }
-    
+
     // Check if it's hierarchical mind map data (has id, label, children)
-    if (!Array.isArray(content) && content.id && content.label) {
+    if (!Array.isArray(parsedContent) && parsedContent.id && parsedContent.label) {
       return [{
         id: 'mindmap-content',
         type: 'mindmap',
         properties: {},
-        data: content
+        data: parsedContent
       }];
     }
-    
+
     // Check if it's an array of A2UI components (has type and id)
-    if (Array.isArray(content) && content.length > 0 && content[0].type && content[0].id) {
-      return content;
+    if (Array.isArray(parsedContent) && parsedContent.length > 0 && parsedContent[0].type && parsedContent[0].id) {
+      return parsedContent;
     }
-    
+
     // Check if it's a raw array of other content
-    if (Array.isArray(content)) {
+    if (Array.isArray(parsedContent)) {
       return [{
         id: 'generated-list',
         type: 'card',
         properties: {
           title: 'Generated Content',
-          content: JSON.stringify(content, null, 2)
+          content: JSON.stringify(parsedContent, null, 2)
         }
       }];
     }
-    
-    if (content.components) return content.components;
-    
-    if (typeof content === 'object') {
+
+    if (parsedContent.components) return parsedContent.components;
+
+    if (typeof parsedContent === 'object') {
       return [{
         id: 'generated-content',
         type: 'card',
         properties: {
           title: 'Generated Content',
-          content: typeof content === 'string' ? content : JSON.stringify(content, null, 2)
+          content: typeof parsedContent === 'string' ? parsedContent : JSON.stringify(parsedContent, null, 2)
         }
       }];
     }
@@ -499,7 +520,7 @@ export default function StudioPanel({
       id: 'text-content',
       type: 'card',
       properties: {
-        content: String(content)
+        content: String(parsedContent)
       }
     }];
   };

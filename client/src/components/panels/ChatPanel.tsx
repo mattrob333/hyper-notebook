@@ -16,6 +16,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Send, Paperclip, Loader2, Bot, User, Sparkles, ThumbsUp, ThumbsDown, Copy, Pin, Plus, SlidersHorizontal, History, ChevronDown, ArrowUp, Mail, Users, Trash2 } from "lucide-react";
+import { ExpertAgentsDrawer } from "@/components/chat/ExpertAgentsDrawer";
 import { motion, AnimatePresence } from "framer-motion";
 import A2UIRenderer from "../a2ui/A2UIRenderer";
 import OnboardingWorkflow from "../workflows/OnboardingWorkflow";
@@ -985,6 +986,9 @@ You MUST respond with ONLY this JSON (no other text):
             </Button>
           </div>
         )}
+        {/* Expert Agents Drawer */}
+        <ExpertAgentsDrawer className="mb-2" />
+
         <div className="bg-muted/60 dark:bg-muted rounded-2xl overflow-hidden transition-colors focus-within:bg-muted/80 dark:focus-within:bg-muted/90">
           <div className="px-4 pt-3 pb-2">
             <Textarea
