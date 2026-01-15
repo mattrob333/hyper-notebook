@@ -70,9 +70,9 @@
 
 ### Phase 3: UI Updates
 
-- [ ] **Restructure right panel**
+- [x] **Restructure right panel**
     - Ref: `nextmethodPRD.md` (Part 6: Right Panel Restructure)
-    - Action: Create collapsible sections: Agents → Tools → Tasks
+    - Action: Created RightPanel with collapsible Agents, Tools, Tasks sections
     - Files: `client/src/components/panels/RightPanel.tsx`
 
 - [ ] **Build A2UI component library**
@@ -90,10 +90,10 @@
     - Action: Create slide-in panel that overlays from right
     - Files: `client/src/components/editor/TipTapSlidePanel.tsx`
 
-- [ ] **Add active tasks panel**
+- [x] **Add active tasks panel**
     - Ref: `nextmethodPRD.md` (Section 3.2.2)
-    - Action: Show running workflows/subagents with progress
-    - Files: `client/src/components/tasks/ActiveTasksPanel.tsx`
+    - Action: Included in RightPanel with status icons, progress bars, pause/resume controls
+    - Files: `client/src/components/panels/RightPanel.tsx`
 
 ---
 
