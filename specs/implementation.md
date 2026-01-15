@@ -41,12 +41,12 @@
 
 ### Phase 2: Persona System
 
-- [ ] **Create persona database schema** ← YOU ARE HERE
+- [x] **Create persona database schema**
     - Ref: `specs/features/personas.md` (Section: Data Model)
-    - Action: Add persona_agents and persona_hierarchy tables
-    - Files: `shared/schema.ts`, run `npm run db:push`
+    - Action: Added persona_agents, persona_hierarchy, debate_sessions tables
+    - Files: `shared/schema.ts`, ran `npm run db:push`
 
-- [ ] **Implement PersonaAgent class**
+- [ ] **Implement PersonaAgent class** ← YOU ARE HERE
     - Ref: `specs/features/personas.md` (Section: Agent Class)
     - Action: Create class for running persona-flavored agent responses
     - Files: `server/personas/PersonaAgent.ts`

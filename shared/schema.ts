@@ -282,3 +282,114 @@ export interface ChatMessage {
 }
 
 export type ContentType = 'study_guide' | 'briefing_doc' | 'faq' | 'timeline' | 'mindmap' | 'infographic' | 'slides' | 'audio_overview' | 'audio_lecture' | 'email';
+
+// ============================================================================
+// Persona System (NextMethod)
+// ============================================================================
+
+// Persona voice style configuration
+export interface PersonaVoiceStyle {
+  tone: string;
+  vocabulary: string[];
+  patterns: string[];
+}
+
+// Department types for persona organization
+export type PersonaDepartment =
+  | 'leadership'
+  | 'marketing'
+  | 'sales'
+  | 'development'
+  | 'research'
+  | 'operations'
+  | 'finance'
+  | 'legal'
+  | 'custom';
+
+// Persona agents table - AI personas for debates and collaboration
+export const personaAgents = pgTable("persona_agents", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  notebookId: varchar("notebook_id").references(() => notebooks.id, { onDelete: 'cascade' }),
+  name: text("name").notNull(),
+  role: text("role").notNull(),
+  department: text("department").notNull().$type<PersonaDepartment>(),
+  avatarUrl: text("avatar_url"),
+  characterSheet: text("character_sheet").notNull(),
+  voiceStyle: jsonb("voice_style").$type<PersonaVoiceStyle>(),
+  expertiseAreas: text("expertise_areas").array(),
+  contextFileIds: text("context_file_ids").array(), // Source IDs for persona context
+  isBuiltIn: boolean("is_built_in").default(false),
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertPersonaAgentSchema = createInsertSchema(personaAgents).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+}).extend({
+  department: z.enum(['leadership', 'marketing', 'sales', 'development', 'research', 'operations', 'finance', 'legal', 'custom']),
+  voiceStyle: z.object({
+    tone: z.string(),
+    vocabulary: z.array(z.string()),
+    patterns: z.array(z.string()),
+  }).optional(),
+  expertiseAreas: z.array(z.string()).optional(),
+  contextFileIds: z.array(z.string()).optional(),
+});
+
+export type InsertPersonaAgent = z.infer<typeof insertPersonaAgentSchema>;
+export type PersonaAgent = typeof personaAgents.$inferSelect;
+
+// Persona hierarchy - org chart relationships
+export const personaHierarchy = pgTable("persona_hierarchy", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  personaId: varchar("persona_id").notNull().references(() => personaAgents.id, { onDelete: 'cascade' }),
+  reportsTo: varchar("reports_to").references(() => personaAgents.id, { onDelete: 'set null' }),
+  orgLevel: integer("org_level").default(5), // 1=C-suite, 2=VP, 3=Director, 4=Manager, 5=IC
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertPersonaHierarchySchema = createInsertSchema(personaHierarchy).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertPersonaHierarchy = z.infer<typeof insertPersonaHierarchySchema>;
+export type PersonaHierarchy = typeof personaHierarchy.$inferSelect;
+
+// Debate sessions - tracks multi-persona conversations
+export const debateSessions = pgTable("debate_sessions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  notebookId: varchar("notebook_id").references(() => notebooks.id, { onDelete: 'cascade' }),
+  conversationId: varchar("conversation_id").references(() => conversations.id, { onDelete: 'cascade' }),
+  topic: text("topic").notNull(),
+  participantIds: text("participant_ids").array().notNull(), // Persona IDs
+  status: text("status").$type<'active' | 'paused' | 'completed' | 'synthesized'>().default('active'),
+  synthesis: jsonb("synthesis").$type<DebateSynthesis>(),
+  createdAt: timestamp("created_at").defaultNow(),
+  completedAt: timestamp("completed_at"),
+});
+
+// Debate synthesis output structure
+export interface DebateSynthesis {
+  executiveSummary: string;
+  keyDecisions: { decision: string; reasoning: string }[];
+  actionItems: { item: string; owner: string; priority: 'high' | 'medium' | 'low' }[];
+  openQuestions: string[];
+  dissentingViews: { persona: string; view: string }[];
+  supportingEvidence?: string[];
+}
+
+export const insertDebateSessionSchema = createInsertSchema(debateSessions).omit({
+  id: true,
+  createdAt: true,
+  completedAt: true,
+}).extend({
+  status: z.enum(['active', 'paused', 'completed', 'synthesized']).optional(),
+  participantIds: z.array(z.string()),
+});
+
+export type InsertDebateSession = z.infer<typeof insertDebateSessionSchema>;
+export type DebateSession = typeof debateSessions.$inferSelect;
