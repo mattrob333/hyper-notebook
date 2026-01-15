@@ -1,6 +1,6 @@
 # Implementation Plan
 
-## Current Phase: Phase 1 - Core Infrastructure
+## Current Phase: Phase 5 - Polish & Testing
 
 ---
 
@@ -99,35 +99,35 @@
 
 ### Phase 4: Tool Integrations
 
-- [ ] **Set up Trigger.dev project**
+- [x] **Set up Trigger.dev project**
     - Ref: `specs/features/workflows.md`
-    - Action: Initialize Trigger.dev, create first workflow
-    - Files: `trigger.config.ts`, `trigger/workflows/`
+    - Action: Initialized Trigger.dev config with retry settings, node runtime
+    - Files: `trigger.config.ts`, `trigger/index.ts`
 
-- [ ] **Implement research workflow**
+- [x] **Implement research workflow**
     - Ref: `specs/features/workflows.md` (Section: Research)
-    - Action: Create competitor research workflow
+    - Action: Created competitor research workflow with SWOT analysis, multi-competitor support
     - Files: `trigger/workflows/research-competitor.ts`
 
-- [ ] **Add workflow status streaming**
+- [x] **Add workflow status streaming**
     - Ref: `nextmethodPRD.md` (Section 4.2)
-    - Action: Subscribe to workflow status updates
-    - Files: `client/src/lib/trigger/status.ts`
+    - Action: Created SSE-based status streaming with polling fallback
+    - Files: `client/src/lib/trigger/status.ts`, `client/src/lib/trigger/index.ts`
 
-- [ ] **Integrate Resend email sending**
+- [x] **Integrate Resend email sending**
     - Ref: `nextmethodPRD.md` (Part 5)
-    - Action: Set up Resend client and send_email tool
+    - Action: Set up Resend client with template wrapper, attachment support
     - Files: `server/email/resend.ts`
 
-- [ ] **Add TipTap AI slash commands**
+- [x] **Add TipTap AI slash commands**
     - Ref: `nextmethodPRD.md` (Section 3.3.2)
-    - Action: Implement /generate, /expand, /compress, /rewrite commands
+    - Action: Implemented /generate, /expand, /compress, /rewrite, /translate, /fix commands
     - Files: `client/src/components/editor/extensions/AICommands.ts`
 
-- [ ] **Connect document templates**
+- [x] **Connect document templates**
     - Ref: `nextmethodPRD.md` (Section 3.3.3)
-    - Action: Create email, proposal, SOP, blog templates
-    - Files: `client/src/lib/templates/`
+    - Action: Created email, proposal, report, blog templates with variable substitution
+    - Files: `client/src/lib/templates/index.ts`
 
 ---
 
