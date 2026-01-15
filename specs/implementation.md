@@ -12,12 +12,12 @@
     - Files: `package.json`
     - Note: Used --legacy-peer-deps due to zod version conflict
 
-- [ ] **Create agent configuration** ← YOU ARE HERE
+- [x] **Create agent configuration**
     - Ref: `specs/features/agent-sdk.md` (Section: Configuration)
-    - Action: Create agent config with model and system prompt loading
+    - Action: Created config with Options and SDKSessionOptions support
     - Files: `server/agent/config.ts`
 
-- [ ] **Create agent singleton pattern**
+- [ ] **Create agent singleton pattern** ← YOU ARE HERE
     - Ref: `specs/features/agent-sdk.md` (Section: Instance Management)
     - Action: Implement singleton for agent instance management
     - Files: `server/agent/instance.ts`
