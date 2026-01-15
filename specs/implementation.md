@@ -61,10 +61,10 @@
     - Action: Built AgentPanel, AgentCheckbox, PersonaChip components with Zustand integration
     - Files: `client/src/components/agents/`
 
-- [ ] **Add persona message rendering**
+- [x] **Add persona message rendering**
     - Ref: `specs/features/personas.md` (Section: Chat Integration)
-    - Action: Update chat to show persona avatars and names
-    - Files: `client/src/components/chat/PersonaMessage.tsx`
+    - Action: Created PersonaMessage component with department colors, avatar, name, role display
+    - Files: `client/src/components/chat/PersonaMessage.tsx`, `client/src/lib/store/index.ts`
 
 ---
 

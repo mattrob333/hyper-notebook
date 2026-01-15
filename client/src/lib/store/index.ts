@@ -11,7 +11,7 @@
 
 import { create } from 'zustand';
 import { devtools, persist } from 'zustand/middleware';
-import type { Message } from '@shared/schema';
+import type { ChatMessage } from '@shared/schema';
 
 // ============================================================================
 // Types
@@ -61,9 +61,11 @@ export interface TipTapState {
   documentId: string | null;
 }
 
-export interface DebateMessage extends Message {
+export interface DebateMessage extends ChatMessage {
   personaId?: string;
   personaName?: string;
+  personaRole?: string;
+  personaDepartment?: string;
   personaAvatar?: string;
 }
 
