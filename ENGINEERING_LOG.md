@@ -490,6 +490,27 @@ Implemented a full-featured professional report editor with AI rewrite capabilit
 
 ## Current Feature Status
 
+### 2026-01-17 - Sources Experience Refresh & Research Flows
+
+**Status:** UI/UX and research workflow improvements complete
+
+**Completed Tasks:**
+
+1. **Sources Panel Experience**
+   - Added clear separation between Context, Working Set, and Recurring Sources with per-section counts
+   - Built a dedicated web research bar with Fast/Deep research modes and result selection
+   - Added quick actions for refresh feeds, clear working set, and clear context
+   - Search/manual additions now tag sources with consistent metadata for origin/kind
+
+2. **Research & Feed Workflows**
+   - Deep research continues to use Firecrawl and persists a report + source list
+   - Fast research routes through `/api/search/web` for provider-based results
+   - Feed refresh endpoint returns updated feed data + optional digest summary
+
+3. **Documentation Updates**
+   - Added specs and internal docs describing the refreshed sources experience
+
+
 ### Completed Features ✓
 - [x] Multi-notebook management system
 - [x] OpenRouter AI integration (15+ models)

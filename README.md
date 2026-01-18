@@ -1,14 +1,14 @@
-# Hyper-Notebook
+# Smart Notebook
 
-An AI-powered research assistant that goes beyond Google NotebookLM. Upload sources, chat with AI about your research, generate professional reports with a full-featured editor, create images, and much more.
+Smart Notebook is an AI-powered research assistant that goes beyond Google NotebookLM. Upload sources, chat with AI about your research, generate professional reports with a full-featured editor, create images, and much more.
 
-## 🚀 Why Hyper-Notebook?
+## 🚀 Why Smart Notebook?
 
-Hyper-Notebook takes the core concept of NotebookLM and supercharges it with professional features for content creators, researchers, and business users.
+Smart Notebook takes the core concept of NotebookLM and supercharges it with professional features for content creators, researchers, and business users.
 
-### Feature Comparison: Hyper-Notebook vs NotebookLM
+### Feature Comparison: Smart Notebook vs NotebookLM
 
-| Feature | Hyper-Notebook | Google NotebookLM |
+| Feature | Smart Notebook | Google NotebookLM |
 |---------|:-------------:|:-----------------:|
 | **Source Management** | | |
 | PDF Upload | ✅ | ✅ |
@@ -16,6 +16,8 @@ Hyper-Notebook takes the core concept of NotebookLM and supercharges it with pro
 | Text/Markdown Sources | ✅ | ✅ |
 | CSV/Spreadsheet Sources | ✅ | ❌ |
 | RSS Feed Integration | ✅ | ❌ |
+| Context / Working Set / Recurring Sources | ✅ | ❌ |
+| Feed Refresh & Digest | ✅ | ❌ |
 | **AI Models** | | |
 | Multiple AI Providers | ✅ (15+ models) | ❌ (Gemini only) |
 | Claude, GPT-4, Gemini, Llama | ✅ | ❌ |
@@ -68,7 +70,14 @@ Hyper-Notebook takes the core concept of NotebookLM and supercharges it with pro
 - **Multi-source research** - PDFs, URLs, text, CSV files
 - **CSV & Lead Management** - Upload contact lists, view as spreadsheets
 - **RSS Feed Integration** - Auto-import from news feeds
+- **Context, Working Set, Recurring Sources** - Separate what you keep vs what you clear
+- **Refresh Feeds** - Update recurring sources and generate digests
 - **Lead context injection** - AI knows about your contacts
+
+### 🔎 Research & Search
+- **Fast Research** - Quick search results you can save to your working set
+- **Deep Research (Firecrawl)** - Multi-source exploration with attribution
+- **Working set actions** - Save, summarize, or clear research sources
 
 ### 🎨 Content Generation Studio
 - Study guides & FAQs
@@ -98,6 +107,8 @@ AI can generate interactive UI components directly in chat:
 - **Backend**: Express.js, Node.js 20+
 - **Database**: PostgreSQL with Drizzle ORM
 - **AI**: OpenRouter API (access to 100+ models)
+- **Web Research**: Firecrawl (deep research)
+- **TTS**: ElevenLabs (audio overviews)
 - **Visualization**: React Flow, Recharts
 - **Rich Text**: TipTap editor
 
@@ -106,6 +117,8 @@ AI can generate interactive UI components directly in chat:
 - Node.js 20+
 - PostgreSQL 14+
 - OpenRouter API key ([Get one here](https://openrouter.ai/keys))
+- Firecrawl API key (optional, for deep research) ([Get one here](https://firecrawl.dev))
+- ElevenLabs API key (optional, for audio overviews) ([Get one here](https://elevenlabs.io))
 
 ## Quick Start
 
@@ -131,8 +144,10 @@ cp .env.example .env
 Edit `.env` with your values:
 
 ```env
-DATABASE_URL=postgresql://username:password@localhost:5432/hyper_notebook
+DATABASE_URL=postgresql://username:password@localhost:5432/smart_notebook
 OPENROUTER_API_KEY=sk-or-v1-your-api-key-here
+FIRECRAWL_API_KEY=your-firecrawl-api-key
+ELEVENLABS_API_KEY=your-elevenlabs-api-key
 PORT=5000
 NODE_ENV=development
 ```
@@ -142,7 +157,7 @@ NODE_ENV=development
 Create the database:
 
 ```bash
-createdb hyper_notebook
+createdb smart_notebook
 ```
 
 Push the schema:
@@ -201,10 +216,16 @@ hyper-notebook/
 - `POST /api/sources` - Create source from JSON
 - `POST /api/sources/upload` - Upload file (PDF, TXT, MD)
 - `DELETE /api/sources/:id` - Delete source
+- `POST /api/sources/clear` - Clear working set or context sources
+- `POST /api/refresh-feeds` - Refresh recurring RSS sources and generate digest
 
 ### Chat
 - `POST /api/chat` - Stream chat response (SSE)
 - `GET /api/models` - Get available AI models
+
+### Research
+- `POST /api/search/web` - Fast research search
+- `POST /api/firecrawl-deep-research` - Firecrawl deep research
 
 ### Content Generation
 - `POST /api/generate` - Generate content (study guide, FAQ, etc.)
@@ -242,6 +263,11 @@ The app supports models from multiple providers via OpenRouter:
 | `DEFAULT_MODEL` | Default AI model ID | No |
 | `SITE_URL` | Your site URL (for OpenRouter) | No |
 | `SITE_NAME` | Your site name (for OpenRouter) | No |
+| `FIRECRAWL_API_KEY` | Firecrawl API key (deep research) | No |
+| `ELEVENLABS_API_KEY` | ElevenLabs TTS API key | No |
+| `HYPERBROWSER_API_KEY` | Hyperbrowser API key | No |
+| `CLERK_PUBLISHABLE_KEY` | Clerk publishable key | No |
+| `CLERK_SECRET_KEY` | Clerk secret key | No |
 
 ## Deployment
 
