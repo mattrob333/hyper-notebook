@@ -297,6 +297,29 @@ export async function registerRoutes(
     }
   });
 
+  app.post("/api/sources/clear", async (req: Request, res: Response) => {
+    try {
+      const { notebookId, scope = 'working' } = req.body as {
+        notebookId?: string;
+        scope?: 'working' | 'context';
+      };
+
+      if (!notebookId) {
+        return res.status(400).json({ error: "notebookId is required" });
+      }
+
+      if (scope !== 'working' && scope !== 'context') {
+        return res.status(400).json({ error: "scope must be 'working' or 'context'" });
+      }
+
+      const deleted = await storage.clearSourcesByScope(notebookId, scope);
+      res.json({ deleted });
+    } catch (error) {
+      console.error('[Clear Sources] Error:', error);
+      res.status(500).json({ error: "Failed to clear sources" });
+    }
+  });
+
   app.patch("/api/sources/:id", async (req: Request, res: Response) => {
     try {
       const { category, summary, content, name } = req.body;
@@ -873,6 +896,9 @@ Write ONLY the script text, no stage directions or speaker labels.`;
             query,
             completedAt: new Date().toISOString(),
             sourcesCount: result.data.sources?.length || 0,
+            origin: 'deep-research',
+            sourceKind: 'text',
+            sourceLabel: 'Research Report',
           },
         });
         createdSources.push(reportSource);
@@ -882,6 +908,14 @@ Write ONLY the script text, no stage directions or speaker labels.`;
       if (result.data?.sources && Array.isArray(result.data.sources)) {
         for (const source of result.data.sources.slice(0, 10)) { // Limit to 10 sources
           try {
+            const sourceLabel = source.title || (() => {
+              try {
+                return new URL(source.url).hostname;
+              } catch {
+                return source.url;
+              }
+            })();
+
             const urlSource = await storage.createSource({
               type: 'url',
               name: source.title || new URL(source.url).hostname,
@@ -894,6 +928,9 @@ Write ONLY the script text, no stage directions or speaker labels.`;
                 sourceUrl: source.url,
                 fromDeepResearch: true,
                 researchQuery: query,
+                origin: 'deep-research',
+                sourceKind: 'url',
+                sourceLabel,
               },
             });
             createdSources.push(urlSource);
@@ -1105,7 +1142,28 @@ Write ONLY the script text, no stage directions or speaker labels.`;
         });
 
       const results = await Promise.all(scrapePromises);
-      const successfulResults = results.filter(r => r.success && r.content);
+      const refreshedResults = results.filter(r => r.success);
+      const successfulResults = refreshedResults.filter(r => r.content);
+
+      const refreshedAt = new Date().toISOString();
+      const feedSourceById = new Map(feedSources.map(source => [source.id, source]));
+
+      for (const result of refreshedResults) {
+        const source = feedSourceById.get(result.id);
+        if (!source) continue;
+
+        try {
+          const metadata = (source.metadata ?? {}) as Record<string, any>;
+          await storage.updateSource(source.id, {
+            metadata: {
+              ...metadata,
+              lastRefreshedAt: refreshedAt,
+            },
+          });
+        } catch (updateError) {
+          console.warn(`[RefreshFeeds] Failed to update metadata for ${source.name}:`, updateError);
+        }
+      }
 
       // Generate AI digest if we have content
       let digest = null;
@@ -1324,7 +1382,11 @@ Write ONLY the script text, no stage directions or speaker labels.`;
         metadata: { 
           originalName: fileName,
           mimeType: mimeType,
-          size: String(file.size)
+          size: String(file.size),
+          origin: 'manual',
+          sourceKind: 'context',
+          sourceLabel: fileName,
+          contextDate: new Date().toISOString().slice(0, 10)
         }
       });
 

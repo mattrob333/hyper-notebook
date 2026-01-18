@@ -78,7 +78,14 @@ export default function CreateNotebookModal({ open, onOpenChange }: CreateNotebo
   });
 
   const addSourceMutation = useMutation({
-    mutationFn: async (data: { notebookId: string; type: string; name: string; content: string }) => {
+    mutationFn: async (data: {
+      notebookId: string;
+      type: string;
+      name: string;
+      content: string;
+      category?: 'context' | 'feed' | 'reference';
+      metadata?: Record<string, any>;
+    }) => {
       const res = await apiRequest('POST', '/api/sources', data);
       return res.json();
     },
@@ -116,23 +123,47 @@ export default function CreateNotebookModal({ open, onOpenChange }: CreateNotebo
     });
   };
 
+  const getUrlLabel = (url: string) => {
+    try {
+      return new URL(url).hostname;
+    } catch {
+      return url.slice(0, 50);
+    }
+  };
+
   const handleAddUrl = () => {
     if (!urlInput.trim() || !createdNotebook) return;
+    const sourceLabel = getUrlLabel(urlInput);
     addSourceMutation.mutate({
       notebookId: createdNotebook.id,
       type: 'url',
-      name: urlInput,
-      content: `URL: ${urlInput}`,
+      name: sourceLabel,
+      content: urlInput,
+      category: 'reference',
+      metadata: {
+        origin: 'manual',
+        sourceKind: 'url',
+        sourceLabel,
+        url: urlInput,
+        sourceUrl: urlInput,
+      }
     });
   };
 
   const handleAddPastedText = () => {
     if (!pasteInput.trim() || !createdNotebook) return;
+    const sourceName = `Pasted text ${new Date().toLocaleString()}`;
     addSourceMutation.mutate({
       notebookId: createdNotebook.id,
       type: 'text',
-      name: `Pasted text ${new Date().toLocaleString()}`,
+      name: sourceName,
       content: pasteInput,
+      category: 'reference',
+      metadata: {
+        origin: 'manual',
+        sourceKind: 'text',
+        sourceLabel: sourceName,
+      }
     });
   };
 

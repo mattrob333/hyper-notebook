@@ -611,13 +611,22 @@ You MUST respond with ONLY this JSON (no other text):
         try {
           // Get notebook ID from URL if available
           const notebookId = window.location.pathname.split('/').pop();
+          const contextName = 'User Profile Context';
+
           await apiRequest('POST', '/api/sources', {
             notebookId: notebookId || null,
             type: 'text',
             category: 'context',
-            name: 'User Profile Context',
+            name: contextName,
             content: lastAssistantMessage.content,
-            metadata: { generatedBy: 'onboarding-workflow', timestamp: new Date().toISOString() }
+            metadata: {
+              generatedBy: 'onboarding-workflow',
+              timestamp: new Date().toISOString(),
+              origin: 'manual',
+              sourceKind: 'context',
+              sourceLabel: contextName,
+              contextDate: new Date().toISOString().slice(0, 10)
+            }
           });
           toast({ title: 'Profile Saved', description: 'Your profile has been saved as a context source.' });
         } catch (error) {
@@ -630,13 +639,21 @@ You MUST respond with ONLY this JSON (no other text):
       if (lastAssistantMessage) {
         try {
           const notebookId = window.location.pathname.split('/').pop();
+          const reportName = `Research Report - ${new Date().toLocaleDateString()}`;
+
           await apiRequest('POST', '/api/sources', {
             notebookId: notebookId || null,
             type: 'text',
             category: 'reference',
-            name: 'Research Report - ' + new Date().toLocaleDateString(),
+            name: reportName,
             content: lastAssistantMessage.content,
-            metadata: { generatedBy: 'research-workflow', timestamp: new Date().toISOString() }
+            metadata: {
+              generatedBy: 'research-workflow',
+              timestamp: new Date().toISOString(),
+              origin: 'manual',
+              sourceKind: 'text',
+              sourceLabel: reportName
+            }
           });
           toast({ title: 'Report Saved', description: 'Your report has been saved to sources.' });
         } catch (error) {
@@ -754,10 +771,16 @@ You MUST respond with ONLY this JSON (no other text):
                 apiRequest('POST', '/api/sources', {
                   notebookId: window.location.pathname.split('/').pop() || null,
                   type: 'text',
-                  category: 'reports',
+                  category: 'reference',
                   name: title,
                   content: content,
-                  metadata: { type: 'report', createdAt: new Date().toISOString() }
+                  metadata: { 
+                    type: 'report',
+                    createdAt: new Date().toISOString(),
+                    origin: 'manual',
+                    sourceKind: 'text',
+                    sourceLabel: title
+                  }
                 }).then(() => {
                   queryClient.invalidateQueries({ queryKey: ['/api/sources'] });
                 });
@@ -788,10 +811,16 @@ You MUST respond with ONLY this JSON (no other text):
                   apiRequest('POST', '/api/sources', {
                     notebookId: window.location.pathname.split('/').pop() || null,
                     type: 'text',
-                    category: 'reports',
+                    category: 'reference',
                     name: title,
                     content: content,
-                    metadata: { type: 'report', createdAt: new Date().toISOString() }
+                    metadata: { 
+                      type: 'report',
+                      createdAt: new Date().toISOString(),
+                      origin: 'manual',
+                      sourceKind: 'text',
+                      sourceLabel: title
+                    }
                   }).then(() => {
                     queryClient.invalidateQueries({ queryKey: ['/api/sources'] });
                   });

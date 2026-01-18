@@ -48,7 +48,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import type { Source, Feed } from "@/lib/types";
+import type { Source } from "@/lib/types";
 
 interface SourcesPanelProps {
   onSourcesChange?: (selectedSourceIds: string[]) => void;
@@ -77,10 +77,12 @@ export default function SourcesPanel({
   const { toast } = useToast();
   const [addUrlDialogOpen, setAddUrlDialogOpen] = useState(false);
   const [addTextDialogOpen, setAddTextDialogOpen] = useState(false);
+  const [addSubredditDialogOpen, setAddSubredditDialogOpen] = useState(false);
   const [deepResearchDialogOpen, setDeepResearchDialogOpen] = useState(false);
   const [urlInput, setUrlInput] = useState('');
   const [textInput, setTextInput] = useState('');
   const [textName, setTextName] = useState('');
+  const [subredditInput, setSubredditInput] = useState('');
   const [researchTopic, setResearchTopic] = useState('');
   const [selectedSources, setSelectedSources] = useState<Set<string>>(new Set());
   const [expandedSourceId, setExpandedSourceId] = useState<string | null>(null);
@@ -101,19 +103,28 @@ export default function SourcesPanel({
   }>>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [showSearchResults, setShowSearchResults] = useState(false);
-  const [feedsExpanded, setFeedsExpanded] = useState(false);
   const [discoveringRss, setDiscoveringRss] = useState<string | null>(null);
   const [renameDialogOpen, setRenameDialogOpen] = useState(false);
   const [renameSourceId, setRenameSourceId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState('');
 
+  const activeNotebookId = notebookId
+    ?? (typeof window !== 'undefined' && window.location.pathname.startsWith('/notebook/')
+      ? window.location.pathname.split('/').filter(Boolean).pop()
+      : undefined);
+  const sourcesQueryKey = activeNotebookId
+    ? [`/api/notebooks/${activeNotebookId}/sources`]
+    : ['/api/sources'];
+
   const { data: sources = [], isLoading, isError, error } = useQuery<Source[]>({
-    queryKey: notebookId ? [`/api/notebooks/${notebookId}/sources`] : ['/api/sources'],
+    queryKey: sourcesQueryKey,
   });
 
-  const { data: feedsList = [] } = useQuery<Feed[]>({
-    queryKey: notebookId ? [`/api/notebooks/${notebookId}/feeds`] : ['/api/feeds'],
-  });
+  const recurringSources = sources.filter((source) => source.category === 'feed');
+  const contextSources = sources.filter((source) => source.category === 'context');
+  const workingSources = sources.filter(
+    (source) => source.category !== 'feed' && source.category !== 'context'
+  );
 
   useEffect(() => {
     if (sources.length > 0) {
@@ -127,13 +138,20 @@ export default function SourcesPanel({
   }, [selectedSources, onSourcesChange]);
 
   const createSourceMutation = useMutation({
-    mutationFn: async (source: { type: string; name: string; content: string; notebookId?: string }) => {
-      const res = await apiRequest('POST', '/api/sources', { ...source, notebookId });
+    mutationFn: async (source: {
+      type: string;
+      name: string;
+      content: string;
+      category?: 'context' | 'feed' | 'reference';
+      metadata?: Record<string, any>;
+      notebookId?: string;
+    }) => {
+      const res = await apiRequest('POST', '/api/sources', { ...source, notebookId: activeNotebookId });
       return res.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: notebookId ? [`/api/notebooks/${notebookId}/sources`] : ['/api/sources'] });
-      if (notebookId) {
+      queryClient.invalidateQueries({ queryKey: sourcesQueryKey });
+      if (activeNotebookId) {
         queryClient.invalidateQueries({ queryKey: ['/api/notebooks'] });
       }
       toast({ title: "Source added successfully" });
@@ -148,8 +166,8 @@ export default function SourcesPanel({
       await apiRequest('DELETE', `/api/sources/${id}`);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: notebookId ? [`/api/notebooks/${notebookId}/sources`] : ['/api/sources'] });
-      if (notebookId) {
+      queryClient.invalidateQueries({ queryKey: sourcesQueryKey });
+      if (activeNotebookId) {
         queryClient.invalidateQueries({ queryKey: ['/api/notebooks'] });
       }
       toast({ title: "Source deleted" });
@@ -164,7 +182,7 @@ export default function SourcesPanel({
       await apiRequest('PATCH', `/api/sources/${id}`, { name });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: notebookId ? [`/api/notebooks/${notebookId}/sources`] : ['/api/sources'] });
+      queryClient.invalidateQueries({ queryKey: sourcesQueryKey });
       toast({ title: "Source renamed" });
       setRenameDialogOpen(false);
       setRenameSourceId(null);
@@ -181,7 +199,7 @@ export default function SourcesPanel({
       return res.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: notebookId ? [`/api/notebooks/${notebookId}/sources`] : ['/api/sources'] });
+      queryClient.invalidateQueries({ queryKey: sourcesQueryKey });
       toast({ title: "Summary generated" });
     },
     onError: (err: Error) => {
@@ -195,7 +213,7 @@ export default function SourcesPanel({
       return res.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: notebookId ? [`/api/notebooks/${notebookId}/sources`] : ['/api/sources'] });
+      queryClient.invalidateQueries({ queryKey: sourcesQueryKey });
       toast({ title: "Category updated" });
     },
     onError: (err: Error) => {
@@ -205,15 +223,43 @@ export default function SourcesPanel({
 
   const refreshFeedsMutation = useMutation({
     mutationFn: async () => {
-      const res = await apiRequest('POST', '/api/refresh-feeds', { notebookId });
+      const res = await apiRequest('POST', '/api/refresh-feeds', { notebookId: activeNotebookId });
       return res.json();
     },
     onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: notebookId ? [`/api/notebooks/${notebookId}/sources`] : ['/api/sources'] });
-      toast({ title: "Feeds refreshed", description: `Updated ${data.updated || 0} feed sources` });
+      const updatedCount = Array.isArray(data?.results)
+        ? data.results.filter((result: { success: boolean }) => result.success).length
+        : 0;
+      queryClient.invalidateQueries({ queryKey: sourcesQueryKey });
+      toast({ title: "Feeds refreshed", description: `Updated ${updatedCount} feed sources` });
     },
     onError: (err: Error) => {
       toast({ title: "Failed to refresh feeds", description: err.message, variant: "destructive" });
+    },
+  });
+
+  const clearSourcesMutation = useMutation({
+    mutationFn: async ({ scope }: { scope: 'working' | 'context' }) => {
+      if (!activeNotebookId) {
+        throw new Error('Notebook ID is required');
+      }
+      const res = await apiRequest('POST', '/api/sources/clear', { notebookId: activeNotebookId, scope });
+      return res.json();
+    },
+    onSuccess: (data, variables) => {
+      queryClient.invalidateQueries({ queryKey: sourcesQueryKey });
+      if (activeNotebookId) {
+        queryClient.invalidateQueries({ queryKey: ['/api/notebooks'] });
+      }
+      const deletedCount = data?.deleted ?? 0;
+      const label = variables.scope === 'context' ? 'context' : 'working set';
+      toast({
+        title: variables.scope === 'context' ? 'Context cleared' : 'Sources cleared',
+        description: `Removed ${deletedCount} ${label} source${deletedCount === 1 ? '' : 's'}`,
+      });
+    },
+    onError: (err: Error) => {
+      toast({ title: 'Failed to clear sources', description: err.message, variant: 'destructive' });
     },
   });
 
@@ -224,14 +270,14 @@ export default function SourcesPanel({
         maxDepth: 5,
         timeLimit: 180,
         maxUrls: 15,
-        notebookId,
+        notebookId: activeNotebookId,
       });
       return res.json();
     },
     onSuccess: async (data) => {
       // Sources are automatically created by the server endpoint
-      queryClient.invalidateQueries({ queryKey: notebookId ? [`/api/notebooks/${notebookId}/sources`] : ['/api/sources'] });
-      if (notebookId) {
+      queryClient.invalidateQueries({ queryKey: sourcesQueryKey });
+      if (activeNotebookId) {
         queryClient.invalidateQueries({ queryKey: ['/api/notebooks'] });
       }
       toast({ 
@@ -243,33 +289,6 @@ export default function SourcesPanel({
     },
     onError: (err: Error) => {
       toast({ title: "Research failed", description: err.message, variant: "destructive" });
-    },
-  });
-
-  const createFeedMutation = useMutation({
-    mutationFn: async (feed: { name: string; url: string; sourceUrl?: string }) => {
-      const res = await apiRequest('POST', '/api/feeds', { ...feed, notebookId });
-      return res.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: notebookId ? [`/api/notebooks/${notebookId}/feeds`] : ['/api/feeds'] });
-      toast({ title: "Feed added" });
-    },
-    onError: (err: Error) => {
-      toast({ title: "Failed to add feed", description: err.message, variant: "destructive" });
-    },
-  });
-
-  const deleteFeedMutation = useMutation({
-    mutationFn: async (id: string) => {
-      await apiRequest('DELETE', `/api/feeds/${id}`);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: notebookId ? [`/api/notebooks/${notebookId}/feeds`] : ['/api/feeds'] });
-      toast({ title: "Feed removed" });
-    },
-    onError: (err: Error) => {
-      toast({ title: "Failed to remove feed", description: err.message, variant: "destructive" });
     },
   });
 
@@ -288,6 +307,24 @@ export default function SourcesPanel({
     return null;
   };
 
+  const getUrlLabel = (url: string): string => {
+    try {
+      return new URL(url).hostname;
+    } catch {
+      return url.slice(0, 50);
+    }
+  };
+
+  const normalizeSubreddit = (value: string): string => {
+    const trimmed = value.trim();
+    if (!trimmed) return '';
+    const urlMatch = trimmed.match(/reddit\.com\/r\/([^/\s]+)/i);
+    if (urlMatch?.[1]) {
+      return urlMatch[1];
+    }
+    return trimmed.replace(/^\/?r\//i, '');
+  };
+
   const discoverRssFeed = async (source: Source) => {
     const sourceUrl = getSourceUrl(source);
     if (!sourceUrl) {
@@ -300,10 +337,22 @@ export default function SourcesPanel({
       const res = await apiRequest('POST', '/api/discover-rss', { url: sourceUrl });
       const data = await res.json();
       if (data.feeds && data.feeds.length > 0) {
-        // Auto-add the first discovered feed
+        // Auto-add the first discovered feed as a recurring source
         const feedUrl = data.feeds[0];
-        const feedName = new URL(feedUrl).hostname + ' RSS Feed';
-        await createFeedMutation.mutateAsync({ name: feedName, url: feedUrl, sourceUrl });
+        const feedLabel = getUrlLabel(feedUrl);
+        await createSourceMutation.mutateAsync({
+          type: 'url',
+          name: feedLabel,
+          content: feedUrl,
+          category: 'feed',
+          metadata: {
+            origin: 'manual',
+            sourceKind: 'rss',
+            sourceLabel: feedLabel,
+            url: feedUrl,
+            sourceUrl: feedUrl,
+          },
+        });
         toast({ title: "RSS feed discovered", description: `Found ${data.feeds.length} feed(s)` });
       } else {
         toast({ title: "No RSS feeds found", description: "This website doesn't appear to have an RSS feed", variant: "destructive" });
@@ -343,10 +392,21 @@ export default function SourcesPanel({
     
     setIsFetchingMetadata(false);
     
+    const sourceLabel = getUrlLabel(urlInput);
+
     createSourceMutation.mutate({
       type: 'url',
       name,
       content: urlInput,
+      category: 'context',
+      metadata: {
+        origin: 'manual',
+        sourceKind: 'context',
+        sourceLabel,
+        url: urlInput,
+        sourceUrl: urlInput,
+        contextDate: new Date().toISOString().slice(0, 10),
+      },
     });
     setUrlInput('');
   };
@@ -357,10 +417,41 @@ export default function SourcesPanel({
       type: 'text',
       name: textName,
       content: textInput,
+      category: 'context',
+      metadata: {
+        origin: 'manual',
+        sourceKind: 'context',
+        sourceLabel: textName,
+        contextDate: new Date().toISOString().slice(0, 10),
+      },
     });
     setAddTextDialogOpen(false);
     setTextInput('');
     setTextName('');
+  };
+
+  const handleAddSubreddit = () => {
+    const normalizedSubreddit = normalizeSubreddit(subredditInput);
+    if (!normalizedSubreddit) return;
+
+    const sourceLabel = `r/${normalizedSubreddit}`;
+    const rssUrl = `https://www.reddit.com/r/${normalizedSubreddit}/new/.rss`;
+
+    createSourceMutation.mutate({
+      type: 'url',
+      name: sourceLabel,
+      content: rssUrl,
+      category: 'feed',
+      metadata: {
+        origin: 'manual',
+        sourceKind: 'subreddit',
+        sourceLabel,
+        url: rssUrl,
+        sourceUrl: rssUrl,
+      },
+    });
+    setAddSubredditDialogOpen(false);
+    setSubredditInput('');
   };
 
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -389,9 +480,9 @@ export default function SourcesPanel({
 
       // Invalidate the correct query based on notebook context
       await queryClient.invalidateQueries({ 
-        queryKey: notebookId ? [`/api/notebooks/${notebookId}/sources`] : ['/api/sources'] 
+        queryKey: sourcesQueryKey
       });
-      if (notebookId) {
+      if (activeNotebookId) {
         await queryClient.invalidateQueries({ queryKey: ['/api/notebooks'] });
       }
       toast({ title: "File uploaded successfully" });
@@ -462,11 +553,21 @@ export default function SourcesPanel({
           name = result.url.slice(0, 50);
         }
       }
+      const sourceLabel = getUrlLabel(result.url);
+
       try {
         await createSourceMutation.mutateAsync({
           type: 'url',
           name,
           content: result.url,
+          category: 'reference',
+          metadata: {
+            origin: 'search',
+            sourceKind: 'url',
+            sourceLabel,
+            url: result.url,
+            sourceUrl: result.url,
+          },
         });
       } catch (err) {
         toast({
@@ -498,6 +599,218 @@ export default function SourcesPanel({
       setSelectedSources(new Set(sources.map(s => s.id)));
     }
   };
+
+  const renderSourceRow = (source: Source) => {
+    const Icon = sourceTypeIcons[source.type] || FileText;
+    const isSelected = selectedSources.has(source.id);
+    const isExpanded = expandedSourceId === source.id;
+    const isActive = selectedSourceId === source.id;
+    const isSummarizing = summarizeSourceMutation.isPending &&
+      summarizeSourceMutation.variables === source.id;
+    const category = source.category ?? 'reference';
+    const sourceLabel = typeof source.metadata?.sourceLabel === 'string' ? source.metadata.sourceLabel : null;
+    const showLabel = sourceLabel && sourceLabel !== source.name;
+
+    return (
+      <div
+        key={source.id}
+        className={`w-full rounded-xl border border-border/50 transition-colors overflow-hidden ${
+          isActive ? 'bg-primary/10 border-primary/30' : 'bg-card'
+        }`}
+        data-testid={`source-item-${source.id}`}
+      >
+        <div
+          className="flex items-center gap-2 px-2 py-2.5 cursor-pointer hover:bg-muted/50 transition-colors min-w-0"
+          onClick={() => {
+            toggleExpand(source.id);
+            onSelectSource?.(source);
+          }}
+        >
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              toggleExpand(source.id);
+            }}
+            className="shrink-0"
+            data-testid={`button-expand-${source.id}`}
+          >
+            {isExpanded ? (
+              <ChevronDown className="w-4 h-4 text-muted-foreground" />
+            ) : (
+              <ChevronRight className="w-4 h-4 text-muted-foreground" />
+            )}
+          </button>
+          <div className="p-1.5 rounded-lg bg-muted shrink-0">
+            <Icon className="w-4 h-4 text-muted-foreground" />
+          </div>
+          <div className="flex-1 min-w-0 overflow-hidden">
+            <div className="flex items-center gap-2 min-w-0">
+              <span className="text-sm block truncate" data-testid={`text-source-name-${source.id}`}>
+                {source.name}
+              </span>
+              {showLabel && (
+                <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground max-w-[140px] truncate">
+                  {sourceLabel}
+                </span>
+              )}
+            </div>
+          </div>
+          <Checkbox
+            checked={isSelected}
+            onCheckedChange={() => toggleSourceSelection(source.id)}
+            onClick={(e) => e.stopPropagation()}
+            className="shrink-0 ml-1"
+            data-testid={`checkbox-source-${source.id}`}
+          />
+        </div>
+
+        {isExpanded && (
+          <div className="px-3 pb-3 pt-1 border-t border-border/30">
+            {source.summary ? (
+              <div className="text-xs text-muted-foreground mb-3 leading-relaxed prose prose-sm prose-neutral dark:prose-invert max-w-none" data-testid={`text-summary-${source.id}`}>
+                <ReactMarkdown>{source.summary}</ReactMarkdown>
+              </div>
+            ) : (
+              <p className="text-xs text-muted-foreground/50 mb-3 italic" data-testid={`text-no-summary-${source.id}`}>
+                No summary available
+              </p>
+            )}
+            <div className="flex gap-2">
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  summarizeSourceMutation.mutate(source.id);
+                }}
+                disabled={isSummarizing}
+                data-testid={`button-summarize-${source.id}`}
+              >
+                {isSummarizing ? (
+                  <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+                ) : (
+                  <Sparkles className="w-3 h-3 mr-1" />
+                )}
+                {source.summary ? 'Re-summarize' : 'Summarize'}
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setRenameSourceId(source.id);
+                  setRenameValue(source.name);
+                  setRenameDialogOpen(true);
+                }}
+                data-testid={`button-rename-${source.id}`}
+              >
+                <Pencil className="w-3 h-3 mr-1" />
+                Rename
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                className="text-destructive"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  deleteSourceMutation.mutate(source.id);
+                }}
+                disabled={deleteSourceMutation.isPending}
+                data-testid={`button-delete-${source.id}`}
+              >
+                <Trash2 className="w-3 h-3 mr-1" />
+                Delete
+              </Button>
+              
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={(e) => e.stopPropagation()}
+                    data-testid={`dropdown-category-${source.id}`}
+                  >
+                    {category === 'feed' ? (
+                      <Rss className="w-3 h-3 mr-1" />
+                    ) : category === 'reference' ? (
+                      <FileText className="w-3 h-3 mr-1" />
+                    ) : (
+                      <Tag className="w-3 h-3 mr-1" />
+                    )}
+                    {category}
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start" onClick={(e) => e.stopPropagation()}>
+                  <DropdownMenuItem 
+                    onClick={() => updateSourceCategoryMutation.mutate({ id: source.id, category: 'context' })}
+                  >
+                    <Tag className="w-3 h-3 mr-2" />
+                    Context
+                  </DropdownMenuItem>
+                  <DropdownMenuItem 
+                    onClick={() => updateSourceCategoryMutation.mutate({ id: source.id, category: 'feed' })}
+                  >
+                    <Rss className="w-3 h-3 mr-2" />
+                    Feed (auto-refresh)
+                  </DropdownMenuItem>
+                  <DropdownMenuItem 
+                    onClick={() => updateSourceCategoryMutation.mutate({ id: source.id, category: 'reference' })}
+                  >
+                    <FileText className="w-3 h-3 mr-2" />
+                    Reference
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+              
+              {source.type === 'url' && getSourceUrl(source) && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    discoverRssFeed(source);
+                  }}
+                  disabled={discoveringRss === source.id}
+                >
+                  {discoveringRss === source.id ? (
+                    <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+                  ) : (
+                    <Rss className="w-3 h-3 mr-1" />
+                  )}
+                  Find RSS
+                </Button>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  const renderSourceGroup = (
+    title: string,
+    description: string,
+    groupSources: Source[],
+    emptyMessage: string
+  ) => (
+    <div className="space-y-2">
+      <div className="flex items-center justify-between">
+        <div>
+          <p className="text-sm font-semibold">{title}</p>
+          <p className="text-xs text-muted-foreground">{description}</p>
+        </div>
+        <span className="text-xs text-muted-foreground">{groupSources.length}</span>
+      </div>
+      {groupSources.length === 0 ? (
+        <p className="text-xs text-muted-foreground/60 italic">{emptyMessage}</p>
+      ) : (
+        <div className="space-y-1">{groupSources.map(renderSourceRow)}</div>
+      )}
+    </div>
+  );
+
+  const isClearingWorking = clearSourcesMutation.isPending && clearSourcesMutation.variables?.scope === 'working';
+  const isClearingContext = clearSourcesMutation.isPending && clearSourcesMutation.variables?.scope === 'context';
 
   const toggleExpand = (sourceId: string) => {
     const newExpandedId = expandedSourceId === sourceId ? null : sourceId;
@@ -639,6 +952,36 @@ export default function SourcesPanel({
               )}
               Refresh Feeds
             </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-1 rounded-lg"
+              onClick={() => clearSourcesMutation.mutate({ scope: 'working' })}
+              disabled={!activeNotebookId || isClearingWorking}
+              data-testid="button-clear-sources"
+            >
+              {isClearingWorking ? (
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              ) : (
+                <FolderArchive className="w-3.5 h-3.5" />
+              )}
+              Clear Sources
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-1 rounded-lg"
+              onClick={() => clearSourcesMutation.mutate({ scope: 'context' })}
+              disabled={!activeNotebookId || isClearingContext}
+              data-testid="button-clear-context"
+            >
+              {isClearingContext ? (
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              ) : (
+                <Trash2 className="w-3.5 h-3.5" />
+              )}
+              Clear Context
+            </Button>
           </div>
         </div>
       </div>
@@ -764,238 +1107,28 @@ export default function SourcesPanel({
               </p>
             </div>
           ) : (
-            <div className="space-y-1 w-full" data-testid="sources-list">
-              {sources.map((source) => {
-                const Icon = sourceTypeIcons[source.type] || FileText;
-                const isSelected = selectedSources.has(source.id);
-                const isExpanded = expandedSourceId === source.id;
-                const isActive = selectedSourceId === source.id;
-                const isSummarizing = summarizeSourceMutation.isPending && 
-                  summarizeSourceMutation.variables === source.id;
-
-                return (
-                  <div
-                    key={source.id}
-                    className={`w-full rounded-xl border border-border/50 transition-colors overflow-hidden ${
-                      isActive ? 'bg-primary/10 border-primary/30' : 'bg-card'
-                    }`}
-                    data-testid={`source-item-${source.id}`}
-                  >
-                    <div
-                      className="flex items-center gap-2 px-2 py-2.5 cursor-pointer hover:bg-muted/50 transition-colors min-w-0"
-                      onClick={() => {
-                        toggleExpand(source.id);
-                        onSelectSource?.(source);
-                      }}
-                    >
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          toggleExpand(source.id);
-                        }}
-                        className="shrink-0"
-                        data-testid={`button-expand-${source.id}`}
-                      >
-                        {isExpanded ? (
-                          <ChevronDown className="w-4 h-4 text-muted-foreground" />
-                        ) : (
-                          <ChevronRight className="w-4 h-4 text-muted-foreground" />
-                        )}
-                      </button>
-                      <div className="p-1.5 rounded-lg bg-muted shrink-0">
-                        <Icon className="w-4 h-4 text-muted-foreground" />
-                      </div>
-                      <div className="flex-1 min-w-0 overflow-hidden">
-                        <span className="text-sm block truncate" data-testid={`text-source-name-${source.id}`}>
-                          {source.name}
-                        </span>
-                      </div>
-                      <Checkbox
-                        checked={isSelected}
-                        onCheckedChange={() => toggleSourceSelection(source.id)}
-                        onClick={(e) => e.stopPropagation()}
-                        className="shrink-0 ml-1"
-                        data-testid={`checkbox-source-${source.id}`}
-                      />
-                    </div>
-
-                    {isExpanded && (
-                      <div className="px-3 pb-3 pt-1 border-t border-border/30">
-                        {source.summary ? (
-                          <div className="text-xs text-muted-foreground mb-3 leading-relaxed prose prose-sm prose-neutral dark:prose-invert max-w-none" data-testid={`text-summary-${source.id}`}>
-                            <ReactMarkdown>{source.summary}</ReactMarkdown>
-                          </div>
-                        ) : (
-                          <p className="text-xs text-muted-foreground/50 mb-3 italic" data-testid={`text-no-summary-${source.id}`}>
-                            No summary available
-                          </p>
-                        )}
-                        <div className="flex gap-2">
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              summarizeSourceMutation.mutate(source.id);
-                            }}
-                            disabled={isSummarizing}
-                            data-testid={`button-summarize-${source.id}`}
-                          >
-                            {isSummarizing ? (
-                              <Loader2 className="w-3 h-3 mr-1 animate-spin" />
-                            ) : (
-                              <Sparkles className="w-3 h-3 mr-1" />
-                            )}
-                            {source.summary ? 'Re-summarize' : 'Summarize'}
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setRenameSourceId(source.id);
-                              setRenameValue(source.name);
-                              setRenameDialogOpen(true);
-                            }}
-                            data-testid={`button-rename-${source.id}`}
-                          >
-                            <Pencil className="w-3 h-3 mr-1" />
-                            Rename
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            className="text-destructive"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              deleteSourceMutation.mutate(source.id);
-                            }}
-                            disabled={deleteSourceMutation.isPending}
-                            data-testid={`button-delete-${source.id}`}
-                          >
-                            <Trash2 className="w-3 h-3 mr-1" />
-                            Delete
-                          </Button>
-                          
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={(e) => e.stopPropagation()}
-                                data-testid={`dropdown-category-${source.id}`}
-                              >
-                                {source.category === 'feed' ? (
-                                  <Rss className="w-3 h-3 mr-1" />
-                                ) : source.category === 'reference' ? (
-                                  <FileText className="w-3 h-3 mr-1" />
-                                ) : (
-                                  <Tag className="w-3 h-3 mr-1" />
-                                )}
-                                {source.category || 'context'}
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="start" onClick={(e) => e.stopPropagation()}>
-                              <DropdownMenuItem 
-                                onClick={() => updateSourceCategoryMutation.mutate({ id: source.id, category: 'context' })}
-                              >
-                                <Tag className="w-3 h-3 mr-2" />
-                                Context
-                              </DropdownMenuItem>
-                              <DropdownMenuItem 
-                                onClick={() => updateSourceCategoryMutation.mutate({ id: source.id, category: 'feed' })}
-                              >
-                                <Rss className="w-3 h-3 mr-2" />
-                                Feed (auto-refresh)
-                              </DropdownMenuItem>
-                              <DropdownMenuItem 
-                                onClick={() => updateSourceCategoryMutation.mutate({ id: source.id, category: 'reference' })}
-                              >
-                                <FileText className="w-3 h-3 mr-2" />
-                                Reference
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                          
-                          {source.type === 'url' && getSourceUrl(source) && (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                discoverRssFeed(source);
-                              }}
-                              disabled={discoveringRss === source.id}
-                            >
-                              {discoveringRss === source.id ? (
-                                <Loader2 className="w-3 h-3 mr-1 animate-spin" />
-                              ) : (
-                                <Rss className="w-3 h-3 mr-1" />
-                              )}
-                              Find RSS
-                            </Button>
-                          )}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
+            <div className="space-y-6 w-full" data-testid="sources-list">
+              {renderSourceGroup(
+                'Recurring',
+                'Saved sources that refresh on demand.',
+                recurringSources,
+                'No recurring sources yet. Save a source as a feed to refresh it.'
+              )}
+              {renderSourceGroup(
+                'Context',
+                'Saved sources you keep and clear manually.',
+                contextSources,
+                'No context sources yet.'
+              )}
+              {renderSourceGroup(
+                'Working Set',
+                'Temporary sources from web search and research.',
+                workingSources,
+                'No working set sources yet.'
+              )}
             </div>
           )}
         </div>
-      </div>
-
-      {/* Feeds Section */}
-      <div className="border-t border-border/50">
-        <button
-          onClick={() => setFeedsExpanded(!feedsExpanded)}
-          className="w-full px-4 py-3 flex items-center justify-between hover:bg-muted/30 transition-colors"
-        >
-          <div className="flex items-center gap-2">
-            <Rss className="w-4 h-4 text-orange-500" />
-            <span className="text-sm font-medium">RSS Feeds</span>
-            <span className="text-xs text-muted-foreground">({feedsList.length})</span>
-          </div>
-          {feedsExpanded ? (
-            <ChevronDown className="w-4 h-4 text-muted-foreground" />
-          ) : (
-            <ChevronRight className="w-4 h-4 text-muted-foreground" />
-          )}
-        </button>
-        
-        {feedsExpanded && (
-          <div className="px-4 pb-4 space-y-2">
-            {feedsList.length === 0 ? (
-              <p className="text-xs text-muted-foreground/50 italic py-2">
-                No RSS feeds yet. Click "Find RSS" on a URL source to discover feeds.
-              </p>
-            ) : (
-              feedsList.map((feed) => (
-                <div
-                  key={feed.id}
-                  className="flex items-center justify-between p-2 rounded-lg bg-muted/30 border border-border/30"
-                >
-                  <div className="flex items-center gap-2 min-w-0 flex-1">
-                    <Rss className="w-3.5 h-3.5 text-orange-500 shrink-0" />
-                    <div className="min-w-0 flex-1">
-                      <p className="text-xs font-medium truncate">{feed.name}</p>
-                      <p className="text-[10px] text-muted-foreground truncate">{feed.url}</p>
-                    </div>
-                  </div>
-                  <Button
-                    size="icon"
-                    variant="ghost"
-                    className="h-6 w-6 shrink-0 text-muted-foreground hover:text-destructive"
-                    onClick={() => deleteFeedMutation.mutate(feed.id)}
-                  >
-                    <Trash2 className="w-3 h-3" />
-                  </Button>
-                </div>
-              ))
-            )}
-          </div>
-        )}
       </div>
 
       <Dialog open={addUrlDialogOpen} onOpenChange={setAddUrlDialogOpen}>
@@ -1026,6 +1159,39 @@ export default function SourcesPanel({
             >
               {createSourceMutation.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
               Add Source
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={addSubredditDialogOpen} onOpenChange={setAddSubredditDialogOpen}>
+        <DialogContent className="rounded-2xl" data-testid="dialog-add-subreddit">
+          <DialogHeader>
+            <DialogTitle>Add Subreddit</DialogTitle>
+            <DialogDescription>
+              Save a subreddit as a recurring RSS source (ex: r/artificial)
+            </DialogDescription>
+          </DialogHeader>
+          <Input
+            placeholder="r/artificial or https://reddit.com/r/artificial"
+            value={subredditInput}
+            onChange={(e) => setSubredditInput(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && handleAddSubreddit()}
+            className="rounded-xl"
+            data-testid="input-subreddit"
+          />
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setAddSubredditDialogOpen(false)} className="rounded-xl" data-testid="button-cancel-subreddit">
+              Cancel
+            </Button>
+            <Button
+              onClick={handleAddSubreddit}
+              className="rounded-xl"
+              disabled={createSourceMutation.isPending || !subredditInput.trim()}
+              data-testid="button-confirm-subreddit"
+            >
+              {createSourceMutation.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+              Add Subreddit
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -1135,6 +1301,22 @@ export default function SourcesPanel({
               <div>
                 <p className="text-sm font-medium">Website URL</p>
                 <p className="text-xs text-muted-foreground">Add a webpage or article</p>
+              </div>
+            </button>
+            <button
+              className="w-full flex items-center gap-3 p-3 rounded-xl border border-border/50 hover-elevate transition-colors text-left"
+              onClick={() => {
+                setAddSourcesModalOpen(false);
+                setAddSubredditDialogOpen(true);
+              }}
+              data-testid="button-modal-add-subreddit"
+            >
+              <div className="w-10 h-10 rounded-lg bg-orange-500/10 dark:bg-orange-500/20 flex items-center justify-center">
+                <Rss className="w-5 h-5 text-orange-500" />
+              </div>
+              <div>
+                <p className="text-sm font-medium">Subreddit (RSS)</p>
+                <p className="text-xs text-muted-foreground">Save r/&lt;sub&gt; as a recurring source</p>
               </div>
             </button>
             <button

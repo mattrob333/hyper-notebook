@@ -31,6 +31,7 @@ export interface IStorage {
   createSource(source: InsertSource): Promise<Source>;
   updateSource(id: string, source: Partial<InsertSource>): Promise<Source | undefined>;
   deleteSource(id: string): Promise<boolean>;
+  clearSourcesByScope(notebookId: string, scope: 'working' | 'context'): Promise<number>;
 
   getNotes(): Promise<Note[]>;
   getNote(id: string): Promise<Note | undefined>;
@@ -180,6 +181,20 @@ export class DatabaseStorage implements IStorage {
       await this.updateNotebookSourceCount(source.notebookId);
     }
     return true;
+  }
+
+  async clearSourcesByScope(notebookId: string, scope: 'working' | 'context'): Promise<number> {
+    const scopeFilter = scope === 'context'
+      ? eq(sources.category, 'context')
+      : eq(sources.category, 'reference');
+
+    const deleted = await db
+      .delete(sources)
+      .where(and(eq(sources.notebookId, notebookId), scopeFilter))
+      .returning({ id: sources.id });
+
+    await this.updateNotebookSourceCount(notebookId);
+    return deleted.length;
   }
 
   async getNotes(): Promise<Note[]> {

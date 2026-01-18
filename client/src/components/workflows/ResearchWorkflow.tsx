@@ -512,11 +512,13 @@ Do NOT include any preamble or explanation. Output ONLY the content itself.`
   const handleSaveToSources = async () => {
     try {
       // Save to both sources AND studio
+      const sourceName = `Generated ${CONTENT_TYPES.find(c => c.id === contentType)?.label || 'Content'}`;
+
       await apiRequest('POST', '/api/sources', {
         notebookId: notebookId || null,
         type: 'text',
-        category: 'content',
-        name: `Generated ${CONTENT_TYPES.find(c => c.id === contentType)?.label || 'Content'}`,
+        category: 'reference',
+        name: sourceName,
         content: generatedContent,
         metadata: {
           generatedBy: 'research-workflow',
@@ -524,6 +526,9 @@ Do NOT include any preamble or explanation. Output ONLY the content itself.`
           contentType,
           angle: selectedAngle === 'custom' ? customAngle : focusAngles.find(a => a.id === selectedAngle)?.label,
           audiences: selectedAudiences,
+          origin: 'manual',
+          sourceKind: 'text',
+          sourceLabel: sourceName,
         }
       });
       await saveToStudio();

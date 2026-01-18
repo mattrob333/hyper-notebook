@@ -160,6 +160,39 @@
 
 ---
 
+### Phase 6: Sources Experience (Recurring + Clear)
+
+- [ ] **Define Sources 2.0 spec**
+    - Ref: `specs/features/sources-experience.md`
+    - Action: Finalize recurring + clear behavior and metadata conventions
+
+- [ ] **Add clear sources endpoint**
+    - Ref: `specs/features/sources-experience.md` (API Contract)
+    - Action: Implement `POST /api/sources/clear` with scope support (working/context)
+    - Files: `server/routes.ts`, `server/storage.ts`
+
+- [ ] **Update source creation metadata**
+    - Ref: `specs/features/sources-experience.md` (Source Creation Rules)
+    - Action: Tag sources with `origin`, `sourceKind`, and `sourceLabel`
+    - Files: `server/routes.ts`, `client/src/components/panels/SourcesPanel.tsx`
+
+- [ ] **Refresh recurring sources metadata**
+    - Ref: `specs/features/sources-experience.md` (Clear + Refresh Behavior)
+    - Action: Update `lastRefreshedAt` after refresh
+    - Files: `server/routes.ts`
+
+- [ ] **Sources panel UX grouping + controls**
+    - Ref: `specs/features/sources-experience.md` (UI/UX Requirements)
+    - Action: Group by Recurring / Context / Working Set; add Clear Sources + Clear Context controls
+    - Files: `client/src/components/panels/SourcesPanel.tsx`
+
+- [ ] **Subreddit add flow**
+    - Ref: `specs/features/sources-experience.md` (Source Creation Rules)
+    - Action: Add subreddit input that saves RSS URL and label
+    - Files: `client/src/components/panels/SourcesPanel.tsx`
+
+---
+
 ## Completion Log
 
 | Date | Phase | Commit |

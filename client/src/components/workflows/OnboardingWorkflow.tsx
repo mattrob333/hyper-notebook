@@ -327,11 +327,13 @@ Make it professional, concise, and actionable. Use markdown formatting with head
   const handleSave = async () => {
     setIsSaving(true);
     try {
+      const sourceName = `User Profile - ${ROLES.find(r => r.id === selectedRole)?.label || 'Unknown'}`;
+
       await apiRequest('POST', '/api/sources', {
         notebookId: notebookId || null,
         type: 'text',
         category: 'context',
-        name: `User Profile - ${ROLES.find(r => r.id === selectedRole)?.label || 'Unknown'}`,
+        name: sourceName,
         content: summaryContent,
         metadata: {
           generatedBy: 'onboarding-workflow',
@@ -343,6 +345,10 @@ Make it professional, concise, and actionable. Use markdown formatting with head
           painPoints: selectedPains,
           goals: selectedGoals,
           priority: goalPriority,
+          origin: 'manual',
+          sourceKind: 'context',
+          sourceLabel: sourceName,
+          contextDate: new Date().toISOString().slice(0, 10)
         }
       });
       
