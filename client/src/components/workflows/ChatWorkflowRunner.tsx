@@ -276,22 +276,181 @@ export default function ChatWorkflowRunner({
           <div className="space-y-2">
             {props.label && <Label>{props.label}</Label>}
             <Input
-              placeholder={props.placeholder || 'Enter tags separated by commas'}
-              value={(value || []).join(', ')}
-              onChange={(e) => {
-                const tags = e.target.value.split(',').map(t => t.trim()).filter(Boolean);
-                updateState(stateKey, tags);
+              placeholder={props.placeholder}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  const input = e.currentTarget;
+                  const newTag = input.value.trim();
+                  if (newTag) {
+                    const currentTags = value || [];
+                    if (!currentTags.includes(newTag)) {
+                      updateState(stateKey, [...currentTags, newTag]);
+                    }
+                    input.value = '';
+                  }
+                }
               }}
             />
             {(value || []).length > 0 && (
-              <div className="flex flex-wrap gap-1">
+              <div className="flex flex-wrap gap-1 mt-2">
                 {(value as string[]).map((tag, idx) => (
-                  <Badge key={idx} variant="secondary" className="text-xs">
+                  <Badge 
+                    key={idx} 
+                    variant="secondary" 
+                    className="text-xs cursor-pointer hover:bg-destructive/20"
+                    onClick={() => {
+                      const currentTags = value || [];
+                      updateState(stateKey, currentTags.filter((_: string, i: number) => i !== idx));
+                    }}
+                  >
                     {tag}
+                    <X className="h-3 w-3 ml-1" />
                   </Badge>
                 ))}
               </div>
             )}
+            <p className="text-xs text-muted-foreground">Press Enter to add each item. Click a tag to remove it.</p>
+          </div>
+        );
+
+      case 'url_input':
+        return (
+          <div className="space-y-2">
+            {props.label && <Label>{props.label}</Label>}
+            <div className="flex gap-2">
+              <Input
+                placeholder={props.placeholder || 'https://example.com'}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    const input = e.currentTarget;
+                    const url = input.value.trim();
+                    if (url && (url.startsWith('http://') || url.startsWith('https://'))) {
+                      const currentUrls = value || [];
+                      if (!currentUrls.includes(url)) {
+                        updateState(stateKey, [...currentUrls, url]);
+                      }
+                      input.value = '';
+                    }
+                  }
+                }}
+              />
+            </div>
+            {(value || []).length > 0 && (
+              <div className="space-y-1 mt-2">
+                {(value as string[]).map((url, idx) => (
+                  <div key={idx} className="flex items-center gap-2 text-xs bg-muted/50 rounded px-2 py-1">
+                    <span className="flex-1 truncate">{url}</span>
+                    <button
+                      onClick={() => {
+                        const currentUrls = value || [];
+                        updateState(stateKey, currentUrls.filter((_: string, i: number) => i !== idx));
+                      }}
+                      className="text-muted-foreground hover:text-destructive"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+            <p className="text-xs text-muted-foreground">Press Enter to add each URL</p>
+          </div>
+        );
+
+      case 'file_upload':
+        return (
+          <div className="space-y-2">
+            {props.label && <Label>{props.label}</Label>}
+            <div className="border-2 border-dashed border-muted-foreground/25 rounded-lg p-6 text-center hover:border-primary/50 transition-colors">
+              <input
+                type="file"
+                multiple={props.maxFiles > 1}
+                accept={props.acceptedTypes?.join(',')}
+                className="hidden"
+                id={`file-upload-${stateKey}`}
+                onChange={(e) => {
+                  const files = Array.from(e.target.files || []);
+                  const currentFiles = value || [];
+                  const newFiles = files.map(f => ({ name: f.name, size: f.size, type: f.type }));
+                  updateState(stateKey, [...currentFiles, ...newFiles].slice(0, props.maxFiles || 5));
+                }}
+              />
+              <label htmlFor={`file-upload-${stateKey}`} className="cursor-pointer">
+                <div className="text-muted-foreground">
+                  <p className="text-sm font-medium">Click to upload files</p>
+                  <p className="text-xs mt-1">
+                    {props.acceptedTypes?.join(', ') || 'All files'} (max {props.maxFiles || 5} files)
+                  </p>
+                </div>
+              </label>
+            </div>
+            {(value || []).length > 0 && (
+              <div className="space-y-1 mt-2">
+                {(value as Array<{name: string}>).map((file, idx) => (
+                  <div key={idx} className="flex items-center gap-2 text-xs bg-muted/50 rounded px-2 py-1">
+                    <FileText className="h-3 w-3 text-muted-foreground" />
+                    <span className="flex-1 truncate">{file.name}</span>
+                    <button
+                      onClick={() => {
+                        const currentFiles = value || [];
+                        updateState(stateKey, currentFiles.filter((_: any, i: number) => i !== idx));
+                      }}
+                      className="text-muted-foreground hover:text-destructive"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        );
+
+      case 'info_card':
+        return (
+          <div className={cn(
+            "p-4 rounded-lg border",
+            props.variant === 'info' && "bg-blue-500/10 border-blue-500/20",
+            props.variant === 'success' && "bg-green-500/10 border-green-500/20",
+            props.variant === 'warning' && "bg-yellow-500/10 border-yellow-500/20",
+          )}>
+            {props.title && <p className="font-medium text-sm mb-1">{props.title}</p>}
+            {props.content && <p className="text-sm text-muted-foreground">{props.content}</p>}
+          </div>
+        );
+
+      case 'hero_card':
+        return (
+          <div className="text-center py-4">
+            <h3 className="text-lg font-semibold mb-2">{props.title}</h3>
+            {props.content && <p className="text-sm text-muted-foreground">{props.content}</p>}
+          </div>
+        );
+
+      case 'number_input':
+        return (
+          <div className="space-y-2">
+            {props.label && <Label>{props.label}</Label>}
+            <Input
+              type="number"
+              placeholder={props.placeholder}
+              value={value || ''}
+              onChange={(e) => updateState(stateKey, e.target.value ? Number(e.target.value) : '')}
+            />
+          </div>
+        );
+
+      case 'date_picker':
+        return (
+          <div className="space-y-2">
+            {props.label && <Label>{props.label}</Label>}
+            <Input
+              type="date"
+              value={value || ''}
+              onChange={(e) => updateState(stateKey, e.target.value)}
+            />
           </div>
         );
 
@@ -324,22 +483,31 @@ export default function ChatWorkflowRunner({
           </div>
 
           <div className="flex flex-wrap gap-2 pt-2 border-t">
-            <Button size="sm" onClick={() => onComplete(state)}>
-              <Save className="h-4 w-4 mr-1" />
-              Done
-            </Button>
+            {onCreateReport && (
+              <Button 
+                size="sm" 
+                className="bg-emerald-600 hover:bg-emerald-700"
+                onClick={() => {
+                  onCreateReport(generatedContent, workflow.output?.title 
+                    ? interpolateTemplate(workflow.output.title, state) 
+                    : workflow.name);
+                  toast({ title: 'Report Saved', description: 'Your report has been saved to Sources.' });
+                }}
+              >
+                <FileText className="h-4 w-4 mr-1" />
+                Save Report
+              </Button>
+            )}
             {onSendToEmail && (
               <Button size="sm" variant="outline" onClick={() => onSendToEmail(generatedContent, workflow.name)}>
                 <Mail className="h-4 w-4 mr-1" />
                 Send to Email
               </Button>
             )}
-            {onCreateReport && (
-              <Button size="sm" variant="outline" onClick={() => onCreateReport(generatedContent, workflow.name)}>
-                <FileText className="h-4 w-4 mr-1" />
-                Save as Report
-              </Button>
-            )}
+            <Button size="sm" variant="outline" onClick={() => onComplete(state)}>
+              <Save className="h-4 w-4 mr-1" />
+              Done
+            </Button>
             <Button size="sm" variant="ghost" onClick={handleBack}>
               <ChevronLeft className="h-4 w-4 mr-1" />
               Edit Inputs
@@ -366,7 +534,7 @@ export default function ChatWorkflowRunner({
             <X className="h-4 w-4" />
           </Button>
         </div>
-        <Progress value={progress} className="h-1 mt-3" />
+        <Progress value={progress} className="h-2 mt-3" />
       </CardHeader>
 
       <CardContent className="space-y-4">

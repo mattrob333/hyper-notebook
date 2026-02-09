@@ -6,6 +6,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { EmailBuilderProvider } from "@/contexts/EmailBuilderContext";
 import { LeadProvider } from "@/contexts/LeadContext";
 import { SignedIn, SignedOut } from "@clerk/clerk-react";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 import NotFound from "@/pages/not-found";
 import Home from "@/pages/home";
 import NotebooksDashboard from "@/pages/notebooks";
@@ -27,27 +28,33 @@ function Router() {
 
 function App() {
   return (
-    <QueryClientProvider client={queryClient}>
-      <TooltipProvider>
-        <EmailBuilderProvider>
-          <LeadProvider>
-            <Toaster />
-            {isClerkAvailable ? (
-              <>
-                <SignedIn>
+    <ErrorBoundary>
+      <QueryClientProvider client={queryClient}>
+        <TooltipProvider>
+          <EmailBuilderProvider>
+            <LeadProvider>
+              <Toaster />
+              {isClerkAvailable ? (
+                <>
+                  <SignedIn>
+                    <ErrorBoundary>
+                      <Router />
+                    </ErrorBoundary>
+                  </SignedIn>
+                  <SignedOut>
+                    <LandingPage />
+                  </SignedOut>
+                </>
+              ) : (
+                <ErrorBoundary>
                   <Router />
-                </SignedIn>
-                <SignedOut>
-                  <LandingPage />
-                </SignedOut>
-              </>
-            ) : (
-              <Router />
-            )}
-          </LeadProvider>
-        </EmailBuilderProvider>
-      </TooltipProvider>
-    </QueryClientProvider>
+                </ErrorBoundary>
+              )}
+            </LeadProvider>
+          </EmailBuilderProvider>
+        </TooltipProvider>
+      </QueryClientProvider>
+    </ErrorBoundary>
   );
 }
 

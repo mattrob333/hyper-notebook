@@ -13,6 +13,41 @@ import { getWorkflowByTrigger } from "./workflows";
 import Papa from "papaparse";
 import { getUserId, authRequired } from "./auth";
 
+// SSRF protection: validate URLs before fetching
+function isUrlAllowed(url: string): boolean {
+  try {
+    const parsed = new URL(url);
+    const hostname = parsed.hostname.toLowerCase();
+
+    // Block private/internal networks
+    if (
+      hostname === 'localhost' ||
+      hostname === '127.0.0.1' ||
+      hostname === '0.0.0.0' ||
+      hostname === '::1' ||
+      hostname === '[::1]' ||
+      hostname.endsWith('.local') ||
+      hostname.endsWith('.internal') ||
+      hostname === '169.254.169.254' || // AWS metadata
+      hostname === 'metadata.google.internal' || // GCP metadata
+      /^10\./.test(hostname) ||
+      /^172\.(1[6-9]|2\d|3[01])\./.test(hostname) ||
+      /^192\.168\./.test(hostname)
+    ) {
+      return false;
+    }
+
+    // Only allow http/https
+    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+      return false;
+    }
+
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 // Auto-detect column types from headers
 function detectColumns(headers: string[]): SpreadsheetContent['detectedColumns'] {
   const lowerHeaders = headers.map(h => h.toLowerCase().trim());
@@ -97,7 +132,16 @@ export async function registerRoutes(
   app.patch("/api/notebooks/:id", async (req: Request, res: Response) => {
     try {
       const userId = getUserId(req);
-      const notebook = await storage.updateNotebook(req.params.id, req.body, userId);
+      // Only allow known fields to be updated
+      const { name, description, emoji, color, letterhead } = req.body;
+      const updates: Record<string, any> = {};
+      if (name !== undefined) updates.name = name;
+      if (description !== undefined) updates.description = description;
+      if (emoji !== undefined) updates.emoji = emoji;
+      if (color !== undefined) updates.color = color;
+      if (letterhead !== undefined) updates.letterhead = letterhead;
+
+      const notebook = await storage.updateNotebook(req.params.id, updates, userId);
       if (!notebook) {
         return res.status(404).json({ error: "Notebook not found" });
       }
@@ -194,9 +238,14 @@ export async function registerRoutes(
 
   app.post("/api/feeds", async (req: Request, res: Response) => {
     try {
-      const feed = await storage.createFeed(req.body);
+      const { insertFeedSchema } = await import("@shared/schema");
+      const validated = insertFeedSchema.parse(req.body);
+      const feed = await storage.createFeed(validated);
       res.status(201).json(feed);
     } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: error.errors });
+      }
       console.error('[Create Feed] Error:', error);
       res.status(500).json({ error: "Failed to create feed" });
     }
@@ -267,8 +316,8 @@ export async function registerRoutes(
           } catch (scrapeError) {
             console.error('[Summarize] Firecrawl error:', scrapeError);
           }
-        } else {
-          // Fallback to basic fetch
+        } else if (isUrlAllowed(url)) {
+          // Fallback to basic fetch (with SSRF protection)
           try {
             const response = await fetch(url);
             const html = await response.text();
@@ -331,6 +380,10 @@ export async function registerRoutes(
         parsedUrl = new URL(url);
       } catch {
         return res.status(400).json({ error: "Invalid URL" });
+      }
+
+      if (!isUrlAllowed(url)) {
+        return res.status(400).json({ error: "URL not allowed" });
       }
 
       // Fetch the page to extract metadata
@@ -485,9 +538,13 @@ Write ONLY the script text, no stage directions or speaker labels.`;
   app.post("/api/scrape", async (req: Request, res: Response) => {
     try {
       const { url } = req.body;
-      
+
       if (!url) {
         return res.status(400).json({ error: "URL is required" });
+      }
+
+      if (!isUrlAllowed(url)) {
+        return res.status(400).json({ error: "URL not allowed" });
       }
 
       const apiKey = process.env.HYPERBROWSER_API_KEY;
@@ -548,9 +605,13 @@ Write ONLY the script text, no stage directions or speaker labels.`;
   app.post("/api/firecrawl-scrape", async (req: Request, res: Response) => {
     try {
       const { url, formats = ['markdown'] } = req.body;
-      
+
       if (!url) {
         return res.status(400).json({ error: "URL is required" });
+      }
+
+      if (!isUrlAllowed(url)) {
+        return res.status(400).json({ error: "URL not allowed" });
       }
 
       const apiKey = process.env.FIRECRAWL_API_KEY;
@@ -664,10 +725,16 @@ Write ONLY the script text, no stage directions or speaker labels.`;
   // Firecrawl Crawl endpoint - crawl multiple pages from a site
   app.post("/api/firecrawl-crawl", async (req: Request, res: Response) => {
     try {
-      const { url, limit = 10, maxDepth = 2 } = req.body;
-      
+      const { url, limit: rawLimit = 10, maxDepth: rawDepth = 2 } = req.body;
+      const limit = Math.min(Math.max(Number(rawLimit) || 10, 1), 50);
+      const maxDepth = Math.min(Math.max(Number(rawDepth) || 2, 1), 5);
+
       if (!url) {
         return res.status(400).json({ error: "URL is required" });
+      }
+
+      if (!isUrlAllowed(url)) {
+        return res.status(400).json({ error: "URL not allowed" });
       }
 
       const apiKey = process.env.FIRECRAWL_API_KEY;
@@ -722,7 +789,11 @@ Write ONLY the script text, no stage directions or speaker labels.`;
   app.get("/api/firecrawl-crawl-status/:jobId", async (req: Request, res: Response) => {
     try {
       const { jobId } = req.params;
-      
+
+      if (!/^[a-zA-Z0-9_-]+$/.test(jobId)) {
+        return res.status(400).json({ error: "Invalid job ID" });
+      }
+
       const apiKey = process.env.FIRECRAWL_API_KEY;
       
       if (!apiKey) {
@@ -926,9 +997,13 @@ Write ONLY the script text, no stage directions or speaker labels.`;
   app.post("/api/discover-rss", async (req: Request, res: Response) => {
     try {
       const { url } = req.body;
-      
+
       if (!url) {
         return res.status(400).json({ error: "URL is required" });
+      }
+
+      if (!isUrlAllowed(url)) {
+        return res.status(400).json({ error: "URL not allowed" });
       }
 
       const apiKey = process.env.FIRECRAWL_API_KEY;
@@ -1391,9 +1466,14 @@ Write ONLY the script text, no stage directions or speaker labels.`;
 
   app.post("/api/conversations", async (req: Request, res: Response) => {
     try {
-      const conversation = await storage.createConversation(req.body);
+      const { insertConversationSchema } = await import("@shared/schema");
+      const validated = insertConversationSchema.parse(req.body);
+      const conversation = await storage.createConversation(validated);
       res.status(201).json(conversation);
     } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: error.errors });
+      }
       res.status(500).json({ error: "Failed to create conversation" });
     }
   });
@@ -1540,7 +1620,16 @@ Available report formats: Briefing Doc, Blog Post, LinkedIn Article, Twitter Thr
       res.end();
     } catch (error) {
       console.error("Chat error:", error);
-      res.status(500).json({ error: "Failed to process chat" });
+      if (!res.headersSent) {
+        res.status(500).json({ error: "Failed to process chat" });
+      } else {
+        try {
+          res.write(`data: ${JSON.stringify({ type: "error", error: "Stream failed" })}\n\n`);
+          res.end();
+        } catch {
+          // Response already closed, nothing to do
+        }
+      }
     }
   });
 
@@ -1967,7 +2056,14 @@ Write the report in clean markdown format. Use proper headings (##, ###), bullet
 
   app.patch("/api/workflows/:id", async (req: Request, res: Response) => {
     try {
-      const workflow = await storage.updateWorkflow(req.params.id, req.body);
+      const { name, description, steps, isActive } = req.body;
+      const updates: Record<string, any> = {};
+      if (name !== undefined) updates.name = name;
+      if (description !== undefined) updates.description = description;
+      if (steps !== undefined) updates.steps = steps;
+      if (isActive !== undefined) updates.isActive = isActive;
+
+      const workflow = await storage.updateWorkflow(req.params.id, updates);
       if (!workflow) {
         return res.status(404).json({ error: "Workflow not found" });
       }
@@ -2066,7 +2162,11 @@ Write the report in clean markdown format. Use proper headings (##, ###), bullet
   app.post("/api/hyperbrowser/scrape", async (req: Request, res: Response) => {
     try {
       const { url } = req.body;
-      
+
+      if (!url || !isUrlAllowed(url)) {
+        return res.status(400).json({ error: "URL is required and must be a valid public URL" });
+      }
+
       if (!hyperbrowserService.isConfigured()) {
         return res.status(400).json({ error: "HyperBrowser API key not configured" });
       }

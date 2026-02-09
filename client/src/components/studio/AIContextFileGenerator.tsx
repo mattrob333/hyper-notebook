@@ -197,7 +197,7 @@ export default function AIContextFileGenerator({ onBack, sources }: AIContextFil
                   <div className="p-1 rounded bg-muted shrink-0">
                     {source.type === 'url' ? <Globe className="w-3 h-3" /> : <FileText className="w-3 h-3" />}
                   </div>
-                  <span className="text-xs truncate pr-1" title={source.name}>{source.name}</span>
+                  <span className="text-xs truncate max-w-[120px]" title={source.name}>{source.name}</span>
                 </div>
               ))}
             </div>

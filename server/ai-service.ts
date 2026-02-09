@@ -2,8 +2,12 @@ import OpenAI from "openai";
 import type { A2UIComponent, ContentType } from "@shared/schema";
 
 // OpenRouter uses OpenAI-compatible API
+if (!process.env.OPENROUTER_API_KEY) {
+  console.error("[ai-service] OPENROUTER_API_KEY is not set. AI features will not work.");
+}
+
 const openrouter = new OpenAI({
-  apiKey: process.env.OPENROUTER_API_KEY || "dummy",
+  apiKey: process.env.OPENROUTER_API_KEY || "missing-key",
   baseURL: "https://openrouter.ai/api/v1",
   defaultHeaders: {
     "HTTP-Referer": process.env.SITE_URL || "http://localhost:5000",

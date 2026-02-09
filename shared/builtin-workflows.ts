@@ -541,6 +541,20 @@ export const CLIENT_DISCOVERY_WORKFLOW: WorkflowDefinition = {
             placeholder: 'Name and title',
           },
         },
+        {
+          type: 'card_selector',
+          stateKey: 'decisionTimeline',
+          props: {
+            label: 'When do they need to make a decision?',
+            columns: 4,
+            options: [
+              { id: 'asap', label: 'ASAP', icon: '⚡', description: 'This week' },
+              { id: '2weeks', label: '2 Weeks', icon: '📅', description: 'Within 2 weeks' },
+              { id: 'month', label: '1 Month', icon: '📆', description: 'Within a month' },
+              { id: 'quarter', label: 'Quarter+', icon: '🗓️', description: '3+ months' },
+            ],
+          },
+        },
       ],
     },
     {
@@ -580,6 +594,7 @@ export const CLIENT_DISCOVERY_WORKFLOW: WorkflowDefinition = {
 **Budget Range**: {{budgetRange}}
 **Decision Factors**: {{decisionFactors}}
 **Decision Maker**: {{decisionMaker}}
+**Decision Timeline**: {{decisionTimeline}}
 
 ---
 
@@ -686,9 +701,25 @@ export const COMPETITIVE_LANDSCAPE_WORKFLOW: WorkflowDefinition = {
           type: 'tag_input',
           stateKey: 'competitors',
           props: {
-            label: 'Enter competitor names (press Enter after each)',
-            placeholder: 'e.g., Competitor A',
+            label: 'Competitor names (press Enter after each)',
+            placeholder: 'e.g., Acme Corp',
             required: true,
+          },
+        },
+        {
+          type: 'textarea',
+          stateKey: 'competitorUrls',
+          props: {
+            label: 'Competitor websites (one per line)',
+            placeholder: 'https://competitor1.com\nhttps://competitor2.com',
+          },
+        },
+        {
+          type: 'textarea',
+          stateKey: 'whyLoseDeals',
+          props: {
+            label: 'Why do you sometimes lose deals to competitors?',
+            placeholder: 'What do competitors do better? What objections do you hear?',
           },
         },
         {
@@ -797,6 +828,10 @@ export const COMPETITIVE_LANDSCAPE_WORKFLOW: WorkflowDefinition = {
 
 ## Competitors
 {{competitors}}
+
+**Competitor Websites**: {{competitorUrls}}
+
+**Why We Lose Deals**: {{whyLoseDeals}}
 
 ## Comparison Criteria
 {{criteria}}

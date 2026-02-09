@@ -1,0 +1,15 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: hyper-notebook-db
+    environment:
+      POSTGRES_USER: hypernotebook
+      POSTGRES_PASSWORD: hypernotebook_dev
+      POSTGRES_DB: hyper_notebook
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+volumes:
+  postgres_data:

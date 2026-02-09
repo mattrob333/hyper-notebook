@@ -153,7 +153,7 @@ export default function WorkflowsLibrary({ onRunWorkflow }: WorkflowsLibraryProp
                   {/* Run button */}
                   <Button
                     size="sm"
-                    className="w-full h-7 text-xs"
+                    className="w-full h-7 text-xs bg-emerald-600 hover:bg-emerald-700"
                     onClick={(e) => handleRun(e, workflow)}
                   >
                     <Play className="h-3 w-3 mr-1" />

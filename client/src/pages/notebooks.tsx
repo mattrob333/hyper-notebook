@@ -26,7 +26,9 @@ import {
 import { formatDistanceToNow } from "date-fns";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { useIsMobile } from "@/hooks/use-mobile";
 import CreateNotebookModal from "@/components/notebooks/CreateNotebookModal";
+import { MobileNotebookList } from "@/components/mobile";
 import type { Notebook } from "@/lib/types";
 
 // Notebook color presets
@@ -50,6 +52,7 @@ export default function NotebooksDashboard() {
   const [createModalOpen, setCreateModalOpen] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(true);
   const { toast } = useToast();
+  const isMobile = useIsMobile();
 
   // Apply dark mode by default
   useEffect(() => {
@@ -103,6 +106,11 @@ export default function NotebooksDashboard() {
       deleteMutation.mutate(id);
     }
   };
+
+  // Render mobile version on small screens (after all hooks)
+  if (isMobile) {
+    return <MobileNotebookList />;
+  }
 
   return (
     <div className="min-h-screen bg-background">

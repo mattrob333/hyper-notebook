@@ -16,6 +16,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Send, Paperclip, Loader2, Bot, User, Sparkles, ThumbsUp, ThumbsDown, Copy, Pin, Plus, SlidersHorizontal, History, ChevronDown, ArrowUp, Mail, Users, Trash2 } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { motion, AnimatePresence } from "framer-motion";
 import A2UIRenderer from "../a2ui/A2UIRenderer";
 import OnboardingWorkflow from "../workflows/OnboardingWorkflow";
@@ -989,7 +990,7 @@ You MUST respond with ONLY this JSON (no other text):
           <div className="px-4 pt-3 pb-2">
             <Textarea
               ref={textareaRef}
-              placeholder="Reply..."
+              placeholder="Ask about your sources or start a workflow..."
               className="min-h-[24px] max-h-32 resize-none border-0 shadow-none ring-0 focus:ring-0 focus:border-0 focus-visible:ring-0 focus-visible:ring-offset-0 focus-visible:outline-none focus:outline-none outline-none bg-transparent text-sm placeholder:text-muted-foreground/60 p-0"
               style={{ outline: 'none', boxShadow: 'none' }}
               value={inputValue}
@@ -1001,40 +1002,70 @@ You MUST respond with ONLY this JSON (no other text):
             />
           </div>
           <div className="flex items-center justify-between px-3 pb-3 gap-2">
-            <div className="flex items-center gap-1">
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-8 w-8 rounded-lg text-muted-foreground"
-                data-testid="button-sparkles"
-              >
-                <Sparkles className="w-4 h-4" />
-              </Button>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-8 w-8 rounded-lg text-muted-foreground"
-                data-testid="button-attach"
-              >
-                <Plus className="w-4 h-4" />
-              </Button>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-8 w-8 rounded-lg text-muted-foreground"
-                data-testid="button-settings"
-              >
-                <SlidersHorizontal className="w-4 h-4" />
-              </Button>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-8 w-8 rounded-lg text-muted-foreground"
-                data-testid="button-history"
-              >
-                <History className="w-4 h-4" />
-              </Button>
-            </div>
+            <TooltipProvider delayDuration={300}>
+              <div className="flex items-center gap-1">
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 rounded-lg text-muted-foreground"
+                      data-testid="button-sparkles"
+                    >
+                      <Sparkles className="w-4 h-4" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="top">
+                    <p>AI Suggestions</p>
+                  </TooltipContent>
+                </Tooltip>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 rounded-lg text-muted-foreground"
+                      data-testid="button-attach"
+                    >
+                      <Plus className="w-4 h-4" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="top">
+                    <p>Attach File</p>
+                  </TooltipContent>
+                </Tooltip>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 rounded-lg text-muted-foreground"
+                      data-testid="button-settings"
+                    >
+                      <SlidersHorizontal className="w-4 h-4" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="top">
+                    <p>Chat Settings</p>
+                  </TooltipContent>
+                </Tooltip>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 rounded-lg text-muted-foreground"
+                      data-testid="button-history"
+                    >
+                      <History className="w-4 h-4" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="top">
+                    <p>Chat History</p>
+                  </TooltipContent>
+                </Tooltip>
+              </div>
+            </TooltipProvider>
             <div className="flex items-center gap-2">
               <Select
                 value={selectedModel}

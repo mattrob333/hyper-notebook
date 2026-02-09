@@ -509,6 +509,11 @@ export default function StudioPanel({
   
   // Show DocumentPanel when document is open (from context or activeView)
   if (documentPanelOpen || activeView === 'document' || activeView === 'email') {
+    // When opened via Email button (activeView === 'email'), default to email type
+    const effectiveType = activeView === 'email' && !documentPanelContext.content 
+      ? 'email' 
+      : documentPanelContext.documentType;
+    
     return (
       <DocumentPanel
         onBack={() => {
@@ -517,7 +522,7 @@ export default function StudioPanel({
         }}
         initialContent={documentPanelContext.content}
         initialTitle={documentPanelContext.title}
-        initialType={documentPanelContext.documentType}
+        initialType={effectiveType}
         initialRecipient={documentPanelContext.recipient}
         initialSubject={documentPanelContext.subject}
       />
@@ -948,10 +953,14 @@ export default function StudioPanel({
           <ScrollArea className="h-full px-2">
             <div className="px-2 space-y-2 py-4">
               {savedContent.length === 0 ? (
-                <div className="text-center py-8 text-muted-foreground">
-                  <FileText className="w-8 h-8 mx-auto mb-2 opacity-50" />
-                  <p className="text-sm">No notes yet</p>
-                  <p className="text-xs mt-1">Generate content to create notes</p>
+                <div className="text-center py-12 text-muted-foreground">
+                  <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center">
+                    <FileText className="w-8 h-8 text-primary/60" />
+                  </div>
+                  <p className="text-sm font-medium text-foreground/80">No notes yet</p>
+                  <p className="text-xs mt-2 max-w-[200px] mx-auto leading-relaxed">
+                    Generate content from your sources using the Studio tools above
+                  </p>
                 </div>
               ) : (
                 <>
@@ -1369,6 +1378,7 @@ export default function StudioPanel({
             <Button 
               onClick={handleCustomGenerate}
               disabled={generateMutation.isPending}
+              className="bg-emerald-600 hover:bg-emerald-700"
               data-testid="button-generate-custom"
             >
               {generateMutation.isPending ? (
@@ -1460,6 +1470,7 @@ export default function StudioPanel({
             <Button 
               onClick={handleConfigGenerate}
               disabled={generateMutation.isPending}
+              className="bg-emerald-600 hover:bg-emerald-700"
               data-testid="button-generate-config"
             >
               {generateMutation.isPending ? (

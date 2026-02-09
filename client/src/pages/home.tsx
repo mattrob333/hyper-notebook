@@ -1,9 +1,9 @@
 import { useState, useEffect, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useParams, useLocation } from "wouter";
-import { 
-  ResizablePanelGroup, 
-  ResizablePanel, 
+import {
+  ResizablePanelGroup,
+  ResizablePanel,
   ResizableHandle,
   type ImperativePanelHandle
 } from "@/components/ui/resizable";
@@ -16,29 +16,16 @@ import StudioPanel from "@/components/panels/StudioPanel";
 import SourceDetailView from "@/components/panels/SourceDetailView";
 import BrowserAgentMonitor from "@/components/browser/BrowserAgentMonitor";
 import { DocumentPanelProvider, useDocumentPanel } from "@/contexts/DocumentPanelContext";
+import { useIsMobile } from "@/hooks/use-mobile";
 import type { Source, ChatMessage, A2UIComponent, Notebook } from "@/lib/types";
 import type { DocumentType } from "@/components/studio/DocumentPanel";
-
-// Hook to detect mobile screen
-function useIsMobile() {
-  const [isMobile, setIsMobile] = useState(false);
-  
-  useEffect(() => {
-    const checkMobile = () => setIsMobile(window.innerWidth < 768);
-    checkMobile();
-    window.addEventListener('resize', checkMobile);
-    return () => window.removeEventListener('resize', checkMobile);
-  }, []);
-  
-  return isMobile;
-}
 
 function HomeContent() {
   const params = useParams<{ id: string }>();
   const [, navigate] = useLocation();
   const notebookId = params.id;
   const isMobile = useIsMobile();
-  
+
   const [isDarkMode, setIsDarkMode] = useState(true);
   const [selectedSourceId, setSelectedSourceId] = useState<string>();
   const [selectedSourceIds, setSelectedSourceIds] = useState<string[]>([]);
@@ -52,14 +39,14 @@ function HomeContent() {
   const [browserTotalSteps, setBrowserTotalSteps] = useState(0);
   const [browserUrl, setBrowserUrl] = useState('about:blank');
   const [messages, setMessages] = useState<ChatMessage[]>([]);
-  
+
   // Document panel context
   const documentPanel = useDocumentPanel();
-  
+
   // Track if sources panel is collapsed (when document is open)
   const [sourcesCollapsed, setSourcesCollapsed] = useState(false);
   const sourcesPanelRef = useRef<ImperativePanelHandle>(null);
-  
+
   // Toggle sources panel collapse
   const toggleSourcesCollapse = () => {
     if (sourcesPanelRef.current) {
@@ -71,7 +58,7 @@ function HomeContent() {
     }
     setSourcesCollapsed(!sourcesCollapsed);
   };
-  
+
   // Collapse sources when document opens
   useEffect(() => {
     if (documentPanel.isOpen && sourcesPanelRef.current && !sourcesCollapsed) {
@@ -96,8 +83,8 @@ function HomeContent() {
     queryKey: notebookId ? [`/api/notebooks/${notebookId}/sources`] : ['/api/sources'],
   });
 
-  const selectedSource = selectedSourceId 
-    ? sources.find(s => s.id === selectedSourceId) 
+  const selectedSource = selectedSourceId
+    ? sources.find(s => s.id === selectedSourceId)
     : undefined;
 
   useEffect(() => {
@@ -142,10 +129,10 @@ function HomeContent() {
   const handleNewMessage = async (content: string, response?: string, a2uiComponents?: A2UIComponent[]) => {
     // Check if we have a response OR a2ui components to display
     const hasResponse = response || (a2uiComponents && a2uiComponents.length > 0);
-    
+
     if (hasResponse) {
       const newMessages: ChatMessage[] = [];
-      
+
       // Only add user message if content is not empty
       if (content && content.trim()) {
         newMessages.push({
@@ -155,7 +142,7 @@ function HomeContent() {
           timestamp: new Date(),
         });
       }
-      
+
       // Always add assistant message with response or components
       newMessages.push({
         id: (Date.now() + 1).toString(),
@@ -164,7 +151,7 @@ function HomeContent() {
         a2uiComponents,
         timestamp: new Date(),
       });
-      
+
       console.log('Adding messages:', newMessages.length, 'with components:', a2uiComponents?.length || 0);
       setMessages(prev => [...prev, ...newMessages]);
     } else if (content && content.trim()) {
@@ -207,7 +194,7 @@ function HomeContent() {
             <span className="text-xs">Studio</span>
           </TabsTrigger>
         </TabsList>
-        
+
         <TabsContent value="sources" className="flex-1 m-0 overflow-hidden">
           <div className="h-full bg-sidebar overflow-hidden">
             <SourcesPanel
@@ -237,11 +224,11 @@ function HomeContent() {
             />
           </div>
         </TabsContent>
-        
+
         <TabsContent value="chat" className="flex-1 m-0 overflow-hidden">
           <div className="h-full bg-sidebar overflow-hidden">
             {selectedSource ? (
-              <SourceDetailView 
+              <SourceDetailView
                 source={selectedSource}
                 onClose={() => setSelectedSourceId(undefined)}
               />
@@ -256,7 +243,7 @@ function HomeContent() {
             )}
           </div>
         </TabsContent>
-        
+
         <TabsContent value="studio" className="flex-1 m-0 overflow-hidden">
           <div className="h-full bg-sidebar overflow-hidden">
             <StudioPanel
@@ -276,10 +263,10 @@ function HomeContent() {
   const renderDesktopLayout = () => (
     <div className="flex-1 p-4 overflow-hidden">
       <ResizablePanelGroup direction="horizontal" className="h-full gap-3">
-        <ResizablePanel 
+        <ResizablePanel
           ref={sourcesPanelRef}
-          defaultSize={20} 
-          minSize={4} 
+          defaultSize={20}
+          minSize={4}
           maxSize={30}
           collapsible={true}
           collapsedSize={4}
@@ -312,13 +299,13 @@ function HomeContent() {
             />
           </div>
         </ResizablePanel>
-        
+
         <ResizableHandle className="w-1 bg-transparent hover:bg-primary/20 transition-colors rounded-full" />
-        
+
         <ResizablePanel defaultSize={55} minSize={35}>
           <div className="h-full bg-sidebar rounded-2xl border border-sidebar-border overflow-hidden">
             {selectedSource ? (
-              <SourceDetailView 
+              <SourceDetailView
                 source={selectedSource}
                 onClose={() => setSelectedSourceId(undefined)}
               />
@@ -333,12 +320,12 @@ function HomeContent() {
             )}
           </div>
         </ResizablePanel>
-        
+
         <ResizableHandle className="w-1 bg-transparent hover:bg-primary/20 transition-colors rounded-full" />
-        
-        <ResizablePanel 
-          defaultSize={documentPanel.isOpen ? 55 : 25} 
-          minSize={documentPanel.isOpen ? 45 : 18} 
+
+        <ResizablePanel
+          defaultSize={documentPanel.isOpen ? 55 : 25}
+          minSize={documentPanel.isOpen ? 45 : 18}
           maxSize={documentPanel.isOpen ? 70 : 35}
         >
           <div className="h-full bg-sidebar rounded-2xl border border-sidebar-border overflow-hidden">
@@ -357,8 +344,8 @@ function HomeContent() {
 
   return (
     <div className="h-screen flex flex-col bg-background" data-testid="home-page">
-      <Navbar 
-        isDarkMode={isDarkMode} 
+      <Navbar
+        isDarkMode={isDarkMode}
         onToggleDarkMode={() => setIsDarkMode(!isDarkMode)}
         notebookName={notebook?.name}
         notebookId={notebookId}
@@ -367,7 +354,7 @@ function HomeContent() {
         onSelectNotebook={(id) => navigate(`/notebook/${id}`)}
         onCreateNotebook={() => navigate('/')}
       />
-      
+
       {isMobile ? renderMobileLayout() : renderDesktopLayout()}
 
       <BrowserAgentMonitor

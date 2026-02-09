@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, jsonb, timestamp, integer, boolean } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, jsonb, timestamp, integer, boolean, index } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -54,7 +54,9 @@ export const sources = pgTable("sources", {
   summary: text("summary"),
   metadata: jsonb("metadata").$type<Record<string, any>>(),
   createdAt: timestamp("created_at").defaultNow(),
-});
+}, (table) => [
+  index("sources_notebook_idx").on(table.notebookId),
+]);
 
 export const insertSourceSchema = createInsertSchema(sources).omit({ id: true, createdAt: true }).extend({
   type: z.enum(['url', 'pdf', 'text', 'audio', 'video', 'csv']),
@@ -102,7 +104,9 @@ export const feeds = pgTable("feeds", {
   itemCount: integer("item_count").default(0),
   isActive: boolean("is_active").default(true),
   createdAt: timestamp("created_at").defaultNow(),
-});
+}, (table) => [
+  index("feeds_notebook_idx").on(table.notebookId),
+]);
 
 export const insertFeedSchema = createInsertSchema(feeds).omit({ id: true, createdAt: true, lastFetched: true, itemCount: true });
 export type InsertFeed = z.infer<typeof insertFeedSchema>;
@@ -110,6 +114,7 @@ export type Feed = typeof feeds.$inferSelect;
 
 export const notes = pgTable("notes", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  notebookId: varchar("notebook_id").references(() => notebooks.id, { onDelete: 'cascade' }),
   title: text("title").notNull(),
   content: text("content").notNull(),
   sourceIds: text("source_ids").array(),
@@ -126,7 +131,9 @@ export const conversations = pgTable("conversations", {
   title: text("title"),
   model: text("model").default("gpt-4.1"),
   createdAt: timestamp("created_at").defaultNow(),
-});
+}, (table) => [
+  index("conversations_notebook_idx").on(table.notebookId),
+]);
 
 export const insertConversationSchema = createInsertSchema(conversations).omit({ id: true, createdAt: true });
 export type InsertConversation = z.infer<typeof insertConversationSchema>;
@@ -134,18 +141,20 @@ export type Conversation = typeof conversations.$inferSelect;
 
 export const messages = pgTable("messages", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  conversationId: varchar("conversation_id").notNull().references(() => conversations.id),
+  conversationId: varchar("conversation_id").notNull().references(() => conversations.id, { onDelete: 'cascade' }),
   role: text("role").notNull().$type<'user' | 'assistant' | 'system'>(),
   content: text("content").notNull(),
   a2uiComponents: jsonb("a2ui_components").$type<A2UIComponent[]>(),
   createdAt: timestamp("created_at").defaultNow(),
-});
+}, (table) => [
+  index("messages_conversation_idx").on(table.conversationId),
+]);
 
 export const insertMessageSchema = createInsertSchema(messages).omit({ id: true, createdAt: true }).extend({
   role: z.enum(['user', 'assistant', 'system']),
   a2uiComponents: z.array(z.object({
     id: z.string(),
-    type: z.enum(['card', 'chart', 'table', 'list', 'code', 'quote', 'image', 'accordion', 'tabs', 'progress', 'badge', 'button', 'link', 'mindmap', 'timeline', 'slides', 'audio_transcript']),
+    type: z.enum(['card', 'chart', 'table', 'list', 'code', 'quote', 'image', 'accordion', 'tabs', 'progress', 'badge', 'button', 'link', 'mindmap', 'timeline', 'slides', 'audio_transcript', 'report_suggestion']),
     parentId: z.string().optional(),
     properties: z.record(z.any()),
     data: z.any().optional(),
@@ -243,7 +252,9 @@ export const generatedContent = pgTable("generated_content", {
   content: jsonb("content").$type<any>().notNull(),
   sourceIds: text("source_ids").array(),
   createdAt: timestamp("created_at").defaultNow(),
-});
+}, (table) => [
+  index("generated_content_notebook_idx").on(table.notebookId),
+]);
 
 // Define base schema and then make content required
 const baseGeneratedContentSchema = createInsertSchema(generatedContent).omit({ id: true, createdAt: true }).extend({
